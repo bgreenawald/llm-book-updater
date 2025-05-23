@@ -1,0 +1,13 @@
+[project]
+name = "llm-book-updater"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "marker-pdf[full]>=1.7.3",
+    "openai>=1.82.0",
+    "streamlit>=1.45.1",
+    "streamlit-ace>=0.1.1",
+    "tqdm>=4.67.1",
+]
