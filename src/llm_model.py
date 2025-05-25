@@ -1,49 +1,56 @@
 import os
-from abc import ABC
+from enum import Enum
 
 from loguru import logger
 from openai import OpenAI
 
 from src.logging_config import setup_logging
 
-# Initialize module-level logger
+# Initialize module‐level logger
 logger = setup_logging("llm_model")
 
 
-class LlmModel(ABC):
+class ModelType(Enum):
+    GROK_3_MINI = "grok-3-mini"
+    GEMINI_FLASH = "gemini-2.5-flash-preview-05-20"
+    GEMINI_PRO = "gemini-2.5-pro-preview-05-06"
+
+
+class LlmModel:
     """
-    Abstract base class for LLM clients, wraps OpenAI chat completion calls
-    with retries, logging, and response validation.
+    LLM client backed by OpenRouter. Wraps OpenAI-compatible chat completions
+    with logging and validation.
     """
+
+    DEFAULT_BASE_URL = "https://openrouter.ai/v1"
+    DEFAULT_API_ENV = "OPENROUTER_API_KEY"
 
     def __init__(
         self,
-        api_key_env: str,
-        model_id: str,
-        base_url: str,
+        model: ModelType,
+        api_key_env: str = DEFAULT_API_ENV,
+        base_url: str = DEFAULT_BASE_URL,
     ) -> None:
         """
         Args:
-            api_key_env: Name of the environment variable holding the API key.
-            model_id: Identifier of the model to use.
-            base_url: Base API URL.
-
-        Raises:
-            ValueError: If the API key is missing.
+            model:        Which model to call (from ModelType).
+            api_key_env:  Name of the ENV var holding your OpenRouter API key.
+            base_url:     OpenRouter base endpoint.
         """
-        logger.info(f"Initializing LLM client: model={model_id}, base_url={base_url}")
+        logger.info(
+            f"Initializing LLM client: model={model.value}, base_url={base_url}"
+        )
         api_key = os.getenv(api_key_env)
         if not api_key:
             msg = f"Missing environment variable: {api_key_env}"
             logger.error(msg)
             raise ValueError(msg)
 
-        self.model_id = model_id
+        self.model_id = model.value
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        logger.success(f"LLM client ready: {model_id}")
+        logger.success(f"LLM client ready: {self.model_id}")
 
     def _log_prompt(self, role: str, content: str) -> None:
-        """Log a truncated version of the prompt for debugging."""
         preview = content if len(content) <= 200 else content[:200] + "..."
         logger.trace(f"{role} prompt: {preview}")
 
@@ -54,19 +61,13 @@ class LlmModel(ABC):
         **kwargs,
     ) -> str:
         """
-        Call the chat completion endpoint.
-
-        Args:
-            system_prompt: System-level instructions.
-            user_prompt: User message content.
-            **kwargs: Additional parameters for the API (e.g., max_tokens, temperature).
+        Make a chat completion call.
 
         Returns:
-            The assistant's reply content as a string.
+            assistant reply content.
 
         Raises:
-            ValueError: On invalid or empty API responses.
-            APIError: On API failures.
+            ValueError on empty/malformed response.
         """
         logger.debug(f"Starting chat_completions for model={self.model_id}")
         self._log_prompt("System", system_prompt)
@@ -81,7 +82,6 @@ class LlmModel(ABC):
             **kwargs,
         )
 
-        # Basic validation of response structure
         choices = getattr(resp, "choices", None)
         if not choices or not choices[0].message.content:
             raise ValueError(f"Empty or malformed response: {resp}")
@@ -90,7 +90,6 @@ class LlmModel(ABC):
         finish_reason = choices[0].finish_reason or "unknown"
         usage = getattr(resp, "usage", {})
 
-        # Log usage and content preview
         details = {
             "id": getattr(resp, "id", ""),
             "model": getattr(resp, "model", self.model_id),
@@ -113,29 +112,4 @@ class LlmModel(ABC):
 
         return content
 
-
-# Concrete model clients
-class Grok3Mini(LlmModel):
-    def __init__(self):
-        super().__init__("GROK_API_KEY", "grok-3-mini", "https://api.x.ai/v1")
-        logger.info("Grok3Mini ready")
-
-
-class Gemini2Flash(LlmModel):
-    def __init__(self):
-        super().__init__(
-            "GEMINI_API_KEY",
-            "gemini-2.5-flash-preview-05-20",
-            "https://generativelanguage.googleapis.com/v1beta/openai/",
-        )
-        logger.info("Gemini2Flash ready")
-
-
-class Gemini2Pro(LlmModel):
-    def __init__(self):
-        super().__init__(
-            "GEMINI_API_KEY",
-            "gemini-2.5-pro-preview-05-06",
-            "https://generativelanguage.googleapis.com/v1beta/openai/",
-        )
-        logger.info("Gemini2Pro ready")
+        return content
