@@ -28,12 +28,14 @@ class LlmModel:
     def __init__(
         self,
         model: ModelType,
+        temperature: float = 0.2,
         api_key_env: str = DEFAULT_API_ENV,
         base_url: str = DEFAULT_BASE_URL,
     ) -> None:
         """
         Args:
             model:        Which model to call (from ModelType).
+            temperature:  Temperature for sampling.
             api_key_env:  Name of the ENV var holding your OpenRouter API key.
             base_url:     OpenRouter base endpoint.
         """
@@ -46,9 +48,27 @@ class LlmModel:
             logger.error(msg)
             raise ValueError(msg)
 
+        self.model_type = model
         self.model_id = model.value
+        self.temperature = temperature
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         logger.success(f"LLM client ready: {self.model_id}")
+
+    @classmethod
+    def create(
+        cls,
+        model_type: ModelType,
+        temperature: float = 0.2,
+        api_key_env: str = DEFAULT_API_ENV,
+        base_url: str = DEFAULT_BASE_URL,
+    ) -> "LlmModel":
+        """Create a new LlmModel instance with the specified configuration."""
+        return cls(
+            model=model_type,
+            temperature=temperature,
+            api_key_env=api_key_env,
+            base_url=base_url,
+        )
 
     def _log_prompt(self, role: str, content: str) -> None:
         preview = content if len(content) <= 200 else content[:200] + "..."
@@ -109,7 +129,5 @@ class LlmModel:
             logger.warning(
                 "Response truncated: consider increasing max_tokens or reviewing model limits"
             )
-
-        return content
 
         return content
