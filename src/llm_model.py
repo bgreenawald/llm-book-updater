@@ -11,9 +11,9 @@ logger = setup_logging("llm_model")
 
 
 class ModelType(Enum):
-    GROK_3_MINI = "grok-3-mini"
-    GEMINI_FLASH = "gemini-2.5-flash-preview-05-20"
-    GEMINI_PRO = "gemini-2.5-pro-preview-05-06"
+    GROK_3_MINI = "x-ai/grok-3-mini-beta"
+    GEMINI_FLASH = "google/gemini-2.5-flash-preview-05-20"
+    GEMINI_PRO = "google/gemini-2.5-pro-preview"
 
 
 class LlmModel:
@@ -22,7 +22,7 @@ class LlmModel:
     with logging and validation.
     """
 
-    DEFAULT_BASE_URL = "https://openrouter.ai/v1"
+    DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
     DEFAULT_API_ENV = "OPENROUTER_API_KEY"
 
     def __init__(
@@ -114,11 +114,6 @@ class LlmModel:
             "id": getattr(resp, "id", ""),
             "model": getattr(resp, "model", self.model_id),
             "finish_reason": finish_reason,
-            "tokens": {
-                "prompt": usage.get("prompt_tokens", 0),
-                "completion": usage.get("completion_tokens", 0),
-                "total": usage.get("total_tokens", 0),
-            },
         }
         logger.debug(
             "Chat completion succeeded",
