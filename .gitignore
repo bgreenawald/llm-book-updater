@@ -3,3 +3,5 @@
 # Python files
 *.pyc
 .python-version
+/logs
+/.vscode
