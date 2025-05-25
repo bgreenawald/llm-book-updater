@@ -54,3 +54,21 @@ class Grok3Mini(LlmModel):
             model_id="grok-3-mini",
             base_url="https://api.x.ai/v1",
         )
+
+
+class Gemini2Flash(LlmModel):
+    def __init__(self):
+        super().__init__(
+            api_key_environment_variable_name="GEMINI_API_KEY",
+            model_id="gemini-2.5-flash-preview-05-20",
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+
+
+class Gemini2Pro(LlmModel):
+    def __init__(self):
+        super().__init__(
+            api_key_environment_variable_name="GEMINI_API_KEY",
+            model_id="gemini-2.5-pro-preview-05-06",
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
