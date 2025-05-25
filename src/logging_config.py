@@ -1,4 +1,5 @@
 """Centralized logging configuration for the application."""
+
 import sys
 from pathlib import Path
 
@@ -27,14 +28,16 @@ def setup_logging(log_name: str = "app"):
     )
 
     # Add stdout handler if not already added
-    if not any(handler.sink == sys.stdout for handler in logger._core.handlers.values()):
+    if not any(
+        handler._sink == sys.stdout for handler in logger._core.handlers.values()
+    ):
         logger.add(
             sys.stdout,
             level="INFO",
             format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                   "<level>{level: <8}</level> | "
-                   "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-                   "<level>{message}</level>"
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+            "<level>{message}</level>",
         )
 
     return logger
