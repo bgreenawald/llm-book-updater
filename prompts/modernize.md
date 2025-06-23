@@ -9,11 +9,11 @@ The goal is not to summarize or rewrite the ideas, but to **reconstruct the pass
 * **Modernize phrasing** for clarity, tone, and rhythm without losing the author’s voice.
 * **Lightly trim** the text where appropriate—eliminate redundancy, tighten wordy constructions, and simplify overly academic or outdated phrasing.
 * Do **not omit important content or ideas**. This is not a summary—your job is to preserve depth while improving flow.
-* If a sentence or phrase is especially **important, rhetorically powerful, or widely quoted**, preserve it **verbatim** using Markdown blockquote syntax. Make sure there is a blank line before and after the quote.
+* If a sentence or phrase is especially **important, rhetorically powerful, or widely quoted**, preserve it **verbatim** using Markdown blockquote syntax. Make sure there is a blank line before and after the quote. Surround the quote with `**Quote: **` and `**End quote.**`.
 
   ```markdown
 
-  > "Each person possesses an inviolability founded on justice that even the welfare of society as a whole cannot override."
+  > **Quote: ** "Each person possesses an inviolability founded on justice that even the welfare of society as a whole cannot override." **End quote.**
 
   ```
 * Do **not add new section headers**, subheadings, or breaks that are not present in the original.
