@@ -219,8 +219,8 @@ class LlmPhase:
     def _format_user_message(self, new_block: str, original_block: str) -> str:
         if self.user_prompt:
             return self.user_prompt.format(
-                new_block=new_block,
-                original_block=original_block,
+                transformed_passage=new_block,
+                orignal_passage=original_block,
             )
         return new_block
 
