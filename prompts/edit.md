@@ -12,7 +12,7 @@ Guidelines for the provided Markdown section:
    * Reorganize or merge ideas if it enhances readability.
    * Condense or expand text judiciously to balance completeness and accessibility.
 6. **Clarity & Accessibility**: Remove redundancies, filler words, and overly dense language. Simplify complex passages, improve pacing, and ensure the text is approachable without losing essential detail.
-7. **Targeted Length Reduction**: Aim to shorten the section by approximately 15%-35% in word count. To achieve this:
+7. **Targeted Length Reduction**: Aim to shorten the section by approximately 25%-50% in word count. This length reduction may vary across the section, depending on how important certain parts are. In other words, very important parts may recieve less reduction, while less important one may recieve more. To achieve this:
    * Eliminate non-essential examples, parenthetical asides, and digressions.
    * Trim adjectives and adverbs that don’t add core meaning.
    * Focus on tightening sentences without losing critical information or voice.
