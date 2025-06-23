@@ -10,6 +10,7 @@ class PhaseType(Enum):
     MODERNIZE = auto()
     EDIT = auto()
     ANNOTATE = auto()
+    FINAL = auto()
 
 
 @dataclass
@@ -21,6 +22,7 @@ class PhaseConfig:
     model_type: ModelType = ModelType.GEMINI_FLASH
     temperature: float = 0.2
     system_prompt_path: Optional[Path] = None
+    user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None
     max_workers: Optional[int] = None
 
@@ -63,6 +65,11 @@ class RunConfig:
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
                 ),
+                PhaseType.FINAL: PhaseConfig(
+                    phase_type=PhaseType.FINAL,
+                    model_type=ModelType.GEMINI_PRO,
+                    temperature=0.2,
+                ),
             }
 
     def get_phase_order(self) -> List[PhaseType]:
@@ -71,6 +78,7 @@ class RunConfig:
             PhaseType.MODERNIZE,
             PhaseType.EDIT,
             PhaseType.ANNOTATE,
+            PhaseType.FINAL,
         ]
 
     def get_phase_config(self, phase_type: PhaseType) -> PhaseConfig:
