@@ -19,17 +19,21 @@ class LlmPhase:
         name: str,
         input_file_path: Path,
         output_file_path: Path,
+        original_file_path: Path,
         system_prompt_path: Path,
         book_name: str,
         author_name: str,
         model: LlmModel,
+        user_prompt_path: Path = None,
         temperature: float = 0.2,
         max_workers: int = None,
     ):
         logger.info(f"Initializing LlmPhase: {name}")
         logger.debug(f"Input file: {input_file_path}")
+        logger.debug(f"Original file: {original_file_path}")
         logger.debug(f"Output file: {output_file_path}")
         logger.debug(f"System prompt path: {system_prompt_path}")
+        logger.debug(f"User prompt path: {user_prompt_path}")
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
         """
@@ -41,20 +45,24 @@ class LlmPhase:
             name (str): Name of the processing phase
             input_file_path (Path): Path to the input Markdown file
             output_file_path (Path): Path for the processed output
+            original_file_path (Path): Path for the original file (pre any transformations)
             system_prompt_path (Path): Path to the system prompt file
             book_name (str): Name of the book
             author_name (str): Name of the author
             model (LlmModel): LLM model instance
+            user_prompt_path (LlmModel, optional): Path to the user prompt file. Defaults to None
             temperature (float, optional): LLM temperature. Defaults to 0.2.
             max_workers (int, optional): Maximum worker threads for parallel processing. Defaults to None (executor default).
         """
         self.name = name
         self.input_file_path = input_file_path
         self.output_file_path = output_file_path
+        self.original_file_path = original_file_path
         self.system_prompt_path = system_prompt_path
         self.book_name = book_name
         self.author_name = author_name
         self.model = model
+        self.user_prompt_path = user_prompt_path
         self.temperature = temperature
         self.max_workers = max_workers
 
@@ -63,8 +71,12 @@ class LlmPhase:
         try:
             self.input_text = self._read_input_file()
             logger.debug(f"Read {len(self.input_text)} characters from input file")
+            self.original_text = self._read_original_file()
+            logger.debug(f"Read {len(self.original_text)} characters from original file")
             self.system_prompt = self._read_system_prompt()
             logger.debug("System prompt loaded successfully")
+            self.user_prompt = self._read_user_prompt()
+            logger.debug("User prompt loaded successfully")
         except Exception as e:
             logger.error(f"Failed to initialize LlmPhase: {str(e)}")
             raise
@@ -90,6 +102,29 @@ class LlmPhase:
             raise
         except IOError as e:
             logger.error(f"Error reading input file {self.input_file_path}: {str(e)}")
+            raise
+
+    def _read_original_file(self) -> str:
+        """
+        Reads the content of the original file and returns it as a string.
+
+        Returns:
+            str: Content of the original file
+
+        Raises:
+            FileNotFoundError: If the original file does not exist
+            IOError: If there is an error reading the file
+        """
+        try:
+            with self.original_file_path.open("r", encoding="utf-8") as f:
+                content = f.read()
+                logger.debug(f"Successfully read original file: {self.original_file_path}")
+                return content
+        except FileNotFoundError:
+            logger.error(f"Original file not found: {self.original_file_path}")
+            raise
+        except IOError as e:
+            logger.error(f"Error reading original file {self.original_file_path}: {str(e)}")
             raise
 
     def _write_output_file(self, content: str) -> None:
@@ -152,13 +187,51 @@ class LlmPhase:
             logger.error(f"Invalid placeholder in system prompt template: {str(e)}")
             raise
 
-    def _process_block(self, block: str, **kwargs) -> str:
+    def _read_user_prompt(self) -> str:
+        """
+        Reads the content of the user prompt file (if it exists) and returns it as a string.
+
+        Returns:
+            str: Content of the system prompt file, if it exists, or an empty string.
+
+        Raises:
+            FileNotFoundError: If the system prompt file is defined but does not exist
+            IOError: If there is an error reading the file
+        """
+        if not self.user_prompt_path:
+            return ""
+        try:
+            with self.user_prompt_path.open("r", encoding="utf-8") as f:
+                content = f.read()
+                logger.debug(f"Read user prompt from {self.user_prompt_path}")
+                logger.trace(f"Formatted user prompt: {formatted_content[:200]}...")
+                return content
+
+        except FileNotFoundError:
+            logger.error(f"User prompt file not found: {self.user_prompt_path}")
+            raise
+        except IOError as e:
+            logger.error(
+                f"Error reading user prompt file {self.user_prompt_path}: {str(e)}"
+            )
+            raise
+
+    def _format_user_message(self, new_block: str, original_block: str) -> str:
+        if self.user_prompt:
+            return self.user_prompt.format(
+                new_block=new_block,
+                original_block=original_block,
+            )
+        return new_block
+
+    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single Markdown block: extract header and body, run LLM on the body if present,
         and return the formatted block with header and processed content.
 
         Args:
-            block (str): The markdown block to process
+            new_block (str): The markdown block to process
+            original_block (str): The original counterpart to the new block
             **kwargs: Additional arguments to pass to the chat completion
 
         Returns:
@@ -172,11 +245,18 @@ class LlmPhase:
                 else f"Block content: {block}"
             )
 
-            lines = block.strip().split("\n", 1)
-            header = lines[0].strip()
-            body = lines[1].strip() if len(lines) > 1 else ""
+            def _get_header_and_body(block: str):  
+                lines = block.strip().split("\n", 1)
+                header = lines[0].strip()
+                body = lines[1].strip() if len(lines) > 1 else ""
+                return header, body
 
-            logger.debug(f"Processing block with header: {header}")
+            new_header, new_body = _get_header_and_body(new_block)
+            original_header, original_body = _get_header_and_body(original_block)
+
+            body = self._format_user_message(new_body, original_body)
+
+            logger.debug(f"Processing block with header: {new_header}")
 
             if body:
                 logger.debug(f"Processing block body (length: {len(body)})")
@@ -186,17 +266,17 @@ class LlmPhase:
                     temperature=self.temperature,
                     **kwargs,
                 )
-                logger.debug(f"Successfully processed block: {header}")
-                return f"{header}\n\n{processed_body}\n\n"
+                logger.debug(f"Successfully processed block: {new_header}")
+                return f"{new_header}\n\n{processed_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
-                return f"{header}\n\n"
+                return f"{new_header}\n\n"
 
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
             # Return the original block to allow processing to continue
-            return f"{header}\n\n{body if body else ''}\n\n"
+            return f"{new_header}\n\n{body if body else ''}\n\n"
 
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
@@ -212,20 +292,26 @@ class LlmPhase:
 
         try:
             pattern = r"(#+\s.*?)(?=\n#+\s|\Z)"
-            blocks = re.findall(pattern, self.input_text, flags=re.DOTALL)
-            logger.info(f"Found {len(blocks)} markdown blocks to process")
+            new_blocks = re.findall(pattern, self.input_text, flags=re.DOTALL)
+            original_blocks = re.findall(pattern, self.original_text, flags=re.DOTALL)
+            logger.info(f"Found {len(new_blocks)} new markdown blocks to process")
+            logger.info(f"Found {len(original_blocks)} markdown blocks")
 
-            if not blocks:
+            if not new_blocks:
                 logger.warning("No markdown blocks found in the input text")
                 self.content = ""
                 return
+            elif len(new_blocks) != len(original_blocks):
+                raise ValueError(f"Block length mismatch: {len(new_blocks)} != {len(original_blocks)}")
+
+            blocks = zip(new_blocks, original_blocks)
 
             # Prepare for parallel processing
             func = partial(self._process_block, **kwargs)
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 processed_blocks = list(
                     tqdm(
-                        executor.map(func, blocks),
+                        executor.map(lambda args: func(*args), blocks),
                         total=len(blocks),
                         desc=f"Processing {self.name} blocks",
                     )
