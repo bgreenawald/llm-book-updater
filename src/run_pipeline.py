@@ -11,6 +11,7 @@ def create_default_run(
     book_name: str,
     author_name: str,
     input_file: str,
+    original_file: str,
     output_dir: str,
     custom_phases: Optional[Dict[PhaseType, Dict]] = None,
 ) -> RunConfig:
@@ -21,6 +22,7 @@ def create_default_run(
         book_name: Name of the book
         author_name: Name of the author
         input_file: Path to the input file
+        original_file: Path to the original file
         output_dir: Directory to store output files
         custom_phases: Dictionary of phase overrides
             Example: {
