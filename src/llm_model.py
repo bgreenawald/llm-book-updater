@@ -11,9 +11,11 @@ logger = setup_logging("llm_model")
 
 
 class ModelType(Enum):
-    GROK_3_MINI = "x-ai/grok-3-mini-beta"
-    GEMINI_FLASH = "google/gemini-2.5-flash-preview-05-20"
-    GEMINI_PRO = "google/gemini-2.5-pro-preview"
+    GROK_3_MINI = "x-ai/grok-3-mini"
+    GEMINI_FLASH = "google/gemini-2.5-flash"
+    GEMINI_PRO = "google/gemini-2.5-pro"
+    DEEPSEEK = "deepseek/deepseek-r1-0528"
+    OPENAI_04_MINI = "openai/o4-mini"
 
 
 class LlmModel:

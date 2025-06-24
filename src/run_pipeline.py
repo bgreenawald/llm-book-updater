@@ -4,6 +4,7 @@ from typing import Dict, Optional
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
+from src.llm_model import ModelType
 from src.pipeline import Pipeline
 
 
@@ -37,6 +38,7 @@ def create_default_run(
     """
     # Convert string paths to Path objects
     input_path = Path(input_file)
+    original_path = Path(original_file)
     output_path = Path(output_dir)
 
     # Create base configuration
@@ -44,6 +46,7 @@ def create_default_run(
         book_name=book_name,
         author_name=author_name,
         input_file=input_path,
+        original_file=original_path,
         output_dir=output_path,
     )
 
@@ -79,10 +82,18 @@ if __name__ == "__main__":
         input_file=r"books\On Liberty\markdown\Mill, On Liberty\Mill, On Liberty Clean.md",
         output_dir=r"books\On Liberty\markdown\Mill, On Liberty",
         custom_phases={
-            # Example: Disable the edit phase
-            # PhaseType.EDIT: {'enabled': False},
-            # Example: Use a different model for annotation
-            # PhaseType.ANNOTATE: {'model_type': ModelType.GEMINI_PRO},
+            PhaseType.MODERNIZE: {
+                "model_type": ModelType.OPENAI_04_MINI,
+            },
+            PhaseType.EDIT: {
+                "model_type": ModelType.OPENAI_04_MINI,
+            },
+            PhaseType.ANNOTATE: {
+                "model_type": ModelType.OPENAI_04_MINI,
+            },
+            PhaseType.FINAL: {
+                "model_type": ModelType.OPENAI_04_MINI,
+            },
         },
     )
 

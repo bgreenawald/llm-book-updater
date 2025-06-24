@@ -27,6 +27,7 @@ class LlmPhase:
         user_prompt_path: Path = None,
         temperature: float = 0.2,
         max_workers: int = None,
+        reasoning: dict = None,
     ):
         logger.info(f"Initializing LlmPhase: {name}")
         logger.debug(f"Input file: {input_file_path}")
@@ -65,6 +66,10 @@ class LlmPhase:
         self.user_prompt_path = user_prompt_path
         self.temperature = temperature
         self.max_workers = max_workers
+        self.reasoning = reasoning or {}
+
+        if self.reasoning:
+            logger.debug(f"Reasoning configuration: {self.reasoning}")
 
         # Read file contents and prompt
         logger.info("Reading input file and system prompt")
@@ -72,7 +77,9 @@ class LlmPhase:
             self.input_text = self._read_input_file()
             logger.debug(f"Read {len(self.input_text)} characters from input file")
             self.original_text = self._read_original_file()
-            logger.debug(f"Read {len(self.original_text)} characters from original file")
+            logger.debug(
+                f"Read {len(self.original_text)} characters from original file"
+            )
             self.system_prompt = self._read_system_prompt()
             logger.debug("System prompt loaded successfully")
             self.user_prompt = self._read_user_prompt()
@@ -80,6 +87,10 @@ class LlmPhase:
         except Exception as e:
             logger.error(f"Failed to initialize LlmPhase: {str(e)}")
             raise
+
+
+    def __str__(self):
+        return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
 
     def _read_input_file(self) -> str:
         """
@@ -118,13 +129,17 @@ class LlmPhase:
         try:
             with self.original_file_path.open("r", encoding="utf-8") as f:
                 content = f.read()
-                logger.debug(f"Successfully read original file: {self.original_file_path}")
+                logger.debug(
+                    f"Successfully read original file: {self.original_file_path}"
+                )
                 return content
         except FileNotFoundError:
             logger.error(f"Original file not found: {self.original_file_path}")
             raise
         except IOError as e:
-            logger.error(f"Error reading original file {self.original_file_path}: {str(e)}")
+            logger.error(
+                f"Error reading original file {self.original_file_path}: {str(e)}"
+            )
             raise
 
     def _write_output_file(self, content: str) -> None:
@@ -240,12 +255,12 @@ class LlmPhase:
         try:
             logger.debug("Processing markdown block")
             logger.trace(
-                f"Block content: {block[:200]}..."
-                if len(block) > 200
-                else f"Block content: {block}"
+                f"Block content: {new_block[:200]}..."
+                if len(new_block) > 200
+                else f"Block content: {new_block}"
             )
 
-            def _get_header_and_body(block: str):  
+            def _get_header_and_body(block: str):
                 lines = block.strip().split("\n", 1)
                 header = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
@@ -264,6 +279,7 @@ class LlmPhase:
                     system_prompt=self.system_prompt,
                     user_prompt=body,
                     temperature=self.temperature,
+                    reasoning=self.reasoning,
                     **kwargs,
                 )
                 logger.debug(f"Successfully processed block: {new_header}")
@@ -302,7 +318,8 @@ class LlmPhase:
                 self.content = ""
                 return
             elif len(new_blocks) != len(original_blocks):
-                raise ValueError(f"Block length mismatch: {len(new_blocks)} != {len(original_blocks)}")
+                msg = f"Block length mismatch: {len(new_blocks)} != {len(original_blocks)}"
+                raise ValueError(msg)
 
             blocks = zip(new_blocks, original_blocks)
 
@@ -312,7 +329,7 @@ class LlmPhase:
                 processed_blocks = list(
                     tqdm(
                         executor.map(lambda args: func(*args), blocks),
-                        total=len(blocks),
+                        total=len(list(blocks)),
                         desc=f"Processing {self.name} blocks",
                     )
                 )

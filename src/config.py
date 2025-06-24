@@ -21,6 +21,7 @@ class PhaseConfig:
     enabled: bool = True
     model_type: ModelType = ModelType.GEMINI_FLASH
     temperature: float = 0.2
+    reasoning: Optional[Dict[str, Dict[str, str]]] = None
     system_prompt_path: Optional[Path] = None
     user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None
@@ -41,6 +42,7 @@ class RunConfig:
     author_name: str
     input_file: Path
     output_dir: Path
+    original_file: Path
     phases: Dict[PhaseType, PhaseConfig] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -54,21 +56,28 @@ class RunConfig:
                     phase_type=PhaseType.MODERNIZE,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
+                    reasoning={"effort": "high"},
                 ),
                 PhaseType.EDIT: PhaseConfig(
                     phase_type=PhaseType.EDIT,
-                    model_type=ModelType.GEMINI_PRO,
+                    model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
+                    reasoning={"effort": "high"},
                 ),
                 PhaseType.ANNOTATE: PhaseConfig(
                     phase_type=PhaseType.ANNOTATE,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
+                    reasoning={"effort": "high"},
                 ),
                 PhaseType.FINAL: PhaseConfig(
                     phase_type=PhaseType.FINAL,
-                    model_type=ModelType.GEMINI_PRO,
+                    model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
+                    reasoning={"effort": "high"},
+                    user_prompt_path=Path(
+                        "./prompts/final_user_prompt.md"
+                    ),
                 ),
             }
 
