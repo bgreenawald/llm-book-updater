@@ -56,28 +56,22 @@ class RunConfig:
                     phase_type=PhaseType.MODERNIZE,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
-                    reasoning={"effort": "high"},
                 ),
                 PhaseType.EDIT: PhaseConfig(
                     phase_type=PhaseType.EDIT,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
-                    reasoning={"effort": "high"},
                 ),
                 PhaseType.ANNOTATE: PhaseConfig(
                     phase_type=PhaseType.ANNOTATE,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
-                    reasoning={"effort": "high"},
                 ),
                 PhaseType.FINAL: PhaseConfig(
                     phase_type=PhaseType.FINAL,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
-                    reasoning={"effort": "high"},
-                    user_prompt_path=Path(
-                        "./prompts/final_user_prompt.md"
-                    ),
+                    user_prompt_path=Path("./prompts/final_user_prompt.md"),
                 ),
             }
 
