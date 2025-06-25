@@ -33,7 +33,7 @@ You should consider making an edit when you spot one of these opportunities. The
 3.  **Execute Judicious Edits**:
     * When you see an opportunity, make a thoughtful, targeted change. Your edits should be elegant and feel like a natural improvement.
     * The goal is always to **enhance the transformed text**. Use the `Original` for inspiration and accuracy, but express the final change in clear, modern prose.
-    * **If you determine a passage already achieves the right balance, actively decide to leave it unchanged.** Inaction is a valid and often correct choice.
+    * **If you determine a passage already achieves the right balance, actively decide to leave it unchanged.** Inaction is a valid choice.
 
 4.  **Final Annotation Check**:
 
