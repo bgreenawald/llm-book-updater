@@ -11,6 +11,7 @@ class PhaseType(Enum):
     EDIT = auto()
     ANNOTATE = auto()
     FINAL = auto()
+    FORMATTING = auto()
 
 
 @dataclass
@@ -73,6 +74,12 @@ class RunConfig:
                     temperature=0.2,
                     user_prompt_path=Path("./prompts/final_user_prompt.md"),
                 ),
+                PhaseType.FORMATTING: PhaseConfig(
+                    phase_type=PhaseType.FORMATTING,
+                    model_type=ModelType.GEMINI_FLASH,
+                    temperature=0.2,
+                    system_prompt_path=Path("./prompts/formatting.md"),
+                ),
             }
 
     def get_phase_order(self) -> List[PhaseType]:
@@ -82,6 +89,7 @@ class RunConfig:
             PhaseType.EDIT,
             PhaseType.ANNOTATE,
             PhaseType.FINAL,
+            PhaseType.FORMATTING,
         ]
 
     def get_phase_config(self, phase_type: PhaseType) -> PhaseConfig:

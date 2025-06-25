@@ -35,25 +35,15 @@ You should consider making an edit when you spot one of these opportunities. The
     * The goal is always to **enhance the transformed text**. Use the `Original` for inspiration and accuracy, but express the final change in clear, modern prose.
     * **If you determine a passage already achieves the right balance, actively decide to leave it unchanged.** Inaction is a valid and often correct choice.
 
-4.  **Final Formatting & Annotation Check**:
-    * Perform a final, quick check to ensure all Markdown structures (headers, images, quotes, annotations) are perfectly formatted according to the required `> **Quote:** ...` and `> **Annotation:** ...` rules. Ensure that if a quote and an annotation come back-to-back, that the quote comes first.
-        ```markdown
-        This is the original paragraph containing a difficult concept with a quote at the end.
+4.  **Final Annotation Check**:
 
-        > **Quote:** "An important quote from the text." **End quote.**
-
-        > **Annotation:** This is a brief, clarifying note about the difficult concept, but coming after the quote. **End annotation.**
-
-        This is the next paragraph of the original text.
-        ```
     * Review existing annotations. Are they still clear, necessary, and concise? You may remove them if your edits have made them redundant.
 
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Enhance, Don't Revert**: Your allegiance is to creating the best possible modern version. Use the `Original` for guidance on meaning and voice, but all your edits must result in clear, contemporary prose.
 * **Respect the Core Edit**: The 30-50% length reduction is a key goal. Your refinements should not significantly increase the length of the text.
-* **Adhere to Strict Formatting**: The specified Markdown for quotes and annotations is absolute.
-* **Do Not Add New Annotations**: You may only review and remove existing annotations.
+* **Do Not Add New Annotations**: Do not add new annotations.
 * **Preserve Verbatim Quotes**: Any text within a `> **Quote:** ... **End quote.**` block is sacrosanct and must not be changed.
 
 ## Output Requirements

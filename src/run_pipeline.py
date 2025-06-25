@@ -94,6 +94,9 @@ if __name__ == "__main__":
             PhaseType.FINAL: {
                 "model_type": ModelType.OPENAI_04_MINI,
             },
+            PhaseType.FORMATTING: {
+                "model_type": ModelType.OPENAI_04_MINI,
+            },
         },
     )
 

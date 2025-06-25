@@ -17,7 +17,7 @@ Your sole objective is to **modernize** the provided passage. This means updatin
     *   **Tone**: Ensure the modernized language matches the original author's tone—be it analytical, passionate, ironic, or formal. The text should not feel casual if the original was formal.
     *   **Rhythm**: Adjust sentence flow to feel natural to a modern ear, but do so without altering the original paragraph breaks or sentence order. The goal is a smoother read, not a different structure.
 
-3. **Verify Key Quotes**: Identify any **especially significant, famous, or essential** quotes in the passage and preserve it **verbatim**. Format these key passages as a Markdown blockquote, preceded by `**Quote:**` and followed by `**End Quote.**`, with blank lines before and after, as in the following example:
+3. **Verify Key Quotes**: Identify any **especially significant, famous, or essential** quotes in the passage and preserve it **verbatim**. Format these key passages as a Markdown blockquote, preceded by `**Quote:**` and followed by `**End quote.**`, with blank lines before and after, as in the following example:
 
   ```markdown
 
@@ -34,7 +34,7 @@ Your sole objective is to **modernize** the provided passage. This means updatin
     *   Keep all Markdown images (`![](...)`) in their original positions and unchanged.
 *   **Identify Key Quotes**:
     *   If a sentence or phrase is especially **important, rhetorically powerful, or widely quoted**, preserve it **verbatim**.
-    *   Format these key passages as a Markdown blockquote, preceded by `**Quote:**` and followed by `**End Quote.**`, with blank lines before and after.
+    *   Format these key passages as a Markdown blockquote, preceded by `**Quote:**` and followed by `**End quote.**`, with blank lines before and after.
 *   **Handle Footnotes**:
     *   If the text contains footnote markers (e.g., `1.` or `[1]`), they must be handled. If the footnote is a simple citation, remove it. If it contains important conceptual context, integrate that context smoothly and directly into the main text.
 *   **Voice Integrity**:
