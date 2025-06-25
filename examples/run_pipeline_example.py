@@ -2,6 +2,7 @@
 Example script demonstrating how to use the new pipeline system.
 """
 
+from src.llm_model import GEMINI_PRO
 from src.run_pipeline import create_default_run, run_pipeline
 
 
@@ -16,7 +17,7 @@ def main():
             # Example: Disable the edit phase
             # PhaseType.EDIT: {'enabled': False},
             # Example: Use a different model for annotation
-            # PhaseType.ANNOTATE: {'model_type': ModelType.GEMINI_PRO},
+            # PhaseType.ANNOTATE: {'model_type': GEMINI_PRO},
             # Example: Set a custom temperature for a specific phase
             # PhaseType.MODERNIZE: {'temperature': 0.3},
             # Example: Set a custom output path for a phase
@@ -24,7 +25,7 @@ def main():
             #     'custom_output_path': Path("path/to/custom_annotated_output.md")
             # },
             # Example: Use a different model for formatting check
-            # PhaseType.FORMATTING: {'model_type': ModelType.GEMINI_PRO},
+            # PhaseType.FORMATTING: {'model_type': GEMINI_PRO},
         },
     )
 

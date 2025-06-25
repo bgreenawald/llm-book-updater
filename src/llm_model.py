@@ -1,6 +1,5 @@
 import json
 import os
-from enum import Enum
 
 import requests
 from loguru import logger
@@ -10,15 +9,14 @@ from src.logging_config import setup_logging
 # Initialize module‐level logger
 logger = setup_logging("llm_model")
 
-
-class ModelType(Enum):
-    GROK_3_MINI = "x-ai/grok-3-mini"
-    GEMINI_FLASH = "google/gemini-2.5-flash"
-    GEMINI_PRO = "google/gemini-2.5-pro"
-    DEEPSEEK = "deepseek/deepseek-r1-0528"
-    OPENAI_04_MINI = "openai/o4-mini-high"
-    CLAUDE_4_SONNET = "anthropic/claude-sonnet-4"
-    GEMINI_FLASH_LITE = "google/gemini-2.5-flash-lite-preview-06-17"
+# Model constants
+GROK_3_MINI = "x-ai/grok-3-mini"
+GEMINI_FLASH = "google/gemini-2.5-flash"
+GEMINI_PRO = "google/gemini-2.5-pro"
+DEEPSEEK = "deepseek/deepseek-r1-0528"
+OPENAI_04_MINI = "openai/o4-mini-high"
+CLAUDE_4_SONNET = "anthropic/claude-sonnet-4"
+GEMINI_FLASH_LITE = "google/gemini-2.5-flash-lite-preview-06-17"
 
 
 class LlmModel:
@@ -32,20 +30,20 @@ class LlmModel:
 
     def __init__(
         self,
-        model: ModelType,
+        model: str,
         temperature: float = 0.2,
         api_key_env: str = DEFAULT_API_ENV,
         base_url: str = DEFAULT_BASE_URL,
     ) -> None:
         """
         Args:
-            model:        Which model to call (from ModelType).
+            model:        Which model to call (string model identifier).
             temperature:  Temperature for sampling.
             api_key_env:  Name of the ENV var holding your OpenRouter API key.
             base_url:     OpenRouter base endpoint.
         """
         logger.info(
-            f"Initializing LLM client: model={model.value}, base_url={base_url}"
+            f"Initializing LLM client: model={model}, base_url={base_url}"
         )
         api_key = os.getenv(api_key_env)
         if not api_key:
@@ -53,8 +51,7 @@ class LlmModel:
             logger.error(msg)
             raise ValueError(msg)
 
-        self.model_type = model
-        self.model_id = model.value
+        self.model_id = model
         self.temperature = temperature
         self.base_url = base_url
         self.api_key = api_key
@@ -63,14 +60,14 @@ class LlmModel:
     @classmethod
     def create(
         cls,
-        model_type: ModelType,
+        model: str,
         temperature: float = 0.2,
         api_key_env: str = DEFAULT_API_ENV,
         base_url: str = DEFAULT_BASE_URL,
     ) -> "LlmModel":
         """Create a new LlmModel instance with the specified configuration."""
         return cls(
-            model=model_type,
+            model=model,
             temperature=temperature,
             api_key_env=api_key_env,
             base_url=base_url,

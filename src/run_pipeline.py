@@ -4,7 +4,7 @@ from typing import Dict, Optional
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
-from src.llm_model import ModelType
+from src.llm_model import GEMINI_FLASH, OPENAI_04_MINI
 from src.pipeline import Pipeline
 
 
@@ -29,7 +29,7 @@ def create_default_run(
             Example: {
                 PhaseType.MODERNIZE: {
                     'enabled': True,
-                    'model_type': ModelType.GEMINI_FLASH,
+                    'model_type': GEMINI_FLASH,
                     'temperature': 0.2,
                     'custom_output_path': 'path/to/custom_output.md',
                 },
@@ -83,19 +83,19 @@ if __name__ == "__main__":
         output_dir=r"books\On Liberty\markdown\Mill, On Liberty",
         custom_phases={
             PhaseType.MODERNIZE: {
-                "model_type": ModelType.OPENAI_04_MINI,
+                "model_type": OPENAI_04_MINI,
             },
             PhaseType.EDIT: {
-                "model_type": ModelType.OPENAI_04_MINI,
+                "model_type": OPENAI_04_MINI,
             },
             PhaseType.ANNOTATE: {
-                "model_type": ModelType.OPENAI_04_MINI,
+                "model_type": OPENAI_04_MINI,
             },
             PhaseType.FINAL: {
-                "model_type": ModelType.OPENAI_04_MINI,
+                "model_type": OPENAI_04_MINI,
             },
             PhaseType.FORMATTING: {
-                "model_type": ModelType.OPENAI_04_MINI,
+                "model_type": OPENAI_04_MINI,
             },
         },
     )

@@ -3,7 +3,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from src.llm_model import ModelType
+from src.llm_model import GEMINI_FLASH
 
 
 class PhaseType(Enum):
@@ -20,7 +20,7 @@ class PhaseConfig:
 
     phase_type: PhaseType
     enabled: bool = True
-    model_type: ModelType = ModelType.GEMINI_FLASH
+    model_type: str = GEMINI_FLASH
     temperature: float = 0.2
     reasoning: Optional[Dict[str, Dict[str, str]]] = None
     system_prompt_path: Optional[Path] = None
@@ -55,28 +55,28 @@ class RunConfig:
             self.phases = {
                 PhaseType.MODERNIZE: PhaseConfig(
                     phase_type=PhaseType.MODERNIZE,
-                    model_type=ModelType.GEMINI_FLASH,
+                    model_type=GEMINI_FLASH,
                     temperature=0.2,
                 ),
                 PhaseType.EDIT: PhaseConfig(
                     phase_type=PhaseType.EDIT,
-                    model_type=ModelType.GEMINI_FLASH,
+                    model_type=GEMINI_FLASH,
                     temperature=0.2,
                 ),
                 PhaseType.ANNOTATE: PhaseConfig(
                     phase_type=PhaseType.ANNOTATE,
-                    model_type=ModelType.GEMINI_FLASH,
+                    model_type=GEMINI_FLASH,
                     temperature=0.2,
                 ),
                 PhaseType.FINAL: PhaseConfig(
                     phase_type=PhaseType.FINAL,
-                    model_type=ModelType.GEMINI_FLASH,
+                    model_type=GEMINI_FLASH,
                     temperature=0.2,
                     user_prompt_path=Path("./prompts/final_user_prompt.md"),
                 ),
                 PhaseType.FORMATTING: PhaseConfig(
                     phase_type=PhaseType.FORMATTING,
-                    model_type=ModelType.GEMINI_FLASH,
+                    model_type=GEMINI_FLASH,
                     temperature=0.2,
                     system_prompt_path=Path("./prompts/formatting.md"),
                 ),
