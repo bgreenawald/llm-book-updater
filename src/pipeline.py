@@ -87,6 +87,7 @@ class Pipeline:
             output_file_path=output_path,
             original_file_path=self.config.original_file,
             system_prompt_path=phase_config.system_prompt_path,
+            user_prompt_path=phase_config.user_prompt_path,
             book_name=self.config.book_name,
             author_name=self.config.author_name,
             model=model,

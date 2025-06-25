@@ -21,10 +21,10 @@ class LlmPhase:
         output_file_path: Path,
         original_file_path: Path,
         system_prompt_path: Path,
+        user_prompt_path: Path,
         book_name: str,
         author_name: str,
         model: LlmModel,
-        user_prompt_path: Path = None,
         temperature: float = 0.2,
         max_workers: int = None,
         reasoning: dict = None,
@@ -48,10 +48,10 @@ class LlmPhase:
             output_file_path (Path): Path for the processed output
             original_file_path (Path): Path for the original file (pre any transformations)
             system_prompt_path (Path): Path to the system prompt file
+            user_prompt_path (Path, optional): Path to the user prompt file. Defaults to None
             book_name (str): Name of the book
             author_name (str): Name of the author
             model (LlmModel): LLM model instance
-            user_prompt_path (LlmModel, optional): Path to the user prompt file. Defaults to None
             temperature (float, optional): LLM temperature. Defaults to 0.2.
             max_workers (int, optional): Maximum worker threads for parallel processing. Defaults to None (executor default).
         """
