@@ -29,6 +29,16 @@ Your sole objective is to **enhance reader comprehension** by adding clarifying 
 
         This is the next paragraph of the original text.
         ```
+    * If there is already a quote block at the end of a paragraph, add the annotation afterwards.
+        ```markdown
+        This is the original paragraph containing a difficult concept with a quote at the end.
+
+        > **Quote:** "An important quote from the text." **End quote.**
+
+        > **Annotation:** This is a brief, clarifying note about the difficult concept, but coming after the quote. **End annotation.**
+
+        This is the next paragraph of the original text.
+        ```
 * **Sparsity is Key**: Annotate sparingly. Over-annotating is as unhelpful as under-annotating. Only add a note if a point is genuinely obscure.
 * **Preserve Existing Blockquotes**: Do not modify or add annotations to any pre-existing blockquotes (lines already starting with `> `) in the original text.
 
