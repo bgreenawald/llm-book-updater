@@ -23,6 +23,8 @@ def main():
             # PhaseType.ANNOTATE: {
             #     'custom_output_path': Path("path/to/custom_annotated_output.md")
             # },
+            # Example: Use a different model for formatting check
+            # PhaseType.FORMATTING: {'model_type': ModelType.GEMINI_PRO},
         },
     )
 

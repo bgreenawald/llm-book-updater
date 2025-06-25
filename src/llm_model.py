@@ -1,8 +1,9 @@
+import json
 import os
 from enum import Enum
 
+import requests
 from loguru import logger
-from openai import OpenAI
 
 from src.logging_config import setup_logging
 
@@ -11,14 +12,18 @@ logger = setup_logging("llm_model")
 
 
 class ModelType(Enum):
-    GROK_3_MINI = "x-ai/grok-3-mini-beta"
-    GEMINI_FLASH = "google/gemini-2.5-flash-preview-05-20"
-    GEMINI_PRO = "google/gemini-2.5-pro-preview"
+    GROK_3_MINI = "x-ai/grok-3-mini"
+    GEMINI_FLASH = "google/gemini-2.5-flash"
+    GEMINI_PRO = "google/gemini-2.5-pro"
+    DEEPSEEK = "deepseek/deepseek-r1-0528"
+    OPENAI_04_MINI = "openai/o4-mini-high"
+    CLAUDE_4_SONNET = "anthropic/claude-sonnet-4"
+    GEMINI_FLASH_LITE = "google/gemini-2.5-flash-lite-preview-06-17"
 
 
 class LlmModel:
     """
-    LLM client backed by OpenRouter. Wraps OpenAI-compatible chat completions
+    LLM client backed by OpenRouter. Makes direct API calls to OpenRouter
     with logging and validation.
     """
 
@@ -51,7 +56,8 @@ class LlmModel:
         self.model_type = model
         self.model_id = model.value
         self.temperature = temperature
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.base_url = base_url
+        self.api_key = api_key
         logger.success(f"LLM client ready: {self.model_id}")
 
     @classmethod
@@ -81,7 +87,7 @@ class LlmModel:
         **kwargs,
     ) -> str:
         """
-        Make a chat completion call.
+        Make a chat completion call using OpenRouter API.
 
         Returns:
             assistant reply content.
@@ -89,36 +95,57 @@ class LlmModel:
         Raises:
             ValueError on empty/malformed response.
         """
-        logger.debug(f"Starting chat_completions for model={self.model_id}")
         self._log_prompt("System", system_prompt)
         self._log_prompt("User", user_prompt)
 
-        resp = self.client.chat.completions.create(
-            model=self.model_id,
-            messages=[
+        # Prepare headers
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Prepare request data
+        data = {
+            "model": self.model_id,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             **kwargs,
-        )
+        }
 
-        choices = getattr(resp, "choices", None)
-        if not choices or not choices[0].message.content:
-            raise ValueError(f"Empty or malformed response: {resp}")
+        # Make the API call
+        try:
+            response = requests.post(
+                url=f"{self.base_url}/chat/completions",
+                headers=headers,
+                data=json.dumps(data),
+            )
+            response.raise_for_status()
 
-        content = choices[0].message.content
-        finish_reason = choices[0].finish_reason or "unknown"
-        usage = getattr(resp, "usage", {})
+            resp_data = response.json()
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {e}")
+            raise ValueError(f"API request failed: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse response JSON: {e}")
+            raise ValueError(f"Failed to parse response JSON: {e}")
+
+        # Extract response content
+        choices = resp_data.get("choices", [])
+        if not choices or not choices[0].get("message", {}).get("content"):
+            raise ValueError(f"Empty or malformed response: {resp_data}")
+
+        content = choices[0]["message"]["content"]
+        finish_reason = choices[0].get("finish_reason", "unknown")
+        usage = resp_data.get("usage", {})
 
         details = {
-            "id": getattr(resp, "id", ""),
-            "model": getattr(resp, "model", self.model_id),
+            "id": resp_data.get("id", ""),
+            "model": resp_data.get("model", self.model_id),
             "finish_reason": finish_reason,
         }
-        logger.debug(
-            "Chat completion succeeded",
-            extra={"details": details, "preview": content[:200]},
-        )
 
         if finish_reason == "length":
             logger.warning(

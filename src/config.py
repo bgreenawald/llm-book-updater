@@ -10,6 +10,8 @@ class PhaseType(Enum):
     MODERNIZE = auto()
     EDIT = auto()
     ANNOTATE = auto()
+    FINAL = auto()
+    FORMATTING = auto()
 
 
 @dataclass
@@ -20,7 +22,9 @@ class PhaseConfig:
     enabled: bool = True
     model_type: ModelType = ModelType.GEMINI_FLASH
     temperature: float = 0.2
+    reasoning: Optional[Dict[str, Dict[str, str]]] = None
     system_prompt_path: Optional[Path] = None
+    user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None
     max_workers: Optional[int] = None
 
@@ -39,6 +43,7 @@ class RunConfig:
     author_name: str
     input_file: Path
     output_dir: Path
+    original_file: Path
     phases: Dict[PhaseType, PhaseConfig] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -55,13 +60,25 @@ class RunConfig:
                 ),
                 PhaseType.EDIT: PhaseConfig(
                     phase_type=PhaseType.EDIT,
-                    model_type=ModelType.GEMINI_PRO,
+                    model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
                 ),
                 PhaseType.ANNOTATE: PhaseConfig(
                     phase_type=PhaseType.ANNOTATE,
                     model_type=ModelType.GEMINI_FLASH,
                     temperature=0.2,
+                ),
+                PhaseType.FINAL: PhaseConfig(
+                    phase_type=PhaseType.FINAL,
+                    model_type=ModelType.GEMINI_FLASH,
+                    temperature=0.2,
+                    user_prompt_path=Path("./prompts/final_user_prompt.md"),
+                ),
+                PhaseType.FORMATTING: PhaseConfig(
+                    phase_type=PhaseType.FORMATTING,
+                    model_type=ModelType.GEMINI_FLASH,
+                    temperature=0.2,
+                    system_prompt_path=Path("./prompts/formatting.md"),
                 ),
             }
 
@@ -71,6 +88,8 @@ class RunConfig:
             PhaseType.MODERNIZE,
             PhaseType.EDIT,
             PhaseType.ANNOTATE,
+            PhaseType.FINAL,
+            PhaseType.FORMATTING,
         ]
 
     def get_phase_config(self, phase_type: PhaseType) -> PhaseConfig:

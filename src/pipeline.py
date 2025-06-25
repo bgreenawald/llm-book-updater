@@ -85,12 +85,15 @@ class Pipeline:
             name=phase_type.name.lower(),
             input_file_path=input_path,
             output_file_path=output_path,
+            original_file_path=self.config.original_file,
             system_prompt_path=phase_config.system_prompt_path,
+            user_prompt_path=phase_config.user_prompt_path,
             book_name=self.config.book_name,
             author_name=self.config.author_name,
             model=model,
             temperature=phase_config.temperature,
             max_workers=phase_config.max_workers,
+            reasoning=phase_config.reasoning,
         )
 
         self._phase_instances[phase_type] = phase
@@ -104,6 +107,7 @@ class Pipeline:
         if phase_type not in self._phase_instances:
             logger.debug(f"Phase {phase_type.name} not initialized, initializing now")
             phase = self._initialize_phase(phase_type)
+            logger.debug(f"Phase: {phase}")
             if not phase:
                 msg = f"Could not initialize phase: {phase_type.name}"
                 logger.warning(msg)
