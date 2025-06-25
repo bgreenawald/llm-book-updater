@@ -28,7 +28,7 @@ Your primary objective is to perform a developmental edit on the provided Markdo
 *   **Preservation of Core Ideas/Arguments**:
     *   The final text should have all of the essential ideas, arguments, and examples of the original text. The logical progression of the text should remain largely the same.
 *   **Length Reduction**:
-    *   Systematically shorten the text by 25-50%. The importance of a passage should dictate the degree of reduction; critical points may be shortened less than supplementary details.
+    *   Systematically shorten the text by 30-50%. The importance of a passage should dictate the degree of reduction; critical points may be shortened less than supplementary details.
 
 ## Output Requirements
 

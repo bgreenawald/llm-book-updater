@@ -218,7 +218,6 @@ class LlmPhase:
             with self.user_prompt_path.open("r", encoding="utf-8") as f:
                 content = f.read()
                 logger.debug(f"Read user prompt from {self.user_prompt_path}")
-                logger.trace(f"Formatted user prompt: {formatted_content[:200]}...")
                 return content
 
         except FileNotFoundError:
@@ -231,14 +230,14 @@ class LlmPhase:
             raise
 
     def _format_user_message(self, new_block: str, original_block: str) -> str:
+        if not new_block and not original_block:
+            return ""
+
         if self.user_prompt:
             ret = self.user_prompt.format(
                 transformed_passage=new_block,
-                orignal_passage=original_block,
+                original_passage=original_block,
             )
-            logger.debug(f"Formatted user prompt: {ret[:200]}...")
-            with open("temp.txt", "w", encoding="utf-8") as f:
-                f.write(ret)
             return ret
         logger.debug("No user prompt defined")
         return new_block
@@ -286,7 +285,7 @@ class LlmPhase:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
             # Return the original block to allow processing to continue
-            return f"{new_header}\n\n{body if body else ''}\n\n"
+            return f"{new_header}\n\n{new_body if new_body else ''}\n\n"
 
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
