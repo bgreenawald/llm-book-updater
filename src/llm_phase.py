@@ -88,7 +88,6 @@ class LlmPhase:
             logger.error(f"Failed to initialize LlmPhase: {str(e)}")
             raise
 
-
     def __str__(self):
         return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
 
@@ -233,10 +232,15 @@ class LlmPhase:
 
     def _format_user_message(self, new_block: str, original_block: str) -> str:
         if self.user_prompt:
-            return self.user_prompt.format(
+            ret = self.user_prompt.format(
                 transformed_passage=new_block,
                 orignal_passage=original_block,
             )
+            logger.debug(f"Formatted user prompt: {ret[:200]}...")
+            with open("temp.txt", "w", encoding="utf-8") as f:
+                f.write(ret)
+            return ret
+        logger.debug("No user prompt defined")
         return new_block
 
     def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
@@ -253,12 +257,6 @@ class LlmPhase:
             str: The processed markdown block
         """
         try:
-            logger.debug("Processing markdown block")
-            logger.trace(
-                f"Block content: {new_block[:200]}..."
-                if len(new_block) > 200
-                else f"Block content: {new_block}"
-            )
 
             def _get_header_and_body(block: str):
                 lines = block.strip().split("\n", 1)
@@ -271,10 +269,7 @@ class LlmPhase:
 
             body = self._format_user_message(new_body, original_body)
 
-            logger.debug(f"Processing block with header: {new_header}")
-
             if body:
-                logger.debug(f"Processing block body (length: {len(body)})")
                 processed_body = self.model.chat_completion(
                     system_prompt=self.system_prompt,
                     user_prompt=body,
@@ -282,7 +277,6 @@ class LlmPhase:
                     reasoning=self.reasoning,
                     **kwargs,
                 )
-                logger.debug(f"Successfully processed block: {new_header}")
                 return f"{new_header}\n\n{processed_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
