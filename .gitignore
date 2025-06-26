@@ -5,4 +5,4 @@
 .python-version
 /logs
 /.vscode
-/run.py
+/src/run_settings.py

@@ -44,7 +44,7 @@ class RunConfig:
     input_file: Path
     output_dir: Path
     original_file: Path
-    phases: Dict[PhaseType, PhaseConfig] = field(default_factory=dict)
+    phases: List[PhaseConfig] = field(default_factory=list)
 
     def __str__(self):
         return f"RunConfig(book_name={self.book_name}, author_name={self.author_name}, input_file={self.input_file}, output_dir={self.output_dir}, original_file={self.original_file}, phases={self.phases})"
@@ -56,48 +56,6 @@ class RunConfig:
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Set default phases if none provided
-        if not self.phases:
-            self.phases = {
-                PhaseType.MODERNIZE: PhaseConfig(
-                    phase_type=PhaseType.MODERNIZE,
-                    model_type=GEMINI_FLASH,
-                    temperature=0.2,
-                ),
-                PhaseType.EDIT: PhaseConfig(
-                    phase_type=PhaseType.EDIT,
-                    model_type=GEMINI_FLASH,
-                    temperature=0.2,
-                ),
-                PhaseType.ANNOTATE: PhaseConfig(
-                    phase_type=PhaseType.ANNOTATE,
-                    model_type=GEMINI_FLASH,
-                    temperature=0.2,
-                ),
-                PhaseType.FINAL: PhaseConfig(
-                    phase_type=PhaseType.FINAL,
-                    model_type=GEMINI_FLASH,
-                    temperature=0.2,
-                    user_prompt_path=Path("./prompts/final_user_prompt.md"),
-                ),
-                PhaseType.FORMATTING: PhaseConfig(
-                    phase_type=PhaseType.FORMATTING,
-                    model_type=GEMINI_FLASH,
-                    temperature=0.2,
-                    system_prompt_path=Path("./prompts/formatting.md"),
-                ),
-            }
-
     def get_phase_order(self) -> List[PhaseType]:
         """Get the ordered list of phase types."""
-        return [
-            PhaseType.MODERNIZE,
-            PhaseType.EDIT,
-            PhaseType.ANNOTATE,
-            PhaseType.FINAL,
-            PhaseType.FORMATTING,
-        ]
-
-    def get_phase_config(self, phase_type: PhaseType) -> PhaseConfig:
-        """Get configuration for a specific phase."""
-        return self.phases.get(phase_type)
+        return [phase.phase_type for phase in self.phases]
