@@ -1,65 +1,103 @@
-# Book Converter
+# LLM Book Updater
 
-## Convert PDF to MD
+A tool for processing and updating book content using Large Language Models (LLMs).
+
+## Features
+
+- **Markdown-First Workflow**: Easily convert PDF books to Markdown and process them.
+- **Flexible Processing Pipeline**: Customize content processing with different "phases" like content modernization, editing, and adding annotations.
+- **Extensible Annotation System**: Add introductions or summaries to sections without altering the original text.
+- **Configurable LLM Models**: Supports various LLM providers and models.
+- **Parallel Processing**: Process multiple sections concurrently for improved performance.
+- **Automatic Metadata**: Keeps a JSON record of each pipeline run, tracking settings, files, and phase details.
+
+## Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd llm-book-updater
+    ```
+
+2.  **Install dependencies using `uv`:**
+    ```bash
+    uv pip install .
+    ```
+    *(This command uses the dependencies specified in `pyproject.toml`)*
+
+3.  **Configure your LLM API credentials** (e.g., set `GEMINI_API_KEY` as an environment variable).
+
+## Usage
+
+The workflow is typically a two-step process:
+
+### 1. Convert PDF to Markdown
+
+Use the `marker` tool to convert your book from PDF to a clean Markdown file.
 
 ```powershell
-uv run marker_single /path/to/file.pdf --output_format markdown --output_dir PATH --use_llm --gemini_api_key GEMINI_API_KEY
+uv run marker_single /path/to/book.pdf --output_format markdown --output_dir . --use_llm --gemini_api_key YOUR_GEMINI_API_KEY
 ```
 
-## Pipeline Metadata
+### 2. Run the Processing Pipeline
 
-The pipeline automatically saves metadata about each run in the output directory. This includes:
+Use the Python pipeline to apply transformations to the Markdown file. You can run pre-defined phases or create your own.
 
-- **Run timestamp**: When the pipeline was executed
-- **Book information**: Book name and author
-- **File paths**: Input, output, and original file locations
-- **Phase details**: Configuration and completion status for each phase
-- **Model settings**: Temperature, model type, and other parameters used
+```python
+# See examples/run_pipeline_example.py for a complete example
 
-### Metadata File Format
+from src.pipeline import Pipeline
+from pathlib import Path
 
-Metadata is saved as JSON files with the naming pattern: `run_metadata_YYYYMMDD_HHMMSS.json`
+# Configure the pipeline
+pipeline = Pipeline(
+    input_file=Path("input.md"),
+    output_directory=Path("output/"),
+    book_name="My Awesome Book",
+    author_name="Author Name",
+    # Other configurations...
+)
 
-Example metadata structure:
-```json
-{
-  "run_timestamp": "2024-01-15T14:30:25.123456",
-  "book_name": "Example Book",
-  "author_name": "Example Author",
-  "input_file": "/path/to/input.md",
-  "original_file": "/path/to/original.pdf",
-  "output_directory": "/path/to/output",
-  "phases": {
-    "MODERNIZE": {
-      "enabled": true,
-      "model_type": "gemini-flash",
-      "temperature": 0.2,
-      "input_file": "/path/to/input.md",
-      "output_file": "/path/to/output/input Modernize.md",
-      "system_prompt": "/path/to/prompts/modernize.md",
-      "user_prompt": null,
-      "max_workers": null,
-      "completed": true,
-      "output_exists": true
-    },
-    "EDIT": {
-      "enabled": false,
-      "model_type": "gemini-flash",
-      "temperature": 0.2,
-      "max_workers": null,
-      "completed": false,
-      "reason": "disabled"
-    }
-  }
-}
+# Run the desired phases
+pipeline.run()
 ```
 
-### Usage
+## Phase Types
 
-Metadata is automatically saved when:
-- Running the complete pipeline with `pipeline.run()` - **saves metadata once for the entire run**
-- Running individual phases with `pipeline.run_phase(phase_type, save_metadata=True)` - **optional metadata saving for single phases**
+The system supports different processing phases:
 
-The metadata files are saved in the same output directory as the processed files, making it easy to track the history and configuration of each pipeline run.
+-   **`StandardLlmPhase`**: Replaces content with LLM-generated output. Useful for tasks like modernizing or editing text.
+-   **`IntroductionAnnotationPhase`**: Adds an LLM-generated introduction to the beginning of each section.
+-   **`SummaryAnnotationPhase`**: Adds an LLM-generated summary to the end of each section.
 
-**Note**: By default, metadata is only saved once per complete pipeline run to avoid creating too many files. If you need metadata for individual phase runs, explicitly set `save_metadata=True` when calling `run_phase()`.
+Phases can be chained together to create complex processing workflows.
+
+## Configuration
+
+### Phase Configuration
+
+All phases can be configured with the following:
+
+-   `name`: Name of the processing phase.
+-   `input_file_path`, `output_file_path`, `original_file_path`: Paths for input, output, and original files.
+-   `system_prompt_path`, `user_prompt_path`: Paths to prompt files.
+-   `book_name`, `author_name`: Metadata for prompts.
+-   `model`: The `LlmModel` instance to use.
+-   `temperature`, `max_workers`, etc.
+
+### Prompt Templates
+
+System and user prompts can be customized with template variables like `{book_name}`, `{author_name}`, `{transformed_passage}`, and `{original_passage}`.
+
+## Examples
+
+See the `examples/` directory for complete working examples:
+
+-   `annotation_example.py`: Demonstrates all three phase types.
+-   `run_pipeline_example.py`: Shows how to run the full pipeline.
+-   `metadata_example.py`: Example of how metadata is saved.
+-   `retry_example.py`: Example with retry logic.
+
+## License
+
+[Add your license information here]
