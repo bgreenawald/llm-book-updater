@@ -72,9 +72,7 @@ class Pipeline:
                     "temperature": phase_config.temperature,
                     "max_workers": phase_config.max_workers,
                     "completed": False,
-                    "reason": "disabled"
-                    if not phase_config.enabled
-                    else "not_run",
+                    "reason": "disabled" if not phase_config.enabled else "not_run",
                 }
                 metadata["phases"].append(phase_metadata)
 
@@ -142,7 +140,9 @@ class Pipeline:
             )
             return None
 
-        logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
+        logger.info(
+            f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})"
+        )
 
         # Initialize the model
         model = LlmModel.create(
@@ -184,7 +184,9 @@ class Pipeline:
 
             phase = self._initialize_phase(i)
             if not phase:
-                logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
+                logger.warning(
+                    f"Could not initialize phase: {phase_config.phase_type.name}"
+                )
                 continue
 
             self._phase_instances.append(phase)
@@ -199,7 +201,9 @@ class Pipeline:
                 completed_phases.append(phase)
             except LlmModelError as e:
                 logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
-                logger.error("Pipeline stopped due to LLM model failure after max retries")
+                logger.error(
+                    "Pipeline stopped due to LLM model failure after max retries"
+                )
                 self._save_run_metadata(completed_phases)
                 raise
             except Exception as e:
@@ -211,3 +215,16 @@ class Pipeline:
         self._save_run_metadata(completed_phases)
 
         logger.success("Pipeline completed successfully")
+
+
+def run_pipeline(config: RunConfig) -> None:
+    """Run the pipeline with the given configuration."""
+    logger.info(f"Running pipeline for {config.book_name}")
+
+    try:
+        pipeline = Pipeline(config)
+        pipeline.run()
+        logger.success("Pipeline completed successfully")
+    except Exception as e:
+        logger.error(f"Pipeline failed: {str(e)}")
+        raise
