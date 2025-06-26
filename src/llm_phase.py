@@ -1,4 +1,5 @@
 import re
+from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
@@ -10,10 +11,10 @@ from src.llm_model import LlmModel
 from src.logging_config import setup_logging
 
 # Set up logging
-logger = setup_logging("llm_phase")
+setup_logging("llm_phase")
 
 
-class LlmPhase:
+class LlmPhase(ABC):
     def __init__(
         self,
         name: str,
@@ -38,22 +39,25 @@ class LlmPhase:
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
         """
-        Runs an individual phase of the LLM processing in parallel. Reads the input file,
-        splits it into Markdown blocks based on headers, processes blocks concurrently,
-        and writes the ordered results to the output file.
+        Base class for LLM processing phases. Provides common functionality for 
+        reading files, managing prompts, and coordinating parallel processing. 
+        Subclasses define specific block processing strategies.
 
         Args:
             name (str): Name of the processing phase
             input_file_path (Path): Path to the input Markdown file
             output_file_path (Path): Path for the processed output
-            original_file_path (Path): Path for the original file (pre any transformations)
+            original_file_path (Path): Path for the original file (pre any 
+                transformations)
             system_prompt_path (Path): Path to the system prompt file
-            user_prompt_path (Path, optional): Path to the user prompt file. Defaults to None
+            user_prompt_path (Path, optional): Path to the user prompt file. 
+                Defaults to None
             book_name (str): Name of the book
             author_name (str): Name of the author
             model (LlmModel): LLM model instance
             temperature (float, optional): LLM temperature. Defaults to 0.2.
-            max_workers (int, optional): Maximum worker threads for parallel processing. Defaults to None (executor default).
+            max_workers (int, optional): Maximum worker threads for parallel 
+                processing. Defaults to None (executor default).
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -89,10 +93,36 @@ class LlmPhase:
             raise
 
     def __str__(self):
-        return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
+        return (
+            f"{self.__class__.__name__}(name={self.name}, "
+            f"input_file_path={self.input_file_path}, "
+            f"output_file_path={self.output_file_path}, "
+            f"original_file_path={self.original_file_path}, "
+            f"system_prompt_path={self.system_prompt_path}, "
+            f"book_name={self.book_name}, author_name={self.author_name}, "
+            f"model={self.model}, user_prompt_path={self.user_prompt_path}, "
+            f"temperature={self.temperature}, max_workers={self.max_workers}, "
+            f"reasoning={self.reasoning})"
+        )
 
     def __repr__(self):
-        return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
+        return self.__str__()
+
+    @abstractmethod
+    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+        """
+        Abstract method for processing a single Markdown block.
+        Subclasses must implement this to define their specific processing strategy.
+
+        Args:
+            new_block (str): The markdown block to process
+            original_block (str): The original counterpart to the new block
+            **kwargs: Additional arguments to pass to the processing
+
+        Returns:
+            str: The processed markdown block
+        """
+        pass
 
     def _read_input_file(self) -> str:
         """
@@ -232,63 +262,60 @@ class LlmPhase:
             )
             raise
 
-    def _format_user_message(self, new_block: str, original_block: str) -> str:
+    def _format_user_message(
+        self,
+        new_block: str,
+        original_block: str,
+        new_title: str = None,
+        original_title: str = None,
+    ) -> str:
+        """
+        Format the user message using the user prompt template if available.
+
+        Args:
+            new_block (str): The new/transformed block content
+            original_block (str): The original block content
+            new_title (str, optional): The new/transformed title
+            original_title (str, optional): The original title
+
+        Returns:
+            str: The formatted user message
+        """
         if not new_block and not original_block:
             return ""
 
         if self.user_prompt:
-            ret = self.user_prompt.format(
-                transformed_passage=new_block,
-                original_passage=original_block,
-            )
+            # Create a context dict with all available variables
+            context = {
+                "transformed_passage": new_block,
+                "original_passage": original_block,
+            }
+
+            # Add titles if provided
+            if new_title is not None:
+                context["transformed_title"] = new_title
+            if original_title is not None:
+                context["original_title"] = original_title
+
+            ret = self.user_prompt.format(**context)
             return ret
         logger.debug("No user prompt defined")
         return new_block
 
-    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+    def _get_header_and_body(self, block: str):
         """
-        Process a single Markdown block: extract header and body, run LLM on the body if present,
-        and return the formatted block with header and processed content.
+        Helper method to extract header and body from a markdown block.
 
         Args:
-            new_block (str): The markdown block to process
-            original_block (str): The original counterpart to the new block
-            **kwargs: Additional arguments to pass to the chat completion
+            block (str): The markdown block to parse
 
         Returns:
-            str: The processed markdown block
+            tuple: (header, body) where header is the first line and body is the rest
         """
-        try:
-
-            def _get_header_and_body(block: str):
-                lines = block.strip().split("\n", 1)
-                header = lines[0].strip()
-                body = lines[1].strip() if len(lines) > 1 else ""
-                return header, body
-
-            new_header, new_body = _get_header_and_body(new_block)
-            original_header, original_body = _get_header_and_body(original_block)
-
-            body = self._format_user_message(new_body, original_body)
-
-            if body:
-                processed_body = self.model.chat_completion(
-                    system_prompt=self.system_prompt,
-                    user_prompt=body,
-                    temperature=self.temperature,
-                    reasoning=self.reasoning,
-                    **kwargs,
-                )
-                return f"{new_header}\n\n{processed_body}\n\n"
-            else:
-                logger.debug("Empty block body, returning header only")
-                return f"{new_header}\n\n"
-
-        except Exception as e:
-            logger.error(f"Error processing block: {str(e)}")
-            logger.exception("Stack trace for block processing error")
-            # Return the original block to allow processing to continue
-            return f"{new_header}\n\n{new_body if new_body else ''}\n\n"
+        lines = block.strip().split("\n", 1)
+        header = lines[0].strip()
+        body = lines[1].strip() if len(lines) > 1 else ""
+        return header, body
 
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
@@ -317,7 +344,7 @@ class LlmPhase:
                 msg = f"Block length mismatch: {len(new_blocks)} != {len(original_blocks)}"
                 raise ValueError(msg)
 
-            blocks = zip(new_blocks, original_blocks)
+            blocks = list(zip(new_blocks, original_blocks))
 
             # Prepare for parallel processing
             func = partial(self._process_block, **kwargs)
@@ -325,7 +352,7 @@ class LlmPhase:
                 processed_blocks = list(
                     tqdm(
                         executor.map(lambda args: func(*args), blocks),
-                        total=len(list(blocks)),
+                        total=len(blocks),
                         desc=f"Processing {self.name} blocks",
                     )
                 )
@@ -335,7 +362,8 @@ class LlmPhase:
             # Reassemble in original order
             self.content = "".join(processed_blocks)
             logger.info(
-                f"Completed processing all blocks. Total output length: {len(self.content)} characters"
+                f"Completed processing all blocks. Total output length: "
+                f"{len(self.content)} characters"
             )
 
         except Exception as e:
@@ -362,3 +390,154 @@ class LlmPhase:
             logger.error(f"Failed to complete LLM phase {self.name}: {str(e)}")
             logger.exception("Stack trace for LLM phase error")
             raise
+
+
+class StandardLlmPhase(LlmPhase):
+    """
+    Standard LLM phase that processes blocks by replacing the body content with LLM output.
+    This maintains the original behavior of the LlmPhase class.
+    """
+
+    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+        """
+        Process a single Markdown block: extract header and body, run LLM on the body if present,
+        and return the formatted block with header and processed content.
+
+        Args:
+            new_block (str): The markdown block to process
+            original_block (str): The original counterpart to the new block
+            **kwargs: Additional arguments to pass to the chat completion
+
+        Returns:
+            str: The processed markdown block
+        """
+        try:
+            new_header, new_body = self._get_header_and_body(new_block)
+            original_header, original_body = self._get_header_and_body(original_block)
+
+            body = self._format_user_message(
+                new_body, original_body, new_header, original_header
+            )
+
+            if body:
+                processed_body = self.model.chat_completion(
+                    system_prompt=self.system_prompt,
+                    user_prompt=body,
+                    temperature=self.temperature,
+                    reasoning=self.reasoning,
+                    **kwargs,
+                )
+                return f"{new_header}\n\n{processed_body}\n\n"
+            else:
+                logger.debug("Empty block body, returning header only")
+                return f"{new_header}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error processing block: {str(e)}")
+            logger.exception("Stack trace for block processing error")
+            # Return the original block to allow processing to continue
+            return f"{new_header}\n\n{new_body if new_body else ''}\n\n"
+
+
+class IntroductionAnnotationPhase(LlmPhase):
+    """
+    LLM phase that adds introduction annotations to the beginning of each block.
+    Uses the block content as input to generate an introduction, then prepends it to the block.
+    """
+
+    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+        """
+        Process a single Markdown block by adding an introduction annotation at the beginning.
+
+        Args:
+            new_block (str): The markdown block to process
+            original_block (str): The original counterpart to the new block
+            **kwargs: Additional arguments to pass to the chat completion
+
+        Returns:
+            str: The processed markdown block with introduction annotation
+        """
+        try:
+            new_header, new_body = self._get_header_and_body(new_block)
+            original_header, original_body = self._get_header_and_body(original_block)
+
+            # Use the block content as the user prompt for generating the introduction
+            user_prompt = self._format_user_message(
+                new_body, original_body, new_header, original_header
+            )
+
+            if user_prompt:
+                introduction = self.model.chat_completion(
+                    system_prompt=self.system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=self.temperature,
+                    reasoning=self.reasoning,
+                    **kwargs,
+                )
+
+                # Combine the introduction with the original block
+                if new_body:
+                    return f"{new_header}\n\n{introduction}\n\n{new_body}\n\n"
+                else:
+                    return f"{new_header}\n\n{introduction}\n\n{original_body}\n\n"
+            else:
+                logger.debug("Empty block body, returning header only")
+                return f"{new_header}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error processing block: {str(e)}")
+            logger.exception("Stack trace for block processing error")
+            # Return the original block to allow processing to continue
+            return f"{new_header}\n\n{new_body if new_body else original_body}\n\n"
+
+
+class SummaryAnnotationPhase(LlmPhase):
+    """
+    LLM phase that adds summary annotations to the end of each block.
+    Uses the block content as input to generate a summary, then appends it to the block.
+    """
+
+    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+        """
+        Process a single Markdown block by adding a summary annotation at the end.
+
+        Args:
+            new_block (str): The markdown block to process
+            original_block (str): The original counterpart to the new block
+            **kwargs: Additional arguments to pass to the chat completion
+
+        Returns:
+            str: The processed markdown block with summary annotation
+        """
+        try:
+            new_header, new_body = self._get_header_and_body(new_block)
+            original_header, original_body = self._get_header_and_body(original_block)
+
+            # Use the block content as the user prompt for generating the summary
+            user_prompt = self._format_user_message(
+                new_body, original_body, new_header, original_header
+            )
+
+            if user_prompt:
+                summary = self.model.chat_completion(
+                    system_prompt=self.system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=self.temperature,
+                    reasoning=self.reasoning,
+                    **kwargs,
+                )
+
+                # Combine the original block with the summary
+                if new_body:
+                    return f"{new_header}\n\n{new_body}\n\n{summary}\n\n"
+                else:
+                    return f"{new_header}\n\n{original_body}\n\n{summary}\n\n"
+            else:
+                logger.debug("Empty block body, returning header only")
+                return f"{new_header}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error processing block: {str(e)}")
+            logger.exception("Stack trace for block processing error")
+            # Return the original block to allow processing to continue
+            return f"{new_header}\n\n{new_body if new_body else original_body}\n\n"
