@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Dict, Optional
+import json
+from datetime import datetime
 
 from loguru import logger
 
@@ -16,6 +18,62 @@ class Pipeline:
         self.config = config
         self._phase_instances: Dict[PhaseType, LlmPhase] = {}
         # We'll initialize phases as they're needed, not all at once
+
+    def __str__(self):
+        return f"Pipeline(config={self.config})"
+
+    def __repr__(self):
+        return f"Pipeline(config={self.config})"
+
+    def _save_run_metadata(self, completed_phases: Dict[PhaseType, LlmPhase]) -> None:
+        """Save metadata about the pipeline run to the output directory."""
+        metadata = {
+            "run_timestamp": datetime.now().isoformat(),
+            "book_name": self.config.book_name,
+            "author_name": self.config.author_name,
+            "input_file": str(self.config.input_file),
+            "original_file": str(self.config.original_file),
+            "output_directory": str(self.config.output_dir),
+            "phases": {}
+        }
+        
+        # Add information about each phase
+        for phase_type, phase in completed_phases.items():
+            phase_metadata = {
+                "enabled": self.config.phases[phase_type].enabled,
+                "model_type": self.config.phases[phase_type].model_type,
+                "temperature": self.config.phases[phase_type].temperature,
+                "input_file": str(phase.input_file_path),
+                "output_file": str(phase.output_file_path),
+                "system_prompt": str(phase.system_prompt_path) if phase.system_prompt_path else None,
+                "user_prompt": str(phase.user_prompt_path) if phase.user_prompt_path else None,
+                "max_workers": self.config.phases[phase_type].max_workers,
+                "completed": True,
+                "output_exists": phase.output_file_path.exists() if phase.output_file_path else False
+            }
+            metadata["phases"][phase_type.name] = phase_metadata
+        
+        # Add information about phases that were configured but not run
+        for phase_type, phase_config in self.config.phases.items():
+            if phase_type not in completed_phases:
+                phase_metadata = {
+                    "enabled": phase_config.enabled,
+                    "model_type": phase_config.model_type,
+                    "temperature": phase_config.temperature,
+                    "max_workers": phase_config.max_workers,
+                    "completed": False,
+                    "reason": "disabled" if not phase_config.enabled else "not_configured"
+                }
+                metadata["phases"][phase_type.name] = phase_metadata
+        
+        # Save metadata to output directory
+        metadata_file = self.config.output_dir / f"run_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        try:
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            logger.info(f"Run metadata saved to: {metadata_file}")
+        except Exception as e:
+            logger.error(f"Failed to save run metadata: {str(e)}")
 
     def _get_phase_output_path(self, phase_type: PhaseType) -> Path:
         """Generate output path for a phase."""
@@ -76,7 +134,7 @@ class Pipeline:
 
         # Initialize the model
         model = LlmModel.create(
-            model_type=phase_config.model_type,
+            model=phase_config.model_type,
             temperature=phase_config.temperature,
         )
 
@@ -99,7 +157,7 @@ class Pipeline:
         self._phase_instances[phase_type] = phase
         return phase
 
-    def run_phase(self, phase_type: PhaseType, **kwargs) -> Optional[LlmPhase]:
+    def run_phase(self, phase_type: PhaseType, save_metadata: bool = False, **kwargs) -> Optional[LlmPhase]:
         """Run a specific phase."""
         logger.debug(f"Attempting to run phase: {phase_type.name}")
 
@@ -124,6 +182,11 @@ class Pipeline:
             phase.run(**kwargs)
             logger.success(f"Successfully completed phase: {phase_type.name}")
             logger.debug(f"Output written to: {phase.output_file_path}")
+            
+            # Save metadata for individual phase run only if requested
+            if save_metadata:
+                self._save_run_metadata({phase_type: phase})
+            
             return phase
         except Exception as e:
             logger.error(f"Error in phase {phase_type.name}: {str(e)}", exc_info=True)
@@ -133,6 +196,8 @@ class Pipeline:
         """Run all enabled phases in order."""
         phase_order = self.config.get_phase_order()
         logger.info(f"Starting pipeline with phases: {[p.name for p in phase_order]}")
+        
+        completed_phases: Dict[PhaseType, LlmPhase] = {}
 
         for phase_type in phase_order:
             logger.debug(f"Checking phase: {phase_type.name}")
@@ -145,6 +210,11 @@ class Pipeline:
                 continue
 
             logger.info(f"Proceeding with phase: {phase_type.name}")
-            self.run_phase(phase_type, **kwargs)
+            phase = self.run_phase(phase_type, **kwargs)
+            if phase:
+                completed_phases[phase_type] = phase
 
+        # Save metadata about the run
+        self._save_run_metadata(completed_phases)
+        
         logger.success("Pipeline completed successfully")

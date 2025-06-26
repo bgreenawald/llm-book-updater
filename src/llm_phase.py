@@ -91,6 +91,9 @@ class LlmPhase:
     def __str__(self):
         return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
 
+    def __repr__(self):
+        return f"LlmPhase(name={self.name}, input_file_path={self.input_file_path}, output_file_path={self.output_file_path}, original_file_path={self.original_file_path}, system_prompt_path={self.system_prompt_path}, book_name={self.book_name}, author_name={self.author_name}, model={self.model}, user_prompt_path={self.user_prompt_path}, temperature={self.temperature}, max_workers={self.max_workers}, reasoning={self.reasoning})"
+
     def _read_input_file(self) -> str:
         """
         Reads the content of the input file and returns it as a string.

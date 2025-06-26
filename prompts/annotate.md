@@ -39,7 +39,7 @@ Your sole objective is to **enhance reader comprehension** by adding clarifying 
 
         This is the next paragraph of the original text.
         ```
-* **Sparsity is Key**: Annotate sparingly. Over-annotating is as unhelpful as under-annotating. Only add a note if a point is genuinely obscure.
+* **Sparsity is Key**: Annotate sparingly. Over-annotating is as unhelpful as under-annotating. Only add a note if a point is genuinely obscure. Annotations should never be definitions of words or well-known historical events.
 * **Preserve Existing Blockquotes**: Do not modify or add annotations to any pre-existing blockquotes (lines already starting with `> `) in the original text.
 
 ## Output Requirements

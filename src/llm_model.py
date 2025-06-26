@@ -73,6 +73,12 @@ class LlmModel:
             base_url=base_url,
         )
 
+    def __str__(self):
+        return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
+
+    def __repr__(self):
+        return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
+
     def _log_prompt(self, role: str, content: str) -> None:
         preview = content if len(content) <= 200 else content[:200] + "..."
         logger.trace(f"{role} prompt: {preview}")

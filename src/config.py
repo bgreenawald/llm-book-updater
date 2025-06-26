@@ -46,6 +46,12 @@ class RunConfig:
     original_file: Path
     phases: Dict[PhaseType, PhaseConfig] = field(default_factory=dict)
 
+    def __str__(self):
+        return f"RunConfig(book_name={self.book_name}, author_name={self.author_name}, input_file={self.input_file}, output_dir={self.output_dir}, original_file={self.original_file}, phases={self.phases})"
+
+    def __repr__(self):
+        return f"RunConfig(book_name={self.book_name}, author_name={self.author_name}, input_file={self.input_file}, output_dir={self.output_dir}, original_file={self.original_file}, phases={self.phases})"
+
     def __post_init__(self):
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
