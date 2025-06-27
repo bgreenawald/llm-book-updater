@@ -50,8 +50,7 @@ class LlmPhase(ABC):
             original_file_path (Path): Path for the original file (pre any 
                 transformations)
             system_prompt_path (Path): Path to the system prompt file
-            user_prompt_path (Path, optional): Path to the user prompt file. 
-                Defaults to None
+            user_prompt_path (Path): Path to the user prompt file
             book_name (str): Name of the book
             author_name (str): Name of the author
             model (LlmModel): LLM model instance
@@ -199,7 +198,6 @@ class LlmPhase(ABC):
     def _read_system_prompt(self) -> str:
         """
         Reads the content of the system prompt file and returns it as a string.
-        Adds in the author and book name.
 
         Returns:
             str: Content of the system prompt file
@@ -207,20 +205,12 @@ class LlmPhase(ABC):
         Raises:
             FileNotFoundError: If the system prompt file does not exist
             IOError: If there is an error reading the file
-            KeyError: If the template contains invalid placeholders
         """
         try:
             with self.system_prompt_path.open("r", encoding="utf-8") as f:
                 content = f.read()
                 logger.debug(f"Read system prompt from {self.system_prompt_path}")
-
-                formatted_content = content.format(
-                    author_name=self.author_name,
-                    book_name=self.book_name,
-                )
-                logger.trace(f"Formatted system prompt: {formatted_content[:200]}...")
-
-                return formatted_content
+                return content
 
         except FileNotFoundError:
             logger.error(f"System prompt file not found: {self.system_prompt_path}")
@@ -230,23 +220,18 @@ class LlmPhase(ABC):
                 f"Error reading system prompt file {self.system_prompt_path}: {str(e)}"
             )
             raise
-        except KeyError as e:
-            logger.error(f"Invalid placeholder in system prompt template: {str(e)}")
-            raise
 
     def _read_user_prompt(self) -> str:
         """
-        Reads the content of the user prompt file (if it exists) and returns it as a string.
+        Reads the content of the user prompt file and returns it as a string.
 
         Returns:
-            str: Content of the system prompt file, if it exists, or an empty string.
+            str: Content of the user prompt file.
 
         Raises:
-            FileNotFoundError: If the system prompt file is defined but does not exist
+            FileNotFoundError: If the user prompt file does not exist
             IOError: If there is an error reading the file
         """
-        if not self.user_prompt_path:
-            return ""
         try:
             with self.user_prompt_path.open("r", encoding="utf-8") as f:
                 content = f.read()
@@ -270,7 +255,7 @@ class LlmPhase(ABC):
         original_title: str = None,
     ) -> str:
         """
-        Format the user message using the user prompt template if available.
+        Format the user message using the user prompt template.
 
         Args:
             new_block (str): The new/transformed block content
@@ -284,23 +269,22 @@ class LlmPhase(ABC):
         if not new_block and not original_block:
             return ""
 
-        if self.user_prompt:
-            # Create a context dict with all available variables
-            context = {
-                "transformed_passage": new_block,
-                "original_passage": original_block,
-            }
+        # Create a context dict with all available variables
+        context = {
+            "transformed_passage": new_block,
+            "original_passage": original_block,
+            "book_name": self.book_name,
+            "author_name": self.author_name,
+        }
 
-            # Add titles if provided
-            if new_title is not None:
-                context["transformed_title"] = new_title
-            if original_title is not None:
-                context["original_title"] = original_title
+        # Add titles if provided
+        if new_title is not None:
+            context["new_title"] = new_title
+        if original_title is not None:
+            context["original_title"] = original_title
 
-            ret = self.user_prompt.format(**context)
-            return ret
-        logger.debug("No user prompt defined")
-        return new_block
+        ret = self.user_prompt.format(**context)
+        return ret
 
     def _get_header_and_body(self, block: str):
         """

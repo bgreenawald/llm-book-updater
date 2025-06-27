@@ -24,14 +24,18 @@ class PhaseConfig:
     temperature: float = 0.2
     reasoning: Optional[Dict[str, Dict[str, str]]] = None
     system_prompt_path: Optional[Path] = None
-    user_prompt_path: Optional[Path] = None
+    user_prompt_path: Path = None
     custom_output_path: Optional[Path] = None
     max_workers: Optional[int] = None
 
     def __post_init__(self):
         if self.system_prompt_path is None:
             self.system_prompt_path = Path(
-                f"./prompts/{self.phase_type.name.lower()}.md"
+                f"./prompts/{self.phase_type.name.lower()}_system.md"
+            )
+        if self.user_prompt_path is None:
+            self.user_prompt_path = Path(
+                f"./prompts/{self.phase_type.name.lower()}_user.md"
             )
 
 

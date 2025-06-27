@@ -37,7 +37,7 @@ def main():
     system_prompts_dir = Path("prompts")
     introduction_prompt = system_prompts_dir / "introduction_annotation.md"
     summary_prompt = system_prompts_dir / "summary_annotation.md"
-    standard_prompt = system_prompts_dir / "edit.md"  # Example standard prompt
+    standard_prompt = system_prompts_dir / "edit_system.md"  # Example standard prompt
 
     # User prompt paths (optional)
     user_prompts_dir = Path("user_prompts")
@@ -58,7 +58,7 @@ def main():
         output_file_path=output_dir / "with_introductions.md",
         original_file_path=original_file,
         system_prompt_path=introduction_prompt,
-        user_prompt_path=None,  # Not needed for annotation phases
+        user_prompt_path=user_prompt,
         book_name=book_name,
         author_name=author_name,
         model=model,
@@ -77,7 +77,7 @@ def main():
         output_file_path=output_dir / "with_summaries.md",
         original_file_path=original_file,
         system_prompt_path=summary_prompt,
-        user_prompt_path=None,  # Not needed for annotation phases
+        user_prompt_path=user_prompt,
         book_name=book_name,
         author_name=author_name,
         model=model,
@@ -96,7 +96,7 @@ def main():
         output_file_path=output_dir / "replaced_content.md",
         original_file_path=original_file,
         system_prompt_path=standard_prompt,
-        user_prompt_path=None,  # Optional user prompt for standard phase
+        user_prompt_path=user_prompt,
         book_name=book_name,
         author_name=author_name,
         model=model,
@@ -138,7 +138,7 @@ def main():
         output_file_path=output_dir / "temp_with_intros.md",
         original_file_path=original_file,
         system_prompt_path=introduction_prompt,
-        user_prompt_path=None,
+        user_prompt_path=user_prompt,
         book_name=book_name,
         author_name=author_name,
         model=model,
@@ -154,7 +154,7 @@ def main():
         output_file_path=output_dir / "with_intros_and_summaries.md",
         original_file_path=original_file,
         system_prompt_path=summary_prompt,
-        user_prompt_path=None,
+        user_prompt_path=user_prompt,
         book_name=book_name,
         author_name=author_name,
         model=model,
