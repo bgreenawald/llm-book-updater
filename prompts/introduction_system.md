@@ -25,7 +25,7 @@ Your sole objective is to create a concise, structured introduction that provide
 
 *   **Format Requirements**:
     *   Entire introduction must be a Markdown blockquote
-    *   Begin with `**Annotated Introduction:**` on its own line
+    *   Begin with `**Annotated introduction:**` on its own line
     *   End with `**End annotated introduction.**` on its own line
     *   Maintain exact subsection headers: `**Overview**`, `**Key Terms/Concepts**`, `**Key People/Places/Events**`
 *   **Content Restrictions**:

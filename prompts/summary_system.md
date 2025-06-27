@@ -26,8 +26,8 @@ Your sole objective is to create a brief, insightful summary that captures the e
 
 *   **Format Requirements**:
     *   Entire overview must be a Markdown blockquote
-    *   Begin with `**Summary:**` on its own line
-    *   End with `**End summary.**` on its own line
+    *   Begin with `**Annotated summary:**` on its own line
+    *   End with `**End annotate summary.**` on its own line
 *   **Content Restrictions**:
     *   Maximum of 5 paragraphs (fewer for shorter sections)
     *   Must cover the entire section's scope without omissions
@@ -41,12 +41,12 @@ Your sole objective is to create a brief, insightful summary that captures the e
 
 ## Output Template
 
-> **Summary:**  
+> **Annotated summary:**  
 > [Your cohesive synthesis of the section's content]  
 > 
 > [Continue as needed - 1 to 5 paragraphs total]  
 > 
-> **End summary.**
+> **End annotated summary.**
 
 
 *   Your response must EXACTLY follow this template
