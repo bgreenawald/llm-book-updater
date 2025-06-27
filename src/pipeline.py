@@ -125,8 +125,9 @@ class Pipeline:
         # Count occurrences of this phase type up to the current index
         phase_count = sum(1 for i in range(phase_index + 1) if self.config.phases[i].phase_type == phase_type)
 
-        # Add current phase suffix with count
-        output_stem = f"{input_stem} {phase_type.name.capitalize()}_{phase_count}"
+        # Add phase index (1-based) and current phase suffix with count
+        phase_index_1_based = phase_index + 1
+        output_stem = f"{phase_index_1_based:02d}-{input_stem} {phase_type.name.capitalize()}_{phase_count}"
         output_file = f"{output_stem}{self.config.input_file.suffix}"
         return self.config.output_dir / output_file
 
