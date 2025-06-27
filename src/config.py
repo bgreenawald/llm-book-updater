@@ -32,13 +32,9 @@ class PhaseConfig:
 
     def __post_init__(self):
         if self.system_prompt_path is None:
-            self.system_prompt_path = Path(
-                f"./prompts/{self.phase_type.name.lower()}_system.md"
-            )
+            self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
         if self.user_prompt_path is None:
-            self.user_prompt_path = Path(
-                f"./prompts/{self.phase_type.name.lower()}_user.md"
-            )
+            self.user_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_user.md")
 
 
 @dataclass
@@ -53,10 +49,24 @@ class RunConfig:
     phases: List[PhaseConfig] = field(default_factory=list)
 
     def __str__(self):
-        return f"RunConfig(book_name={self.book_name}, author_name={self.author_name}, input_file={self.input_file}, output_dir={self.output_dir}, original_file={self.original_file}, phases={self.phases})"
+        return (
+            f"RunConfig(book_name={self.book_name}, "
+            f"author_name={self.author_name}, "
+            f"input_file={self.input_file}, "
+            f"output_dir={self.output_dir}, "
+            f"original_file={self.original_file}, "
+            f"phases={self.phases})"
+        )
 
     def __repr__(self):
-        return f"RunConfig(book_name={self.book_name}, author_name={self.author_name}, input_file={self.input_file}, output_dir={self.output_dir}, original_file={self.original_file}, phases={self.phases})"
+        return (
+            f"RunConfig(book_name={self.book_name}, "
+            f"author_name={self.author_name}, "
+            f"input_file={self.input_file}, "
+            f"output_dir={self.output_dir}, "
+            f"original_file={self.original_file}, "
+            f"phases={self.phases})"
+        )
 
     def __post_init__(self):
         # Ensure output directory exists

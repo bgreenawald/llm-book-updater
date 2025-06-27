@@ -5,9 +5,40 @@ from typing import List, Optional
 
 from loguru import logger
 
-from src.config import RunConfig
+from src.config import PhaseType, RunConfig
 from src.llm_model import LlmModel, LlmModelError
-from src.llm_phase import LlmPhase
+from src.llm_phase import IntroductionAnnotationPhase, LlmPhase, StandardLlmPhase, SummaryAnnotationPhase
+
+
+def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
+    """
+    Factory function to create the appropriate phase instance based on PhaseType.
+
+    Args:
+        phase_type: The type of phase to create
+        **kwargs: Arguments to pass to the phase constructor
+
+    Returns:
+        An instance of the appropriate phase class
+
+    Raises:
+        ValueError: If the phase type is not supported
+    """
+    phase_mapping = {
+        PhaseType.MODERNIZE: StandardLlmPhase,
+        PhaseType.EDIT: StandardLlmPhase,
+        PhaseType.ANNOTATE: StandardLlmPhase,
+        PhaseType.FINAL: StandardLlmPhase,
+        PhaseType.FORMATTING: StandardLlmPhase,
+        PhaseType.INTRODUCTION: IntroductionAnnotationPhase,
+        PhaseType.SUMMARY: SummaryAnnotationPhase,
+    }
+
+    phase_class = phase_mapping.get(phase_type)
+    if phase_class is None:
+        raise ValueError(f"Unsupported phase type: {phase_type}")
+
+    return phase_class(**kwargs)
 
 
 class Pipeline:
@@ -47,17 +78,11 @@ class Pipeline:
                 "temperature": phase_config.temperature,
                 "input_file": str(phase.input_file_path),
                 "output_file": str(phase.output_file_path),
-                "system_prompt": str(phase.system_prompt_path)
-                if phase.system_prompt_path
-                else None,
-                "user_prompt": str(phase.user_prompt_path)
-                if phase.user_prompt_path
-                else None,
+                "system_prompt": str(phase.system_prompt_path) if phase.system_prompt_path else None,
+                "user_prompt": str(phase.user_prompt_path) if phase.user_prompt_path else None,
                 "max_workers": phase_config.max_workers,
                 "completed": True,
-                "output_exists": phase.output_file_path.exists()
-                if phase.output_file_path
-                else False,
+                "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
             }
             metadata["phases"].append(phase_metadata)
 
@@ -77,10 +102,7 @@ class Pipeline:
                 metadata["phases"].append(phase_metadata)
 
         # Save metadata to output directory
-        metadata_file = (
-            self.config.output_dir
-            / f"run_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
+        metadata_file = self.config.output_dir / f"run_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         try:
             with open(metadata_file, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -101,11 +123,7 @@ class Pipeline:
         phase_type = phase_config.phase_type
 
         # Count occurrences of this phase type up to the current index
-        phase_count = sum(
-            1
-            for i in range(phase_index + 1)
-            if self.config.phases[i].phase_type == phase_type
-        )
+        phase_count = sum(1 for i in range(phase_index + 1) if self.config.phases[i].phase_type == phase_type)
 
         # Add current phase suffix with count
         output_stem = f"{input_stem} {phase_type.name.capitalize()}_{phase_count}"
@@ -134,15 +152,10 @@ class Pipeline:
 
         # For the first phase, check if input file exists
         if phase_index == 0 and not input_path.exists():
-            logger.error(
-                f"Input file not found for initial phase "
-                f"{phase_config.phase_type.name}: {input_path}"
-            )
+            logger.error(f"Input file not found for initial phase {phase_config.phase_type.name}: {input_path}")
             return None
 
-        logger.info(
-            f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})"
-        )
+        logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
         # Initialize the model
         model = LlmModel.create(
@@ -150,8 +163,9 @@ class Pipeline:
             temperature=phase_config.temperature,
         )
 
-        # Create the phase instance
-        phase = LlmPhase(
+        # Create the phase instance using the factory
+        phase = create_phase(
+            phase_type=phase_config.phase_type,
             name=phase_config.phase_type.name.lower(),
             input_file_path=input_path,
             output_file_path=output_path,
@@ -184,9 +198,7 @@ class Pipeline:
 
             phase = self._initialize_phase(i)
             if not phase:
-                logger.warning(
-                    f"Could not initialize phase: {phase_config.phase_type.name}"
-                )
+                logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
                 continue
 
             self._phase_instances.append(phase)
@@ -201,9 +213,7 @@ class Pipeline:
                 completed_phases.append(phase)
             except LlmModelError as e:
                 logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
-                logger.error(
-                    "Pipeline stopped due to LLM model failure after max retries"
-                )
+                logger.error("Pipeline stopped due to LLM model failure after max retries")
                 self._save_run_metadata(completed_phases)
                 raise
             except Exception as e:

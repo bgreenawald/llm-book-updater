@@ -6,7 +6,8 @@ This example shows how metadata is automatically saved when running the pipeline
 """
 
 from pathlib import Path
-from src.config import RunConfig, PhaseConfig, PhaseType
+
+from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
 
 

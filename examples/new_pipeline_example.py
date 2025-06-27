@@ -1,5 +1,5 @@
 """
-Example script demonstrating how to use the new pipeline system.
+Example script demonstrating the new pipeline system with phase factory.
 """
 
 import sys
@@ -15,21 +15,23 @@ from src.pipeline import run_pipeline
 
 
 def main():
-    # Define the sequence of phases for this run
-    # This list can be customized to change the order, repeat phases, or disable them.
+    """Run the pipeline with different phase types."""
+
+    # Define phases with different types
     run_phases: List[PhaseConfig] = [
+        # Standard phases (use StandardLlmPhase)
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model_type=OPENAI_04_MINI,
-            temperature=0.3,  # Example: Set a custom temperature
+            temperature=0.3,
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
-            enabled=False,  # Example: Disable the edit phase
+            enabled=False,  # Disable this phase
         ),
         PhaseConfig(
             phase_type=PhaseType.ANNOTATE,
-            model_type=GEMINI_PRO,  # Example: Use a different model
+            model_type=GEMINI_PRO,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
@@ -37,9 +39,9 @@ def main():
         ),
         PhaseConfig(
             phase_type=PhaseType.FORMATTING,
-            model_type=GEMINI_PRO,  # Example: Use different model for formatting
+            model_type=GEMINI_PRO,
         ),
-        # Example: Add annotation phases
+        # Annotation phases (use specific annotation classes)
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,
             model_type=GEMINI_PRO,
@@ -52,7 +54,7 @@ def main():
         ),
     ]
 
-    # Create a run configuration from the defined phases
+    # Create run configuration
     config = RunConfig(
         book_name="On Liberty",
         author_name="John Stuart Mill",
