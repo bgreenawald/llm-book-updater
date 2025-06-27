@@ -35,11 +35,10 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.FINAL,
             model_type=OPENAI_04_MINI,
-            user_prompt_path=Path("./prompts/final_user_prompt.md"),
         ),
         PhaseConfig(
             phase_type=PhaseType.FORMATTING,
-            model_type=GEMINI_PRO,  # Example: Use a different model for formatting check
+            model_type=GEMINI_PRO,  # Example: Use a different model for formatting
         ),
     ]
 
@@ -47,9 +46,13 @@ def main():
     config = RunConfig(
         book_name="On Liberty",
         author_name="John Stuart Mill",
-        input_file=Path(r"books\On Liberty\markdown\Mill, On Liberty\Mill, On Liberty Clean.md"),
+        input_file=Path(
+            r"books\On Liberty\markdown\Mill, On Liberty\Mill, On Liberty Clean.md"
+        ),
         output_dir=Path(r"books\On Liberty\markdown\Mill, On Liberty"),
-        original_file=Path(r"books\On Liberty\markdown\Mill, On Liberty\Mill, On Liberty Clean.md"),
+        original_file=Path(
+            r"books\On Liberty\markdown\Mill, On Liberty\Mill, On Liberty Clean.md"
+        ),
         phases=run_phases,
     )
 
