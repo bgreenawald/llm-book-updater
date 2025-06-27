@@ -6,4 +6,4 @@ Please modernize the following passage from *{book_name}* by *{author_name}*:
 {original_passage}
 <END_PASSAGE>
 
-Return only the modernized passage. 
+Return only the modernized passage, without the section title. 

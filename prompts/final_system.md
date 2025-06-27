@@ -49,4 +49,5 @@ You should consider making an edit when you spot one of these opportunities. The
 ## Output Requirements
 
 * Return **only** the final, polished passage in a single Markdown block.
+* Do **not** include the section title in the output.
 * Do **not** include any introductory text, explanations, reports on your changes, or any other metadata in your response. Your output must begin directly with the finalized Markdown content.

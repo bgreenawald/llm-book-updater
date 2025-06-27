@@ -40,5 +40,6 @@ Your sole objective is to **modernize** the provided passage. This means updatin
 
 ## Output Requirements
 
-*   Return **only** the fully modernized Markdown content.
-*   Do **not** include any introductory text, explanations, comments, or metadata in your response. Your output should begin directly with the modernized Markdown.
+* Return **only** the fully modernized Markdown content.
+* Do **not** include the section title in the output.
+* Do **not** include any introductory text, explanations, comments, or metadata in your response. Your output should begin directly with the modernized Markdown.

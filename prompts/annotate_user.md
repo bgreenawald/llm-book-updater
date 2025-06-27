@@ -6,4 +6,4 @@ Please annotate the following passage from *{book_name}* by *{author_name}*:
 {transformed_passage}
 <END_PASSAGE>
 
-Return only the annotated passage.
+Return only the annotated passage, without the section title.

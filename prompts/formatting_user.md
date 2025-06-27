@@ -6,4 +6,4 @@ Please check and fix the formatting of the following passage from *{book_name}* 
 {transformed_passage}
 <END_PASSAGE>
 
-Return only the properly formatted passage. 
+Return only the properly formatted passage, without the section title. 

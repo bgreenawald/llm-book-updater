@@ -18,4 +18,4 @@ Transformed Passage
 
 ---
 
-Return only the final, refined passage.
+Return only the final, refined passage, without the section title.

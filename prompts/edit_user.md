@@ -6,4 +6,4 @@ Please edit the following passage from *{book_name}* by *{author_name}* for clar
 {transformed_passage}
 <END_PASSAGE>
 
-Return only the edited passage.
+Return only the edited passage, without the section title.

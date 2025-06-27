@@ -32,5 +32,6 @@ Your primary objective is to perform a developmental edit on the provided Markdo
 
 ## Output Requirements
 
-*   Return **only** the fully edited Markdown content for the section.
-*   Do **not** include any introductory text, explanations, comments, or metadata in your response. Your output should begin directly with the edited Markdown.
+* Return **only** the fully edited Markdown content for the section.
+* Do **not** include the section title in the output.
+* Do **not** include any introductory text, explanations, comments, or metadata in your response. Your output should begin directly with the edited Markdown.
