@@ -12,6 +12,8 @@ class PhaseType(Enum):
     ANNOTATE = auto()
     FINAL = auto()
     FORMATTING = auto()
+    INTRODUCTION = auto()
+    SUMMARY = auto()
 
 
 @dataclass
