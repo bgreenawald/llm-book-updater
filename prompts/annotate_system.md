@@ -46,4 +46,5 @@ Your sole objective is to **enhance reader comprehension** by adding clarifying 
 
 * Return **only** the original Markdown content with your annotations seamlessly integrated.
 * Do **not** include the section title in the output.
+* Do **not** modify/remove any of the text. You can only add your annotations.
 * Do **not** include any introductory text, explanations, comments, or metadata in your response. Your output must begin directly with the processed Markdown content.
