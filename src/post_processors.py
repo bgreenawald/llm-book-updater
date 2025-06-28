@@ -323,10 +323,10 @@ class OrderQuoteAnnotationProcessor(PostProcessor):
                         # Next non-blank is quote/annotation, skip this blank line
                         i += 1
                         continue
-                    else:
-                        flush_block()
-                        processed_lines.append(line)
-                        i += 1
+
+                    flush_block()
+                    processed_lines.append(line)
+                    i += 1
                 else:
                     processed_lines.append(line)
                     i += 1
