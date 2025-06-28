@@ -14,7 +14,7 @@ def setup_logging() -> None:
     """Configure logging with debug level and better formatting."""
     logger.remove()  # Remove default handler
     logger.add(
-        sys.stderr,
+        sink=sys.stderr,
         level="DEBUG",
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -30,7 +30,7 @@ def main() -> None:
     setup_logging()
     try:
         logger.info("Starting pipeline execution from main.py")
-        run_pipeline(config)
+        run_pipeline(config=config)
         logger.success("Pipeline execution finished.")
     except Exception as e:
         logger.error(f"An error occurred during pipeline execution: {e}", exc_info=True)

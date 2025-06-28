@@ -76,7 +76,9 @@ class PhaseFactory:
         Returns:
             StandardLlmPhase: Configured standard phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors, phase_type=config.phase_type
+        )
 
         return StandardLlmPhase(
             name=config.name,
@@ -106,7 +108,9 @@ class PhaseFactory:
         Returns:
             IntroductionAnnotationPhase: Configured introduction annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors, phase_type=config.phase_type
+        )
 
         return IntroductionAnnotationPhase(
             name=config.name,
@@ -136,7 +140,9 @@ class PhaseFactory:
         Returns:
             SummaryAnnotationPhase: Configured summary annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors, phase_type=config.phase_type
+        )
 
         return SummaryAnnotationPhase(
             name=config.name,
@@ -219,10 +225,10 @@ class PhaseFactory:
             PostProcessorChain: Chain with formatting processors
         """
         chain = PostProcessorChain()
-        chain.add_processor(RemoveXmlTagsProcessor())
-        chain.add_processor(RemoveTrailingWhitespaceProcessor())
-        chain.add_processor(EnsureBlankLineProcessor())
-        chain.add_processor(OrderQuoteAnnotationProcessor())
+        chain.add_processor(processor=RemoveXmlTagsProcessor())
+        chain.add_processor(processor=RemoveTrailingWhitespaceProcessor())
+        chain.add_processor(processor=EnsureBlankLineProcessor())
+        chain.add_processor(processor=OrderQuoteAnnotationProcessor())
         return chain
 
     @staticmethod
@@ -267,20 +273,20 @@ class PhaseFactory:
                     formatting_chain = PhaseFactory._create_formatting_processor_chain()
                     # Add all processors from the formatting chain
                     for processor in formatting_chain.processors:
-                        chain.add_processor(processor)
+                        chain.add_processor(processor=processor)
                 else:
                     # Handle built-in processor by name
-                    processor = PhaseFactory._create_built_in_processor(processor_item)
+                    processor = PhaseFactory._create_built_in_processor(processor_name=processor_item)
                     if processor:
-                        chain.add_processor(processor)
+                        chain.add_processor(processor=processor)
             elif isinstance(processor_item, PostProcessor):
                 # Handle custom PostProcessor instances
-                chain.add_processor(processor_item)
+                chain.add_processor(processor=processor_item)
             elif isinstance(processor_item, PostProcessorType):
                 # Handle PostProcessorType enum values
-                processor = PhaseFactory._create_processor_from_enum(processor_item)
+                processor = PhaseFactory._create_processor_from_enum(processor_type=processor_item)
                 if processor:
-                    chain.add_processor(processor)
+                    chain.add_processor(processor=processor)
             else:
                 # Skip invalid items
                 continue

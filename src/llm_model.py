@@ -7,7 +7,7 @@ import requests
 from src.logging_config import setup_logging
 
 # Initialize module-level logger
-module_logger = setup_logging("llm_model")
+module_logger = setup_logging(log_name="llm_model")
 
 # Model constants
 GROK_3_MINI = "x-ai/grok-3-mini"
@@ -146,7 +146,7 @@ class LlmModel:
                 response = requests.post(
                     url=f"{self.base_url}/chat/completions",
                     headers=headers,
-                    data=json.dumps(data),
+                    data=json.dumps(obj=data),
                     timeout=30,  # Add timeout to prevent hanging requests
                 )
                 response.raise_for_status()
@@ -154,7 +154,7 @@ class LlmModel:
 
             except requests.exceptions.RequestException as e:
                 last_error = e
-                if attempt < self.max_retries and self._should_retry(e):
+                if attempt < self.max_retries and self._should_retry(error=e):
                     delay = self.retry_delay * (self.backoff_factor**attempt)
                     module_logger.warning(
                         f"API call failed (attempt {attempt + 1}/"
@@ -197,8 +197,8 @@ class LlmModel:
             LlmModelError: When API calls fail after max retries.
             ValueError: On empty/malformed response.
         """
-        self._log_prompt("System", system_prompt)
-        self._log_prompt("User", user_prompt)
+        self._log_prompt(role="System", content=system_prompt)
+        self._log_prompt(role="User", content=user_prompt)
 
         # Prepare headers
         headers = {
@@ -218,7 +218,7 @@ class LlmModel:
 
         # Make the API call with retry logic
         try:
-            resp_data = self._make_api_call(headers, data)
+            resp_data = self._make_api_call(headers=headers, data=data)
         except LlmModelError:
             # Re-raise LlmModelError to stop the pipeline
             raise

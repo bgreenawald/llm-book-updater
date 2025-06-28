@@ -8,7 +8,11 @@ from loguru import logger
 from src.config import PhaseType, RunConfig
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import IntroductionAnnotationPhase, LlmPhase, StandardLlmPhase, SummaryAnnotationPhase
+from src.logging_config import setup_logging
 from src.phase_factory import PhaseFactory
+
+# Initialize module-level logger
+module_logger = setup_logging(log_name="pipeline")
 
 
 def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
@@ -102,6 +106,8 @@ class Pipeline:
             "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
             "fully_rendered_system_prompt": phase.system_prompt,
             "length_reduction_parameter": phase.length_reduction,
+            "book_name": self.config.book_name,
+            "author_name": self.config.author_name,
         }
         self._system_prompt_metadata.append(metadata)
 
@@ -127,8 +133,8 @@ class Pipeline:
             self.config.output_dir / f"system_prompt_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         )
         try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            with open(file=metadata_file, mode="w", encoding="utf-8") as f:
+                json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"System prompt metadata saved to: {metadata_file}")
         except Exception as e:
             logger.error(f"Failed to save system prompt metadata: {str(e)}")
@@ -213,8 +219,8 @@ class Pipeline:
         # Save metadata to output directory
         metadata_file = self.config.output_dir / f"run_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            with open(file=metadata_file, mode="w", encoding="utf-8") as f:
+                json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"Run metadata saved to: {metadata_file}")
         except Exception as e:
             logger.error(f"Failed to save run metadata: {str(e)}")
@@ -271,7 +277,7 @@ class Pipeline:
 
         # Subsequent phases use the previous phase's output
         previous_phase_index = phase_index - 1
-        return self._get_phase_output_path(previous_phase_index)
+        return self._get_phase_output_path(phase_index=previous_phase_index)
 
     def _initialize_phase(self, phase_index: int) -> Optional[LlmPhase]:
         """
@@ -292,8 +298,8 @@ class Pipeline:
             logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
             return None
 
-        input_path = self._get_phase_input_path(phase_index)
-        output_path = self._get_phase_output_path(phase_index)
+        input_path = self._get_phase_input_path(phase_index=phase_index)
+        output_path = self._get_phase_output_path(phase_index=phase_index)
 
         # For the first phase, check if input file exists
         if phase_index == 0 and not input_path.exists():
@@ -329,11 +335,11 @@ class Pipeline:
         # Create the phase instance using the factory, passing length_reduction as a kwarg
         phase_factory_kwargs = {"length_reduction": self.config.length_reduction}
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
-            phase = PhaseFactory.create_standard_phase(factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_standard_phase(config=factory_config, **phase_factory_kwargs)
         elif phase_config.phase_type == PhaseType.INTRODUCTION:
-            phase = PhaseFactory.create_introduction_annotation_phase(factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_introduction_annotation_phase(config=factory_config, **phase_factory_kwargs)
         elif phase_config.phase_type == PhaseType.SUMMARY:
-            phase = PhaseFactory.create_summary_annotation_phase(factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_summary_annotation_phase(config=factory_config, **phase_factory_kwargs)
         else:
             raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
 
@@ -372,7 +378,7 @@ class Pipeline:
 
                 logger.info(f"Proceeding with phase: {phase_config.phase_type.name}")
 
-                phase = self._initialize_phase(i)
+                phase = self._initialize_phase(phase_index=i)
                 if not phase:
                     logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
                     continue
@@ -384,7 +390,7 @@ class Pipeline:
                     logger.debug(f"Input file: {phase.input_file_path}")
                     logger.debug(f"Output file: {phase.output_file_path}")
                     # Collect system prompt metadata right before processing starts
-                    self._collect_system_prompt_metadata(phase, i)
+                    self._collect_system_prompt_metadata(phase=phase, phase_index=i)
                     phase.run(**kwargs)
                     logger.success(f"Successfully completed phase: {phase.name}")
                     logger.debug(f"Output written to: {phase.output_file_path}")
@@ -400,7 +406,7 @@ class Pipeline:
             logger.success("Pipeline completed successfully")
         finally:
             # Save metadata about the run (whether successful or failed)
-            self._save_run_metadata(completed_phases)
+            self._save_run_metadata(completed_phases=completed_phases)
             # Save all system prompt metadata at the end of the run
             self._save_all_system_prompt_metadata()
 
@@ -421,7 +427,7 @@ def run_pipeline(config: RunConfig) -> None:
     logger.info(f"Running pipeline for {config.book_name}")
 
     try:
-        pipeline = Pipeline(config)
+        pipeline = Pipeline(config=config)
         pipeline.run()
         logger.success("Pipeline completed successfully")
     except Exception as e:

@@ -24,7 +24,7 @@ def setup_logging(log_name: str = "app") -> logger:
 
     # Add file handler
     logger.add(
-        log_dir / f"{log_name}.log",
+        sink=log_dir / f"{log_name}.log",
         rotation="10 MB",
         level="INFO",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
@@ -33,7 +33,7 @@ def setup_logging(log_name: str = "app") -> logger:
     # Add stdout handler if not already added
     if not any(handler._sink == sys.stdout for handler in logger._core.handlers.values()):
         logger.add(
-            sys.stdout,
+            sink=sys.stdout,
             level="INFO",
             format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "

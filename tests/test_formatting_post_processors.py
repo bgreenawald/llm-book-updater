@@ -24,42 +24,42 @@ class TestEnsureBlankLineProcessor:
         """Test basic blank line insertion between paragraphs."""
         llm_block = "Paragraph 1.\nParagraph 2."
         expected_output = "Paragraph 1.\n\nParagraph 2."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_no_blank_line_for_list_items(self, ensure_blank_line_processor):
         """Test that list items don't get blank lines between them."""
         llm_block = "* Item 1\n* Item 2"
         expected_output = "* Item 1\n* Item 2"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_no_blank_line_for_multiline_quote(self, ensure_blank_line_processor):
         """Test that multiline quotes don't get blank lines between lines."""
         llm_block = "> Quote line 1\n> Quote line 2"
         expected_output = "> Quote line 1\n> Quote line 2"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_blank_line_between_special_blocks(self, ensure_blank_line_processor):
         """Test blank lines between Quote and Annotation blocks."""
         llm_block = "> **Quote:** A quote. **End quote.**\n> **Annotation:** An annotation. **End annotation.**"
         expected_output = "> **Quote:** A quote. **End quote.**\n\n> **Annotation:** An annotation. **End annotation.**"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_block_surrounded_by_blank_lines(self, ensure_blank_line_processor):
         """Test that Quote blocks are properly surrounded by blank lines."""
         llm_block = "Some text.\n> **Quote:** This is a quote. **End quote.**\nMore text."
         expected_output = "Some text.\n\n> **Quote:** This is a quote. **End quote.**\n\nMore text."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_annotation_block_surrounded_by_blank_lines(self, ensure_blank_line_processor):
         """Test that Annotation blocks are properly surrounded by blank lines."""
         llm_block = "Some text.\n> **Annotation:** This is an annotation. **End annotation.**\nMore text."
         expected_output = "Some text.\n\n> **Annotation:** This is an annotation. **End annotation.**\n\nMore text."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_multiple_quote_blocks_with_blank_lines(self, ensure_blank_line_processor):
@@ -78,7 +78,7 @@ class TestEnsureBlankLineProcessor:
             "> **Quote:** Second quote. **End quote.**\n\n"
             "Conclusion."
         )
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_block_with_multiple_lines(self, ensure_blank_line_processor):
@@ -87,7 +87,7 @@ class TestEnsureBlankLineProcessor:
         expected_output = (
             "Text before.\n\n> **Quote:** This is a single-line quote block. **End quote.**\n\nText after."
         )
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_annotation_block_with_multiple_lines(self, ensure_blank_line_processor):
@@ -100,14 +100,14 @@ class TestEnsureBlankLineProcessor:
             "> **Annotation:** This is a single-line annotation block. **End annotation.**\n\n"
             "Text after."
         )
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_regular_quotes_not_surrounded(self, ensure_blank_line_processor):
         """Test that regular quotes (not Quote/Annotation blocks) are not surrounded."""
         llm_block = "Some text.\n> This is a regular quote.\n> Not a special block.\nMore text."
         expected_output = "Some text.\n\n> This is a regular quote.\n> Not a special block.\n\nMore text."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_mixed_content_with_quotes_and_lists(self, ensure_blank_line_processor):
@@ -130,28 +130,28 @@ class TestEnsureBlankLineProcessor:
             "> **Annotation:** An annotation. **End annotation.**\n\n"
             "Conclusion."
         )
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_empty_lines_preserved(self, ensure_blank_line_processor):
         """Test that existing empty lines are preserved."""
         llm_block = "Line 1.\n\nLine 2.\n\n\nLine 3."
         expected_output = "Line 1.\n\nLine 2.\n\n\nLine 3."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_block_at_end(self, ensure_blank_line_processor):
         """Test Quote block at the end of content."""
         llm_block = "Some text.\n> **Quote:** Final quote. **End quote.**"
         expected_output = "Some text.\n\n> **Quote:** Final quote. **End quote.**"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_block_at_beginning(self, ensure_blank_line_processor):
         """Test Quote block at the beginning of content."""
         llm_block = "> **Quote:** Opening quote. **End quote.**\nSome text."
         expected_output = "> **Quote:** Opening quote. **End quote.**\n\nSome text."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_multiline_quotes_still_work(self, ensure_blank_line_processor):
@@ -170,14 +170,14 @@ class TestEnsureBlankLineProcessor:
             "> It should not have blank lines between lines.\n\n"
             "More text."
         )
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_mixed_list_types(self, ensure_blank_line_processor):
         """Test mixed list types (asterisk and dash)."""
         llm_block = "* Item 1\n- Item 2\n* Item 3"
         expected_output = "* Item 1\n- Item 2\n* Item 3"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_list_with_nested_content(self, ensure_blank_line_processor):
@@ -192,35 +192,35 @@ class TestEnsureBlankLineProcessor:
         """
         llm_block = "* Item 1\n  Nested content\n* Item 2"
         expected_output = "* Item 1\n\n  Nested content\n\n* Item 2"
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_block_with_whitespace(self, ensure_blank_line_processor):
         """Test Quote blocks with leading/trailing whitespace."""
         llm_block = "Text.\n> **Quote:**  Quote with spaces  . **End quote.**\nMore text."
         expected_output = "Text.\n\n> **Quote:**  Quote with spaces  . **End quote.**\n\nMore text."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_empty_input(self, ensure_blank_line_processor):
         """Test with empty input."""
         llm_block = ""
         expected_output = ""
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_single_line_input(self, ensure_blank_line_processor):
         """Test with single line input."""
         llm_block = "Single line."
         expected_output = "Single line."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_consecutive_blank_lines(self, ensure_blank_line_processor):
         """Test handling of consecutive blank lines."""
         llm_block = "Line 1.\n\n\nLine 2."
         expected_output = "Line 1.\n\n\nLine 2."
-        result = ensure_blank_line_processor.process("", llm_block)
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
 
@@ -241,70 +241,70 @@ class TestRemoveXmlTagsProcessor:
         """Test basic XML tag removal."""
         llm_block = "<p>Some text.</p>\n<br>\n<item>Another item</item>"
         expected_output = "Some text.\n<br>\nAnother item"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_preserve_br_tags(self, remove_xml_tags_processor):
         """Test that <br> tags are preserved."""
         llm_block = "<p>Text</p>\n<br>\n<br/>\n<strong>Bold</strong>"
         expected_output = "Text\n<br>\n<br/>\nBold"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_remove_self_closing_tags(self, remove_xml_tags_processor):
         """Test removal of self-closing tags."""
         llm_block = "<img src='test.jpg'/>\n<hr/>\n<br>\nText"
         expected_output = "\n\n<br>\nText"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_remove_nested_tags(self, remove_xml_tags_processor):
         """Test removal of nested XML tags."""
         llm_block = "<div><p><strong>Bold text</strong></p></div>"
         expected_output = "Bold text"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_remove_tags_with_attributes(self, remove_xml_tags_processor):
         """Test removal of tags with attributes."""
         llm_block = '<p class="test" id="main">Content</p>'
         expected_output = "Content"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_remove_tags_with_special_characters(self, remove_xml_tags_processor):
         """Test removal of tags with special characters in attributes."""
         llm_block = '<a href="test.html" onclick="alert(\'test\')">Link</a>'
         expected_output = "Link"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_no_tags_to_remove(self, remove_xml_tags_processor):
         """Test text with no XML tags."""
         llm_block = "Plain text without any tags."
         expected_output = "Plain text without any tags."
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_empty_input(self, remove_xml_tags_processor):
         """Test with empty input."""
         llm_block = ""
         expected_output = ""
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_only_tags(self, remove_xml_tags_processor):
         """Test input containing only XML tags."""
         llm_block = "<p></p>\n<div></div>\n<br>"
         expected_output = "\n\n<br>"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_malformed_tags(self, remove_xml_tags_processor):
         """Test handling of malformed XML tags."""
         llm_block = "<p>Text</p>\n<unclosed>\n<br>\n<malformed"
         expected_output = "Text\n\n<br>\n<malformed"
-        result = remove_xml_tags_processor.process("", llm_block)
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
 
@@ -325,56 +325,56 @@ class TestRemoveTrailingWhitespaceProcessor:
         """Test basic trailing whitespace removal."""
         llm_block = "Line 1  \nLine 2\t\nLine 3"
         expected_output = "Line 1\nLine 2\nLine 3"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_remove_mixed_whitespace(self, remove_trailing_whitespace_processor):
         """Test removal of mixed whitespace characters."""
         llm_block = "Line 1 \t \nLine 2  \t  \nLine 3"
         expected_output = "Line 1\nLine 2\nLine 3"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_preserve_leading_whitespace(self, remove_trailing_whitespace_processor):
         """Test that leading whitespace is preserved."""
         llm_block = "  Line 1  \n\tLine 2\t\n   Line 3   "
         expected_output = "  Line 1\n\tLine 2\n   Line 3"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_preserve_leading_and_remove_trailing(self, remove_trailing_whitespace_processor):
+        """Test that leading whitespace is preserved and trailing whitespace is removed."""
+        llm_block = "  Line 1  \n\tLine 2\t\n   Line 3   \n"
+        expected_output = "  Line 1\n\tLine 2\n   Line 3\n"
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_empty_lines(self, remove_trailing_whitespace_processor):
         """Test handling of empty lines."""
         llm_block = "Line 1\n  \n\t\nLine 2"
         expected_output = "Line 1\n\n\nLine 2"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
-        assert result == expected_output
-
-    def test_no_trailing_whitespace(self, remove_trailing_whitespace_processor):
-        """Test text with no trailing whitespace."""
-        llm_block = "Line 1\nLine 2\nLine 3"
-        expected_output = "Line 1\nLine 2\nLine 3"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
-        assert result == expected_output
-
-    def test_empty_input(self, remove_trailing_whitespace_processor):
-        """Test with empty input."""
-        llm_block = ""
-        expected_output = ""
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_only_whitespace_lines(self, remove_trailing_whitespace_processor):
         """Test lines containing only whitespace."""
         llm_block = "  \n\t\n   \n"
         expected_output = "\n\n\n"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
-    def test_single_line_with_trailing_whitespace(self, remove_trailing_whitespace_processor):
-        """Test single line with trailing whitespace."""
-        llm_block = "Single line with spaces  \t  "
-        expected_output = "Single line with spaces"
-        result = remove_trailing_whitespace_processor.process("", llm_block)
+    def test_no_trailing_whitespace(self, remove_trailing_whitespace_processor):
+        """Test text with no trailing whitespace."""
+        llm_block = "Line 1\nLine 2\nLine 3"
+        expected_output = "Line 1\nLine 2\nLine 3"
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_empty_input(self, remove_trailing_whitespace_processor):
+        """Test with empty input."""
+        llm_block = ""
+        expected_output = ""
+        result = remove_trailing_whitespace_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
 
@@ -405,7 +405,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** This is an annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_simple_reorder_annotation_before_quote_with_newline(self, order_quote_annotation_processor):
@@ -422,7 +422,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** This is an annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_multiple_quotes_and_annotations(self, order_quote_annotation_processor):
@@ -443,7 +443,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Second annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_separate_blocks_not_affected(self, order_quote_annotation_processor):
@@ -468,7 +468,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Second annotation. **End annotation.**\n"
             "Third paragraph."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quotes_only_no_change(self, order_quote_annotation_processor):
@@ -485,7 +485,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Quote:** Second quote. **End quote.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_annotations_only_no_change(self, order_quote_annotation_processor):
@@ -502,7 +502,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Second annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_mixed_content_with_regular_quotes(self, order_quote_annotation_processor):
@@ -521,21 +521,21 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Quote:** A quote block. **End quote.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_empty_input(self, order_quote_annotation_processor):
         """Test with empty input."""
         llm_block = ""
         expected_output = ""
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_no_quotes_or_annotations(self, order_quote_annotation_processor):
         """Test with no Quote or Annotation blocks."""
         llm_block = "First paragraph.\nSecond paragraph.\n> Regular quote.\nThird paragraph."
         expected_output = "First paragraph.\nSecond paragraph.\n> Regular quote.\nThird paragraph."
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_complex_mixed_scenario(self, order_quote_annotation_processor):
@@ -574,7 +574,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Final annotation. **End annotation.**\n"
             "End."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_annotation_with_whitespace(self, order_quote_annotation_processor):
@@ -591,7 +591,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:**  Annotation with spaces  . **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_multiple_consecutive_blank_lines(self, order_quote_annotation_processor):
@@ -609,7 +609,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** An annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_annotation_at_beginning(self, order_quote_annotation_processor):
@@ -624,7 +624,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** First annotation. **End annotation.**\n"
             "Regular text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_annotation_at_end(self, order_quote_annotation_processor):
@@ -639,7 +639,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Quote:** Final quote. **End quote.**\n"
             "> **Annotation:** Final annotation. **End annotation.**"
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_multiple_consecutive_blank_lines_between_blocks(self, order_quote_annotation_processor):
@@ -672,7 +672,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Third annotation. **End annotation.**\n"
             "Final text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_whitespace_only_lines_between_blocks(self, order_quote_annotation_processor):
@@ -705,7 +705,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Third annotation. **End annotation.**\n"
             "Final text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_annotation_blocks_at_start_with_blank_lines(self, order_quote_annotation_processor):
@@ -728,7 +728,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Middle annotation. **End annotation.**\n"
             "More text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_quote_annotation_blocks_at_end_with_blank_lines(self, order_quote_annotation_processor):
@@ -751,7 +751,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Quote:** Final quote. **End quote.**\n"
             "> **Annotation:** Final annotation. **End annotation.**"
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_mixed_whitespace_and_blank_lines(self, order_quote_annotation_processor):
@@ -788,7 +788,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Second annotation. **End annotation.**\n"
             "> **Annotation:** End annotation. **End annotation.**"
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_lookahead_logic_with_multiple_blank_lines(self, order_quote_annotation_processor):
@@ -814,7 +814,7 @@ class TestOrderQuoteAnnotationProcessor:
             "\n\n"
             "Final text."
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_flush_logic_at_boundaries(self, order_quote_annotation_processor):
@@ -839,7 +839,7 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Quote:** Last quote. **End quote.**\n"
             "> **Annotation:** Last annotation. **End annotation.**"
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
     def test_edge_case_only_whitespace_content(self, order_quote_annotation_processor):
@@ -861,5 +861,5 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** Another annotation. **End annotation.**\n"
             "  "
         )
-        result = order_quote_annotation_processor.process("", llm_block)
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output

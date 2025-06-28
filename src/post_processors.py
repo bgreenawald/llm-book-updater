@@ -65,7 +65,7 @@ class EnsureBlankLineProcessor(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("ensure_blank_line", config)
+        super().__init__(name="ensure_blank_line", config=config)
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         """
@@ -93,7 +93,9 @@ class EnsureBlankLineProcessor(PostProcessor):
                     is_list = line.strip().startswith(("* ", "- ")) and next_line.strip().startswith(("* ", "- "))
 
                     # Check if we're in a multiline quote block (not Quote/Annotation blocks)
-                    in_multiline_quote = self._is_in_multiline_quote(lines, i, line, next_line)
+                    in_multiline_quote = self._is_in_multiline_quote(
+                        lines=lines, current_idx=i, current_line=line, next_line=next_line
+                    )
 
                     if not is_list and not in_multiline_quote:
                         processed_lines.append("")
@@ -142,11 +144,11 @@ class RemoveXmlTagsProcessor(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("remove_xml_tags", config)
-        self.xml_tag_pattern = re.compile(r"<(?!(/)?br)[^>]*>")
+        super().__init__(name="remove_xml_tags", config=config)
+        self.xml_tag_pattern = re.compile(pattern=r"<(?!(/)?br)[^>]*>")
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
-        return self.xml_tag_pattern.sub("", llm_block)
+        return self.xml_tag_pattern.sub(repl="", string=llm_block)
 
 
 class RemoveTrailingWhitespaceProcessor(PostProcessor):
@@ -155,7 +157,7 @@ class RemoveTrailingWhitespaceProcessor(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("remove_trailing_whitespace", config)
+        super().__init__(name="remove_trailing_whitespace", config=config)
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         return "\n".join(line.rstrip() for line in llm_block.split("\n"))
@@ -167,13 +169,13 @@ class RevertRemovedBlockLines(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("revert_removed_block_lines", config)
+        super().__init__(name="revert_removed_block_lines", config=config)
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         original_lines = original_block.splitlines()
         llm_lines = llm_block.splitlines()
 
-        matcher = difflib.SequenceMatcher(None, original_lines, llm_lines)
+        matcher = difflib.SequenceMatcher(a=original_lines, b=llm_lines)
         processed_lines = list(llm_lines)
 
         for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
@@ -197,7 +199,7 @@ class NoNewHeadersPostProcessor(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("no_new_headers", config)
+        super().__init__(name="no_new_headers", config=config)
         self.header_pattern = re.compile(r"^(#+)\s+(.*)")
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
@@ -317,7 +319,7 @@ class OrderQuoteAnnotationProcessor(PostProcessor):
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__("order_quote_annotation", config)
+        super().__init__(name="order_quote_annotation", config=config)
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         """
