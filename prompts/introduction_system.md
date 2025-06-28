@@ -40,7 +40,7 @@ Your sole objective is to create a concise, structured introduction that provide
 
 ## Output Template
 
-> **Annotated Introduction:**<br>
+> **Annotated introduction:**<br>
 ><br>
 > **Overview**<br>
 > [Your 1-3 paragraph overview here. Focus on what makes this section unique and why it matters.]<br>

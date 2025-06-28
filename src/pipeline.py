@@ -8,6 +8,7 @@ from loguru import logger
 from src.config import PhaseType, RunConfig
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import IntroductionAnnotationPhase, LlmPhase, StandardLlmPhase, SummaryAnnotationPhase
+from src.phase_factory import PhaseFactory
 
 
 def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
@@ -29,7 +30,6 @@ def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
         PhaseType.EDIT: StandardLlmPhase,
         PhaseType.ANNOTATE: StandardLlmPhase,
         PhaseType.FINAL: StandardLlmPhase,
-        PhaseType.FORMATTING: StandardLlmPhase,
         PhaseType.INTRODUCTION: IntroductionAnnotationPhase,
         PhaseType.SUMMARY: SummaryAnnotationPhase,
     }
@@ -70,6 +70,12 @@ class Pipeline:
         # Add information about each completed phase
         for i, phase in enumerate(completed_phases):
             phase_config = self.config.phases[i]
+
+            # Get post-processor information
+            post_processors_info = []
+            if phase.post_processor_chain:
+                post_processors_info = [p.name for p in phase.post_processor_chain.processors]
+
             phase_metadata = {
                 "phase_name": phase.name,
                 "phase_index": i,
@@ -81,6 +87,8 @@ class Pipeline:
                 "system_prompt": str(phase.system_prompt_path) if phase.system_prompt_path else None,
                 "user_prompt": str(phase.user_prompt_path) if phase.user_prompt_path else None,
                 "max_workers": phase_config.max_workers,
+                "post_processors": post_processors_info,
+                "post_processor_count": len(post_processors_info),
                 "completed": True,
                 "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
             }
@@ -89,6 +97,18 @@ class Pipeline:
         # Add information about phases that were configured but not run
         for i, phase_config in enumerate(self.config.phases):
             if i >= len(completed_phases):
+                # Get post-processor information from config
+                post_processors_info = []
+                if phase_config.post_processors:
+                    # Convert post-processors to readable names
+                    for processor in phase_config.post_processors:
+                        if hasattr(processor, "name"):
+                            post_processors_info.append(processor.name)
+                        elif isinstance(processor, str):
+                            post_processors_info.append(processor)
+                        else:
+                            post_processors_info.append(str(processor))
+
                 phase_metadata = {
                     "phase_name": phase_config.phase_type.name.lower(),
                     "phase_index": i,
@@ -96,6 +116,8 @@ class Pipeline:
                     "model_type": phase_config.model_type,
                     "temperature": phase_config.temperature,
                     "max_workers": phase_config.max_workers,
+                    "post_processors": post_processors_info,
+                    "post_processor_count": len(post_processors_info),
                     "completed": False,
                     "reason": "disabled" if not phase_config.enabled else "not_run",
                 }
@@ -164,8 +186,8 @@ class Pipeline:
             temperature=phase_config.temperature,
         )
 
-        # Create the phase instance using the factory
-        phase = create_phase(
+        # Create PhaseConfig for the factory
+        factory_config = type(phase_config)(
             phase_type=phase_config.phase_type,
             name=phase_config.phase_type.name.lower(),
             input_file_path=input_path,
@@ -179,7 +201,26 @@ class Pipeline:
             temperature=phase_config.temperature,
             max_workers=phase_config.max_workers,
             reasoning=phase_config.reasoning,
+            post_processors=phase_config.post_processors,
         )
+
+        # Create the phase instance using the factory
+        if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
+            phase = PhaseFactory.create_standard_phase(factory_config)
+        elif phase_config.phase_type == PhaseType.INTRODUCTION:
+            phase = PhaseFactory.create_introduction_annotation_phase(factory_config)
+        elif phase_config.phase_type == PhaseType.SUMMARY:
+            phase = PhaseFactory.create_summary_annotation_phase(factory_config)
+        else:
+            raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
+
+        # Log post-processor information
+        if phase.post_processor_chain:
+            processor_names = [p.name for p in phase.post_processor_chain.processors]
+            logger.info(f"Post-processing pipeline for {phase.name}: {processor_names}")
+            logger.info(f"Post-processor count: {len(processor_names)}")
+        else:
+            logger.info(f"No post-processors configured for {phase.name}")
 
         return phase
 
@@ -190,42 +231,41 @@ class Pipeline:
 
         completed_phases: List[LlmPhase] = []
 
-        for i, phase_config in enumerate(self.config.phases):
-            if not phase_config.enabled:
-                logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
-                continue
+        try:
+            for i, phase_config in enumerate(self.config.phases):
+                if not phase_config.enabled:
+                    logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
+                    continue
 
-            logger.info(f"Proceeding with phase: {phase_config.phase_type.name}")
+                logger.info(f"Proceeding with phase: {phase_config.phase_type.name}")
 
-            phase = self._initialize_phase(i)
-            if not phase:
-                logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
-                continue
+                phase = self._initialize_phase(i)
+                if not phase:
+                    logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
+                    continue
 
-            self._phase_instances.append(phase)
+                self._phase_instances.append(phase)
 
-            try:
-                logger.info(f"Starting phase: {phase.name}")
-                logger.debug(f"Input file: {phase.input_file_path}")
-                logger.debug(f"Output file: {phase.output_file_path}")
-                phase.run(**kwargs)
-                logger.success(f"Successfully completed phase: {phase.name}")
-                logger.debug(f"Output written to: {phase.output_file_path}")
-                completed_phases.append(phase)
-            except LlmModelError as e:
-                logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
-                logger.error("Pipeline stopped due to LLM model failure after max retries")
-                self._save_run_metadata(completed_phases)
-                raise
-            except Exception as e:
-                logger.error(f"Error in phase {phase.name}: {str(e)}", exc_info=True)
-                self._save_run_metadata(completed_phases)
-                raise
+                try:
+                    logger.info(f"Starting phase: {phase.name}")
+                    logger.debug(f"Input file: {phase.input_file_path}")
+                    logger.debug(f"Output file: {phase.output_file_path}")
+                    phase.run(**kwargs)
+                    logger.success(f"Successfully completed phase: {phase.name}")
+                    logger.debug(f"Output written to: {phase.output_file_path}")
+                    completed_phases.append(phase)
+                except LlmModelError as e:
+                    logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
+                    logger.error("Pipeline stopped due to LLM model failure after max retries")
+                    raise
+                except Exception as e:
+                    logger.error(f"Error in phase {phase.name}: {str(e)}", exc_info=True)
+                    raise
 
-        # Save metadata about the run
-        self._save_run_metadata(completed_phases)
-
-        logger.success("Pipeline completed successfully")
+            logger.success("Pipeline completed successfully")
+        finally:
+            # Save metadata about the run (whether successful or failed)
+            self._save_run_metadata(completed_phases)
 
 
 def run_pipeline(config: RunConfig) -> None:
