@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from src.llm_model import GEMINI_FLASH
 
@@ -29,12 +29,24 @@ class PhaseConfig:
     user_prompt_path: Path = None
     custom_output_path: Optional[Path] = None
     max_workers: Optional[int] = None
+    # Additional parameters for PhaseFactory integration
+    name: Optional[str] = None
+    input_file_path: Optional[Path] = None
+    output_file_path: Optional[Path] = None
+    original_file_path: Optional[Path] = None
+    model: Optional[object] = None  # LlmModel instance
+    # Unified post-processors list that can contain strings (built-in) or PostProcessor instances (custom)
+    post_processors: Optional[List[Union[str, object]]] = None
+    book_name: Optional[str] = None
+    author_name: Optional[str] = None
 
     def __post_init__(self):
         if self.system_prompt_path is None:
             self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
         if self.user_prompt_path is None:
             self.user_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_user.md")
+        if self.name is None:
+            self.name = self.phase_type.name.lower()
 
 
 @dataclass

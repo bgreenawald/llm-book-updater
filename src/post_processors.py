@@ -229,6 +229,7 @@ class PostProcessorChain(PostProcessor):
         Args:
             processors (Optional[List[PostProcessor]]): List of post-processors to chain
         """
+        super().__init__(name="post_processor_chain")
         self.processors = processors or []
         logger.debug(f"Initialized post-processor chain with {len(self.processors)} processors")
 
