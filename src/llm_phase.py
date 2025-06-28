@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from src.llm_model import LlmModel
 from src.logging_config import setup_logging
+from src.post_processors import PostProcessorChain
 
 # Set up logging
 setup_logging("llm_phase")
@@ -29,6 +30,7 @@ class LlmPhase(ABC):
         temperature: float = 0.2,
         max_workers: int = None,
         reasoning: dict = None,
+        post_processor_chain: PostProcessorChain = None,
     ):
         logger.info(f"Initializing LlmPhase: {name}")
         logger.debug(f"Input file: {input_file_path}")
@@ -57,6 +59,8 @@ class LlmPhase(ABC):
             temperature (float, optional): LLM temperature. Defaults to 0.2.
             max_workers (int, optional): Maximum worker threads for parallel 
                 processing. Defaults to None (executor default).
+            post_processor_chain (PostProcessorChain, optional): Post-processor 
+                chain for additional processing. Defaults to None.
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -70,6 +74,7 @@ class LlmPhase(ABC):
         self.temperature = temperature
         self.max_workers = max_workers
         self.reasoning = reasoning or {}
+        self.post_processor_chain = post_processor_chain
 
         if self.reasoning:
             logger.debug(f"Reasoning configuration: {self.reasoning}")
@@ -80,9 +85,7 @@ class LlmPhase(ABC):
             self.input_text = self._read_input_file()
             logger.debug(f"Read {len(self.input_text)} characters from input file")
             self.original_text = self._read_original_file()
-            logger.debug(
-                f"Read {len(self.original_text)} characters from original file"
-            )
+            logger.debug(f"Read {len(self.original_text)} characters from original file")
             self.system_prompt = self._read_system_prompt()
             logger.debug("System prompt loaded successfully")
             self.user_prompt = self._read_user_prompt()
@@ -101,7 +104,8 @@ class LlmPhase(ABC):
             f"book_name={self.book_name}, author_name={self.author_name}, "
             f"model={self.model}, user_prompt_path={self.user_prompt_path}, "
             f"temperature={self.temperature}, max_workers={self.max_workers}, "
-            f"reasoning={self.reasoning})"
+            f"reasoning={self.reasoning}, "
+            f"post_processor_chain={self.post_processor_chain})"
         )
 
     def __repr__(self):
@@ -122,6 +126,34 @@ class LlmPhase(ABC):
             str: The processed markdown block
         """
         pass
+
+    def _apply_post_processing(self, original_block: str, llm_block: str, **kwargs) -> str:
+        """
+        Apply post-processing to the LLM-generated block if a post-processor chain
+        is configured.
+
+        Args:
+            original_block (str): The original markdown block
+            llm_block (str): The LLM-generated block
+            **kwargs: Additional context for post-processors
+
+        Returns:
+            str: The post-processed block, or the original LLM block if no
+                post-processors are configured
+        """
+        if self.post_processor_chain is None:
+            return llm_block
+
+        logger.debug(f"Applying post-processing chain with {len(self.post_processor_chain)} processors")
+        try:
+            processed_block = self.post_processor_chain.process(original_block, llm_block, **kwargs)
+            logger.debug("Post-processing completed successfully")
+            return processed_block
+        except Exception as e:
+            logger.error(f"Error during post-processing: {str(e)}")
+            logger.exception("Post-processing error stack trace")
+            # Return the original LLM block if post-processing fails
+            return llm_block
 
     def _read_input_file(self) -> str:
         """
@@ -160,17 +192,13 @@ class LlmPhase(ABC):
         try:
             with self.original_file_path.open("r", encoding="utf-8") as f:
                 content = f.read()
-                logger.debug(
-                    f"Successfully read original file: {self.original_file_path}"
-                )
+                logger.debug(f"Successfully read original file: {self.original_file_path}")
                 return content
         except FileNotFoundError:
             logger.error(f"Original file not found: {self.original_file_path}")
             raise
         except IOError as e:
-            logger.error(
-                f"Error reading original file {self.original_file_path}: {str(e)}"
-            )
+            logger.error(f"Error reading original file {self.original_file_path}: {str(e)}")
             raise
 
     def _write_output_file(self, content: str) -> None:
@@ -190,9 +218,7 @@ class LlmPhase(ABC):
             logger.info(f"Successfully wrote output to: {self.output_file_path}")
             logger.debug(f"Wrote {len(content)} characters to output file")
         except IOError as e:
-            logger.error(
-                f"Error writing to output file {self.output_file_path}: {str(e)}"
-            )
+            logger.error(f"Error writing to output file {self.output_file_path}: {str(e)}")
             raise
 
     def _read_system_prompt(self) -> str:
@@ -216,9 +242,7 @@ class LlmPhase(ABC):
             logger.error(f"System prompt file not found: {self.system_prompt_path}")
             raise
         except IOError as e:
-            logger.error(
-                f"Error reading system prompt file {self.system_prompt_path}: {str(e)}"
-            )
+            logger.error(f"Error reading system prompt file {self.system_prompt_path}: {str(e)}")
             raise
 
     def _read_user_prompt(self) -> str:
@@ -242,9 +266,7 @@ class LlmPhase(ABC):
             logger.error(f"User prompt file not found: {self.user_prompt_path}")
             raise
         except IOError as e:
-            logger.error(
-                f"Error reading user prompt file {self.user_prompt_path}: {str(e)}"
-            )
+            logger.error(f"Error reading user prompt file {self.user_prompt_path}: {str(e)}")
             raise
 
     def _format_user_message(
@@ -309,9 +331,7 @@ class LlmPhase(ABC):
         Args:
             **kwargs: Additional arguments to pass to the block processing
         """
-        logger.info(
-            f"Starting to process markdown blocks with {self.max_workers} workers"
-        )
+        logger.info(f"Starting to process markdown blocks with {self.max_workers} workers")
 
         try:
             pattern = r"(#+\s.*?)(?=\n#+\s|\Z)"
@@ -345,10 +365,7 @@ class LlmPhase(ABC):
 
             # Reassemble in original order
             self.content = "".join(processed_blocks)
-            logger.info(
-                f"Completed processing all blocks. Total output length: "
-                f"{len(self.content)} characters"
-            )
+            logger.info(f"Completed processing all blocks. Total output length: {len(self.content)} characters")
 
         except Exception as e:
             logger.error(f"Error during markdown block processing: {str(e)}")
@@ -399,9 +416,7 @@ class StandardLlmPhase(LlmPhase):
             new_header, new_body = self._get_header_and_body(new_block)
             original_header, original_body = self._get_header_and_body(original_block)
 
-            body = self._format_user_message(
-                new_body, original_body, new_header, original_header
-            )
+            body = self._format_user_message(new_body, original_body, new_header, original_header)
 
             if body:
                 processed_body = self.model.chat_completion(
@@ -411,6 +426,7 @@ class StandardLlmPhase(LlmPhase):
                     reasoning=self.reasoning,
                     **kwargs,
                 )
+                processed_body = self._apply_post_processing(original_body, processed_body, **kwargs)
                 return f"{new_header}\n\n{processed_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
@@ -446,9 +462,7 @@ class IntroductionAnnotationPhase(LlmPhase):
             original_header, original_body = self._get_header_and_body(original_block)
 
             # Use the block content as the user prompt for generating the introduction
-            user_prompt = self._format_user_message(
-                new_body, original_body, new_header, original_header
-            )
+            user_prompt = self._format_user_message(new_body, original_body, new_header, original_header)
 
             if user_prompt:
                 introduction = self.model.chat_completion(
@@ -458,6 +472,9 @@ class IntroductionAnnotationPhase(LlmPhase):
                     reasoning=self.reasoning,
                     **kwargs,
                 )
+
+                # Apply post-processing to the introduction
+                introduction = self._apply_post_processing(original_body, introduction, **kwargs)
 
                 # Combine the introduction with the original block
                 if new_body:
@@ -498,9 +515,7 @@ class SummaryAnnotationPhase(LlmPhase):
             original_header, original_body = self._get_header_and_body(original_block)
 
             # Use the block content as the user prompt for generating the summary
-            user_prompt = self._format_user_message(
-                new_body, original_body, new_header, original_header
-            )
+            user_prompt = self._format_user_message(new_body, original_body, new_header, original_header)
 
             if user_prompt:
                 summary = self.model.chat_completion(
@@ -510,6 +525,9 @@ class SummaryAnnotationPhase(LlmPhase):
                     reasoning=self.reasoning,
                     **kwargs,
                 )
+
+                # Apply post-processing to the summary
+                summary = self._apply_post_processing(original_body, summary, **kwargs)
 
                 # Combine the original block with the summary
                 if new_body:
