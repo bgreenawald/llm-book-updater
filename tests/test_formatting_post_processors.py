@@ -181,7 +181,15 @@ class TestEnsureBlankLineProcessor:
         assert result == expected_output
 
     def test_list_with_nested_content(self, ensure_blank_line_processor):
-        """Test lists with nested content."""
+        """Test lists with nested content.
+
+        Note: Nested content (indented text that's not a list item) requires
+        blank line separation because it's not part of the list item exception.
+        The processor only avoids blank lines between consecutive list items
+        (lines starting with '* ' or '- '), not between list items and their
+        nested content. This improves readability by clearly separating the
+        list structure from its nested content.
+        """
         llm_block = "* Item 1\n  Nested content\n* Item 2"
         expected_output = "* Item 1\n\n  Nested content\n\n* Item 2"
         result = ensure_blank_line_processor.process("", llm_block)
