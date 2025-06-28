@@ -1,7 +1,7 @@
 import difflib
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-import re
 
 from loguru import logger
 
@@ -49,9 +49,104 @@ class PostProcessor(ABC):
         return self.__str__()
 
 
+class EnsureBlankLineProcessor(PostProcessor):
+    """
+    Ensures there is a blank line between any two elements, with exceptions for
+    markdown lists and multiline block quotes.
+
+    Quote and Annotation blocks are single-line blocks that should be surrounded
+    by blank lines.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("ensure_blank_line", config)
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        lines = llm_block.split("\n")
+        processed_lines = []
+
+        for i, line in enumerate(lines):
+            processed_lines.append(line)
+
+            if i < len(lines) - 1:
+                next_line = lines[i + 1]
+
+                if line.strip() and next_line.strip():
+                    # Check for exceptions
+                    is_list = line.strip().startswith(("* ", "- ")) and next_line.strip().startswith(("* ", "- "))
+
+                    # Check if we're in a multiline quote block (not Quote/Annotation blocks)
+                    in_multiline_quote = self._is_in_multiline_quote(lines, i, line, next_line)
+
+                    if not is_list and not in_multiline_quote:
+                        processed_lines.append("")
+
+        return "\n".join(processed_lines)
+
+    def _is_in_multiline_quote(self, lines: List[str], current_idx: int, current_line: str, next_line: str) -> bool:
+        """
+        Determine if we're in a multiline quote block that should not have
+        blank lines inserted between its lines.
+
+        Note: Quote and Annotation blocks are single-line blocks and are
+        handled separately.
+        """
+        # Check if current line starts with quote marker
+        if not current_line.strip().startswith(">"):
+            return False
+
+        # Check if this is a Quote or Annotation block (single-line)
+        if "**Quote:**" in current_line or "**Annotation:**" in current_line:
+            return False
+
+        # Check if next line also starts with quote marker
+        if next_line.strip().startswith(">"):
+            return True
+
+        # Check if we're in the middle of a multiline quote block
+        # Look ahead to see if there are more quote lines coming
+        for j in range(current_idx + 2, len(lines)):
+            future_line = lines[j].strip()
+            if not future_line:
+                continue
+            if future_line.startswith(">"):
+                # But not if it's a Quote or Annotation block
+                if not ("**Quote:**" in future_line or "**Annotation:**" in future_line):
+                    return True
+            # If we hit a non-quote line, we're not in a multiline quote
+            break
+
+        return False
+
+
+class RemoveXmlTagsProcessor(PostProcessor):
+    """
+    Removes XML tags, except for <br>.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("remove_xml_tags", config)
+        self.xml_tag_pattern = re.compile(r"<(?!(/)?br)[^>]*>")
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        return self.xml_tag_pattern.sub("", llm_block)
+
+
+class RemoveTrailingWhitespaceProcessor(PostProcessor):
+    """
+    Removes trailing whitespace from each line.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("remove_trailing_whitespace", config)
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        return "\n".join(line.rstrip() for line in llm_block.split("\n"))
+
+
 class RevertRemovedBlockLines(PostProcessor):
     """
-    Restores block comment lines (starting with ' > ') that were removed by the LLM.
+    Restores block comment lines (starting with '> ') that were removed by the LLM.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -119,7 +214,7 @@ class NoNewHeadersPostProcessor(PostProcessor):
         return "\n".join(processed_lines)
 
 
-class PostProcessorChain:
+class PostProcessorChain(PostProcessor):
     """
     A chain of post-processors that are applied in sequence.
 
@@ -178,8 +273,7 @@ class PostProcessorChain:
         return len(self.processors)
 
     def __str__(self):
-        processor_names = [p.name for p in self.processors]
-        return f"PostProcessorChain({processor_names})"
+        return f"PostProcessorChain({[p.name for p in self.processors]})"
 
     def __repr__(self):
         return self.__str__()

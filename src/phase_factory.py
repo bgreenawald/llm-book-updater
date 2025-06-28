@@ -7,7 +7,10 @@ from src.post_processors import (
     ConsistencyPostProcessor,
     ContentValidationPostProcessor,
     CustomPostProcessor,
-    FormattingPostProcessor,
+    EnsureBlankLineProcessor,
+    RemoveXmlTagsProcessor,
+    RemoveTrailingWhitespaceProcessor,
+    OrderQuoteAnnotationProcessor,
     PostProcessorChain,
 )
 
@@ -238,9 +241,12 @@ class PhaseFactory:
             PostProcessor: The created processor or None if not found
         """
         processors = {
-            "formatting": FormattingPostProcessor,
             "consistency": ConsistencyPostProcessor,
             "validation": ContentValidationPostProcessor,
+            "ensure_blank_line": EnsureBlankLineProcessor,
+            "remove_xml_tags": RemoveXmlTagsProcessor,
+            "remove_trailing_whitespace": RemoveTrailingWhitespaceProcessor,
+            "order_quote_annotation": OrderQuoteAnnotationProcessor,
         }
 
         processor_class = processors.get(processor_name.lower())
