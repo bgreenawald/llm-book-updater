@@ -75,7 +75,8 @@ class RunConfig:
     original_file: Path
     phases: List[PhaseConfig] = field(default_factory=list)
     # Length reduction parameter for the entire run (can be int or tuple of bounds)
-    length_reduction: Optional[Union[int, Tuple[int, int]]] = None
+    # Default to 35-50% reduction if not specified
+    length_reduction: Optional[Union[int, Tuple[int, int]]] = (35, 50)
 
     def __str__(self):
         return (

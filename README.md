@@ -97,49 +97,54 @@ The `RunConfig` class supports the following parameters:
 
 ### Length Reduction Parameter
 
-The `length_reduction` parameter allows you to control how much the edit and final phases shorten the text. This parameter is set at the run level and applies to all phases that use length reduction. It can be specified in two ways:
+The pipeline supports a `length_reduction` parameter that can be specified at the run level. This parameter controls how much the content should be reduced in length during the editing phase.
 
-1. **Single percentage value**: A single integer representing the target reduction percentage
-2. **Range of percentages**: A tuple of two integers representing the minimum and maximum reduction range
+### Usage
+
+The `length_reduction` parameter can be:
+- A single integer (e.g., `40` for 40% reduction)
+- A tuple of bounds (e.g., `(35, 50)` for 35-50% reduction)
+- `None` to use the default of `(35, 50)` (35-50% reduction)
+
+### Examples
 
 ```python
-from src.config import PhaseConfig, PhaseType, RunConfig
+from src.config import RunConfig, PhaseConfig, PhaseType
+from src.pipeline import Pipeline
 
-# Single percentage (40% reduction)
-config1 = RunConfig(
-    book_name="Example Book",
-    author_name="Example Author",
-    input_file=Path("input.md"),
+# Single percentage reduction
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name", 
+    input_file=Path("input.txt"),
     output_dir=Path("output"),
-    original_file=Path("original.md"),
+    original_file=Path("original.txt"),
     phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
-    length_reduction=40,
+    length_reduction=40  # 40% reduction
 )
 
-# Range of percentages (30-50% reduction)
-config2 = RunConfig(
-    book_name="Example Book",
-    author_name="Example Author",
-    input_file=Path("input.md"),
+# Range reduction (default behavior)
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name",
+    input_file=Path("input.txt"), 
     output_dir=Path("output"),
-    original_file=Path("original.md"),
+    original_file=Path("original.txt"),
     phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
-    length_reduction=(30, 50),
+    length_reduction=(35, 50)  # 35-50% reduction
 )
 
-# No length reduction specified (uses default from prompt)
-config3 = RunConfig(
-    book_name="Example Book",
-    author_name="Example Author",
-    input_file=Path("input.md"),
-    output_dir=Path("output"),
-    original_file=Path("original.md"),
-    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
-    # length_reduction=None (default)
+# Use default (35-50% reduction)
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name",
+    input_file=Path("input.txt"),
+    output_dir=Path("output"), 
+    original_file=Path("original.txt"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)]
+    # length_reduction defaults to (35, 50)
 )
 ```
-
-The length reduction parameter is automatically formatted and injected into the system prompt templates for both the edit and final phases. See `examples/length_reduction_example.py` for complete usage examples.
 
 ### Post-Processor Types
 
