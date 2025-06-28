@@ -45,13 +45,15 @@ def test_phase_factory():
     for phase_type in standard_phases:
         try:
             phase = create_phase(phase_type, **test_params)
-            # Just check the class type without initializing
+            # This part of the test will likely not be reached due to expected initialization failure
             assert isinstance(phase, StandardLlmPhase), f"Expected StandardLlmPhase for {phase_type}, got {type(phase)}"
             print(f"✓ {phase_type.name} -> {type(phase).__name__}")
         except Exception as e:
-            # We expect initialization to fail due to missing files, but class creation should work
+            # We expect initialization to fail due to missing files.
+            # The key is that create_phase should not raise an unexpected error.
             if "No such file or directory" in str(e):
-                print(f"✓ {phase_type.name} -> {type(phase).__name__} (class created, init failed as expected)")
+                # This confirms that the factory tried to create a phase, which failed as expected.
+                print(f"✓ {phase_type.name} -> (class creation initiated, init failed as expected)")
             else:
                 raise
 
@@ -67,8 +69,7 @@ def test_phase_factory():
     except Exception as e:
         if "No such file or directory" in str(e):
             print(
-                f"✓ {PhaseType.INTRODUCTION.name} -> {type(intro_phase).__name__} "
-                f"(class created, init failed as expected)"
+                f"✓ {PhaseType.INTRODUCTION.name} -> (class creation initiated, init failed as expected)"
             )
         else:
             raise
@@ -82,7 +83,7 @@ def test_phase_factory():
     except Exception as e:
         if "No such file or directory" in str(e):
             print(
-                f"✓ {PhaseType.SUMMARY.name} -> {type(summary_phase).__name__} (class created, init failed as expected)"
+                f"✓ {PhaseType.SUMMARY.name} -> (class creation initiated, init failed as expected)"
             )
         else:
             raise

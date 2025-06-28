@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
+import re
 
 from loguru import logger
 
@@ -45,6 +46,50 @@ class PostProcessor(ABC):
 
     def __repr__(self):
         return self.__str__()
+
+
+class NoNewHeadersPostProcessor(PostProcessor):
+    """
+    Ensures no new markdown headers are added to the content.
+
+    This processor handles two cases:
+    1. An entirely new markdown header is added: The new header line is deleted.
+    2. An existing line is converted to a markdown header: The line is reverted to its original state.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("no_new_headers", config)
+        self.header_pattern = re.compile(r"^(#+)\s+(.*)")
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        original_lines = original_block.splitlines()
+        original_lines_set = set(original_lines)
+        original_content_map = {line.strip(): line for line in original_lines}
+
+        llm_lines = llm_block.splitlines()
+        processed_lines = []
+
+        for line in llm_lines:
+            match = self.header_pattern.match(line)
+
+            if not match:
+                processed_lines.append(line)
+                continue
+
+            if line in original_lines_set:
+                processed_lines.append(line)
+                continue
+
+            header_content = match.group(2).strip()
+
+            if header_content in original_content_map:
+                original_line = original_content_map[header_content]
+                logger.info(f"Reverting converted header: '{line}' to '{original_line}'")
+                processed_lines.append(original_line)
+            else:
+                logger.info(f"Removing new header: '{line}'")
+
+        return "\n".join(processed_lines)
 
 
 class PostProcessorChain:
