@@ -48,12 +48,51 @@ class Pipeline:
         """Initialize the pipeline with a run configuration."""
         self.config = config
         self._phase_instances: List[LlmPhase] = []
+        self._system_prompt_metadata: list = []  # Collect system prompt metadata for all phases
 
     def __str__(self):
         return f"Pipeline(config={self.config})"
 
     def __repr__(self):
         return f"Pipeline(config={self.config})"
+
+    def _collect_system_prompt_metadata(self, phase: LlmPhase, phase_index: int) -> None:
+        """Collect metadata about the fully rendered system prompt for a phase (do not save yet)."""
+        metadata = {
+            "phase_name": phase.name,
+            "phase_index": phase_index,
+            "phase_type": self.config.phases[phase_index].phase_type.name,
+            "model_type": self.config.phases[phase_index].model_type,
+            "temperature": self.config.phases[phase_index].temperature,
+            "input_file": str(phase.input_file_path),
+            "output_file": str(phase.output_file_path),
+            "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
+            "fully_rendered_system_prompt": phase.system_prompt,
+            "length_reduction_parameter": phase.length_reduction,
+        }
+        self._system_prompt_metadata.append(metadata)
+
+    def _save_all_system_prompt_metadata(self) -> None:
+        """Save all collected system prompt metadata to a single file at the end of the run."""
+        metadata = {
+            "run_timestamp": datetime.now().isoformat(),
+            "book_name": self.config.book_name,
+            "author_name": self.config.author_name,
+            "input_file": str(self.config.input_file),
+            "original_file": str(self.config.original_file),
+            "output_directory": str(self.config.output_dir),
+            "length_reduction": self.config.length_reduction,
+            "phases": self._system_prompt_metadata,
+        }
+        metadata_file = (
+            self.config.output_dir / f"system_prompt_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        try:
+            with open(metadata_file, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            logger.info(f"System prompt metadata saved to: {metadata_file}")
+        except Exception as e:
+            logger.error(f"Failed to save system prompt metadata: {str(e)}")
 
     def _save_run_metadata(self, completed_phases: List[LlmPhase]) -> None:
         """Save metadata about the pipeline run to the output directory."""
@@ -186,7 +225,7 @@ class Pipeline:
             temperature=phase_config.temperature,
         )
 
-        # Create PhaseConfig for the factory
+        # Create PhaseConfig for the factory (do NOT include length_reduction)
         factory_config = type(phase_config)(
             phase_type=phase_config.phase_type,
             name=phase_config.phase_type.name.lower(),
@@ -204,18 +243,16 @@ class Pipeline:
             post_processors=phase_config.post_processors,
         )
 
-        # Create the phase instance using the factory
+        # Create the phase instance using the factory, passing length_reduction as a kwarg
+        phase_factory_kwargs = {"length_reduction": self.config.length_reduction}
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
-            phase = PhaseFactory.create_standard_phase(factory_config)
+            phase = PhaseFactory.create_standard_phase(factory_config, **phase_factory_kwargs)
         elif phase_config.phase_type == PhaseType.INTRODUCTION:
-            phase = PhaseFactory.create_introduction_annotation_phase(factory_config)
+            phase = PhaseFactory.create_introduction_annotation_phase(factory_config, **phase_factory_kwargs)
         elif phase_config.phase_type == PhaseType.SUMMARY:
-            phase = PhaseFactory.create_summary_annotation_phase(factory_config)
+            phase = PhaseFactory.create_summary_annotation_phase(factory_config, **phase_factory_kwargs)
         else:
             raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
-
-        # Set the length reduction from the run config
-        phase.length_reduction = self.config.length_reduction
 
         # Log post-processor information
         if phase.post_processor_chain:
@@ -253,6 +290,8 @@ class Pipeline:
                     logger.info(f"Starting phase: {phase.name}")
                     logger.debug(f"Input file: {phase.input_file_path}")
                     logger.debug(f"Output file: {phase.output_file_path}")
+                    # Collect system prompt metadata right before processing starts
+                    self._collect_system_prompt_metadata(phase, i)
                     phase.run(**kwargs)
                     logger.success(f"Successfully completed phase: {phase.name}")
                     logger.debug(f"Output written to: {phase.output_file_path}")
@@ -269,6 +308,8 @@ class Pipeline:
         finally:
             # Save metadata about the run (whether successful or failed)
             self._save_run_metadata(completed_phases)
+            # Save all system prompt metadata at the end of the run
+            self._save_all_system_prompt_metadata()
 
 
 def run_pipeline(config: RunConfig) -> None:

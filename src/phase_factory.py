@@ -67,7 +67,7 @@ class PhaseFactory:
     }
 
     @staticmethod
-    def create_standard_phase(config: PhaseConfig) -> StandardLlmPhase:
+    def create_standard_phase(config: PhaseConfig, **kwargs) -> StandardLlmPhase:
         """
         Create a standard LLM phase with optional post-processors.
 
@@ -93,10 +93,11 @@ class PhaseFactory:
             max_workers=config.max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
+            **kwargs,
         )
 
     @staticmethod
-    def create_introduction_annotation_phase(config: PhaseConfig) -> IntroductionAnnotationPhase:
+    def create_introduction_annotation_phase(config: PhaseConfig, **kwargs) -> IntroductionAnnotationPhase:
         """
         Create an introduction annotation phase with optional post-processors.
 
@@ -122,10 +123,11 @@ class PhaseFactory:
             max_workers=config.max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
+            **kwargs,
         )
 
     @staticmethod
-    def create_summary_annotation_phase(config: PhaseConfig) -> SummaryAnnotationPhase:
+    def create_summary_annotation_phase(config: PhaseConfig, **kwargs) -> SummaryAnnotationPhase:
         """
         Create a summary annotation phase with optional post-processors.
 
@@ -151,6 +153,7 @@ class PhaseFactory:
             max_workers=config.max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
+            **kwargs,
         )
 
     @staticmethod
