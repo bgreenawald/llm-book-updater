@@ -23,8 +23,9 @@ class PhaseFactory:
     without having to manually configure post-processor chains for each phase type.
     """
 
-    # Default post-processor configurations for each phase type
     DEFAULT_POST_PROCESSORS = {
+        """Default post-processor configurations for each phase type."""
+    DEFAULT_POST_PROCESSORS: dict[PhaseType, list[PostProcessorType]] = {
         PhaseType.MODERNIZE: [
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,

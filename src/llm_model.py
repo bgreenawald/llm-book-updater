@@ -104,6 +104,13 @@ class LlmModel:
         return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
 
     def _log_prompt(self, role: str, content: str) -> None:
+        """
+        Logs a preview of the prompt content.
+
+        Args:
+            role (str): The role of the prompt (e.g., "System", "User").
+            content (str): The full content of the prompt.
+        """
         preview = content if len(content) <= 200 else content[:200] + "..."
         module_logger.trace(f"{role} prompt: {preview}")
 
@@ -120,7 +127,20 @@ class LlmModel:
         return False
 
     def _make_api_call(self, headers: dict, data: dict) -> dict:
-        """Make a single API call with retry logic."""
+        """
+        Makes a single API call to OpenRouter with retry logic.
+
+        Args:
+            headers (dict): HTTP headers for the request.
+            data (dict): JSON payload for the request.
+
+        Returns:
+            dict: The JSON response from the API.
+
+        Raises:
+            LlmModelError: If the API call fails after all retries.
+            json.JSONDecodeError: If the response cannot be decoded as JSON.
+        """
         last_error = None
 
         for attempt in range(self.max_retries + 1):

@@ -7,6 +7,7 @@ from src.llm_model import GEMINI_FLASH
 
 
 class PhaseType(Enum):
+    """Enumeration of available processing phases."""
     MODERNIZE = auto()
     EDIT = auto()
     ANNOTATE = auto()
@@ -56,6 +57,9 @@ class PhaseConfig:
     author_name: Optional[str] = None
 
     def __post_init__(self):
+        """
+        Post-initialization to set default prompt paths and name if not provided.
+        """
         if self.system_prompt_path is None:
             self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
         if self.user_prompt_path is None:
@@ -101,7 +105,9 @@ class RunConfig:
         )
 
     def __post_init__(self):
-        # Ensure output directory exists
+        """
+        Post-initialization to ensure the output directory exists.
+        """
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def get_phase_order(self) -> List[PhaseType]:

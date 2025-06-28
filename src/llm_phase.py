@@ -17,6 +17,12 @@ setup_logging("llm_phase")
 
 
 class LlmPhase(ABC):
+    """
+    Base class for LLM processing phases. Provides common functionality for
+    reading files, managing prompts, and coordinating parallel processing.
+    Subclasses define specific block processing strategies.
+    """
+
     def __init__(
         self,
         name: str,
@@ -34,19 +40,8 @@ class LlmPhase(ABC):
         post_processor_chain: PostProcessorChain = None,
         length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
     ):
-        logger.info(f"Initializing LlmPhase: {name}")
-        logger.debug(f"Input file: {input_file_path}")
-        logger.debug(f"Original file: {original_file_path}")
-        logger.debug(f"Output file: {output_file_path}")
-        logger.debug(f"System prompt path: {system_prompt_path}")
-        logger.debug(f"User prompt path: {user_prompt_path}")
-        logger.debug(f"Book: {book_name} by {author_name}")
-        logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
-        logger.debug(f"Length reduction: {length_reduction}")
         """
-        Base class for LLM processing phases. Provides common functionality for
-        reading files, managing prompts, and coordinating parallel processing.
-        Subclasses define specific block processing strategies.
+        Initialize the LLM phase.
 
         Args:
             name (str): Name of the processing phase
@@ -62,9 +57,22 @@ class LlmPhase(ABC):
             temperature (float, optional): LLM temperature. Defaults to 0.2.
             max_workers (int, optional): Maximum worker threads for parallel
                 processing. Defaults to None (executor default).
+            reasoning (dict, optional): Reasoning configuration. Defaults to None.
             post_processor_chain (PostProcessorChain, optional): Post-processor
                 chain for additional processing. Defaults to None.
+            length_reduction (Optional[Union[int, Tuple[int, int]]], optional):
+                Length reduction parameter. Defaults to None.
         """
+        logger.info(f"Initializing LlmPhase: {name}")
+        logger.debug(f"Input file: {input_file_path}")
+        logger.debug(f"Original file: {original_file_path}")
+        logger.debug(f"Output file: {output_file_path}")
+        logger.debug(f"System prompt path: {system_prompt_path}")
+        logger.debug(f"User prompt path: {user_prompt_path}")
+        logger.debug(f"Book: {book_name} by {author_name}")
+        logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
+        logger.debug(f"Length reduction: {length_reduction}")
+
         self.name = name
         self.input_file_path = input_file_path
         self.output_file_path = output_file_path
@@ -99,6 +107,9 @@ class LlmPhase(ABC):
             raise
 
     def __str__(self):
+        """
+        Returns a string representation of the LlmPhase instance.
+        """
         return (
             f"{self.__class__.__name__}(name={self.name}, "
             f"input_file_path={self.input_file_path}, "
@@ -114,6 +125,9 @@ class LlmPhase(ABC):
         )
 
     def __repr__(self):
+        """
+        Returns a detailed string representation of the LlmPhase instance for debugging.
+        """
         return self.__str__()
 
     @abstractmethod

@@ -16,11 +16,11 @@ def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
     Factory function to create the appropriate phase instance based on PhaseType.
 
     Args:
-        phase_type: The type of phase to create
+        phase_type (PhaseType): The type of phase to create
         **kwargs: Arguments to pass to the phase constructor
 
     Returns:
-        An instance of the appropriate phase class
+        LlmPhase: An instance of the appropriate phase class
 
     Raises:
         ValueError: If the phase type is not supported
@@ -42,22 +42,55 @@ def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
 
 
 class Pipeline:
-    """Manages the execution of LLM processing phases."""
+    """
+    Manages the execution of LLM processing phases.
+
+    The Pipeline class orchestrates the sequential execution of multiple
+    LLM processing phases, handling file I/O, phase initialization,
+    and metadata collection throughout the process.
+    """
 
     def __init__(self, config: RunConfig):
-        """Initialize the pipeline with a run configuration."""
+        """
+        Initialize the pipeline with a run configuration.
+
+        Args:
+            config (RunConfig): Configuration object containing all run parameters
+        """
         self.config = config
         self._phase_instances: List[LlmPhase] = []
         self._system_prompt_metadata: list = []  # Collect system prompt metadata for all phases
 
     def __str__(self):
+        """
+        Returns a string representation of the Pipeline instance.
+
+        Returns:
+            str: String representation of the pipeline
+        """
         return f"Pipeline(config={self.config})"
 
     def __repr__(self):
+        """
+        Returns a detailed string representation of the Pipeline instance for debugging.
+
+        Returns:
+            str: Detailed string representation of the pipeline
+        """
         return f"Pipeline(config={self.config})"
 
     def _collect_system_prompt_metadata(self, phase: LlmPhase, phase_index: int) -> None:
-        """Collect metadata about the fully rendered system prompt for a phase (do not save yet)."""
+        """
+        Collect metadata about the fully rendered system prompt for a phase.
+
+        This method collects comprehensive metadata about a phase's system prompt
+        including the phase configuration, model settings, and the fully rendered
+        prompt content. The metadata is stored for later saving.
+
+        Args:
+            phase (LlmPhase): The phase instance to collect metadata from
+            phase_index (int): The index of the phase in the pipeline sequence
+        """
         metadata = {
             "phase_name": phase.name,
             "phase_index": phase_index,
@@ -73,7 +106,13 @@ class Pipeline:
         self._system_prompt_metadata.append(metadata)
 
     def _save_all_system_prompt_metadata(self) -> None:
-        """Save all collected system prompt metadata to a single file at the end of the run."""
+        """
+        Save all collected system prompt metadata to a single file at the end of the run.
+
+        This method creates a comprehensive JSON file containing metadata about
+        all phases' system prompts, including the run configuration and timestamp.
+        The file is saved to the output directory with a timestamped filename.
+        """
         metadata = {
             "run_timestamp": datetime.now().isoformat(),
             "book_name": self.config.book_name,
@@ -95,7 +134,16 @@ class Pipeline:
             logger.error(f"Failed to save system prompt metadata: {str(e)}")
 
     def _save_run_metadata(self, completed_phases: List[LlmPhase]) -> None:
-        """Save metadata about the pipeline run to the output directory."""
+        """
+        Save metadata about the pipeline run to the output directory.
+
+        This method creates a comprehensive JSON file containing metadata about
+        the entire pipeline run, including information about all phases (both
+        completed and not run), their configurations, and execution status.
+
+        Args:
+            completed_phases (List[LlmPhase]): List of phases that were successfully completed
+        """
         metadata = {
             "run_timestamp": datetime.now().isoformat(),
             "book_name": self.config.book_name,
@@ -172,7 +220,19 @@ class Pipeline:
             logger.error(f"Failed to save run metadata: {str(e)}")
 
     def _get_phase_output_path(self, phase_index: int) -> Path:
-        """Generate output path for a phase."""
+        """
+        Generate output path for a phase.
+
+        This method determines the output file path for a specific phase,
+        either using a custom path if specified in the configuration or
+        generating a default path based on the phase type and index.
+
+        Args:
+            phase_index (int): The index of the phase in the pipeline sequence
+
+        Returns:
+            Path: The output file path for the phase
+        """
         phase_config = self.config.phases[phase_index]
 
         # Use custom output path if specified
@@ -193,7 +253,18 @@ class Pipeline:
         return self.config.output_dir / output_file
 
     def _get_phase_input_path(self, phase_index: int) -> Path:
-        """Determine input path for a phase based on the previous phase's output."""
+        """
+        Determine input path for a phase based on the previous phase's output.
+
+        The first phase uses the run's input file, while subsequent phases
+        use the output from the previous phase as their input.
+
+        Args:
+            phase_index (int): The index of the phase in the pipeline sequence
+
+        Returns:
+            Path: The input file path for the phase
+        """
         # First phase uses the run's input file
         if phase_index == 0:
             return self.config.input_file
@@ -203,7 +274,19 @@ class Pipeline:
         return self._get_phase_output_path(previous_phase_index)
 
     def _initialize_phase(self, phase_index: int) -> Optional[LlmPhase]:
-        """Initialize a single phase when it's about to run."""
+        """
+        Initialize a single phase when it's about to run.
+
+        This method creates and configures a phase instance based on the
+        configuration, including setting up the LLM model, determining
+        input/output paths, and creating the appropriate phase type.
+
+        Args:
+            phase_index (int): The index of the phase to initialize
+
+        Returns:
+            Optional[LlmPhase]: The initialized phase instance, or None if the phase is disabled
+        """
         phase_config = self.config.phases[phase_index]
         if not phase_config.enabled:
             logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
@@ -265,7 +348,17 @@ class Pipeline:
         return phase
 
     def run(self, **kwargs) -> None:
-        """Run all enabled phases in order."""
+        """
+        Run all enabled phases in order.
+
+        This method executes all enabled phases in the configured sequence,
+        handling phase initialization, execution, error handling, and metadata
+        collection. It ensures proper cleanup and metadata saving even if
+        errors occur.
+
+        Args:
+            **kwargs: Additional arguments to pass to the processing methods
+        """
         phase_order = self.config.get_phase_order()
         logger.info(f"Starting pipeline with phases: {[p.name for p in phase_order]}")
 
@@ -313,7 +406,18 @@ class Pipeline:
 
 
 def run_pipeline(config: RunConfig) -> None:
-    """Run the pipeline with the given configuration."""
+    """
+    Run the pipeline with the given configuration.
+
+    This is the main entry point for running the LLM processing pipeline.
+    It creates a Pipeline instance and executes it with the provided configuration.
+
+    Args:
+        config (RunConfig): Configuration object containing all run parameters
+
+    Raises:
+        Exception: If the pipeline fails to execute
+    """
     logger.info(f"Running pipeline for {config.book_name}")
 
     try:
