@@ -40,19 +40,19 @@ Your sole objective is to create a concise, structured introduction that provide
 
 ## Output Template
 
-> **Annotated Introduction:**
-> 
-> **Overview**
-> [Your 1-3 paragraph overview here. Focus on what makes this section unique and why it matters.]  
-> 
-> **Key Terms/Concepts**  
-> *[New Term 1]* - [Precise 1-sentence definition]  
-> *[New Term 2]* - [Precise 1-sentence definition]  
-> 
-> **Key People/Places/Events**  
-> *[Relevant Entity 1]* - [Essential context in 1 sentence]  
-> *[Relevant Entity 2]* - [Essential context in 1 sentence]  
-> 
+> **Annotated Introduction:**<br>
+><br>
+> **Overview**<br>
+> [Your 1-3 paragraph overview here. Focus on what makes this section unique and why it matters.]<br>
+><br>
+> **Key Terms/Concepts**<br>
+> *[New Term 1]* - [Precise 1-sentence definition]<br>
+> *[New Term 2]* - [Precise 1-sentence definition]<br>
+><br>
+> **Key People/Places/Events**<br>
+> *[Relevant Entity 1]* - [Essential context in 1 sentence]<br>
+> *[Relevant Entity 2]* - [Essential context in 1 sentence]<br>
+><br>
 > **End annotated introduction.**
 
 *   Your response must EXACTLY follow this template structure

@@ -41,11 +41,11 @@ Your sole objective is to create a brief, insightful summary that captures the e
 
 ## Output Template
 
-> **Annotated summary:**  
-> [Your cohesive synthesis of the section's content]  
-> 
-> [Continue as needed - 1 to 5 paragraphs total]  
-> 
+> **Annotated summary:**<br>
+> [Your cohesive synthesis of the section's content]<br>
+><br>
+> [Continue as needed - 1 to 5 paragraphs total]<br>
+><br>
 > **End annotated summary.**
 
 
