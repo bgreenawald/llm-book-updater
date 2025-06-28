@@ -41,15 +41,15 @@ class LlmPhase(ABC):
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
         """
-        Base class for LLM processing phases. Provides common functionality for 
-        reading files, managing prompts, and coordinating parallel processing. 
+        Base class for LLM processing phases. Provides common functionality for
+        reading files, managing prompts, and coordinating parallel processing.
         Subclasses define specific block processing strategies.
 
         Args:
             name (str): Name of the processing phase
             input_file_path (Path): Path to the input Markdown file
             output_file_path (Path): Path for the processed output
-            original_file_path (Path): Path for the original file (pre any 
+            original_file_path (Path): Path for the original file (pre any
                 transformations)
             system_prompt_path (Path): Path to the system prompt file
             user_prompt_path (Path): Path to the user prompt file
@@ -57,9 +57,9 @@ class LlmPhase(ABC):
             author_name (str): Name of the author
             model (LlmModel): LLM model instance
             temperature (float, optional): LLM temperature. Defaults to 0.2.
-            max_workers (int, optional): Maximum worker threads for parallel 
+            max_workers (int, optional): Maximum worker threads for parallel
                 processing. Defaults to None (executor default).
-            post_processor_chain (PostProcessorChain, optional): Post-processor 
+            post_processor_chain (PostProcessorChain, optional): Post-processor
                 chain for additional processing. Defaults to None.
         """
         self.name = name
@@ -428,7 +428,7 @@ class StandardLlmPhase(LlmPhase):
                     reasoning=self.reasoning,
                     **kwargs,
                 )
-                processed_body = self._apply_post_processing(original_body, processed_body, **kwargs)
+                processed_body = self._apply_post_processing(current_body, processed_body, **kwargs)
                 return f"{current_header}\n\n{processed_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
@@ -477,13 +477,10 @@ class IntroductionAnnotationPhase(LlmPhase):
                 )
 
                 # Apply post-processing to the introduction
-                introduction = self._apply_post_processing(original_body, introduction, **kwargs)
+                introduction = self._apply_post_processing(current_body, introduction, **kwargs)
 
                 # Combine the introduction with the original block
-                if current_body:
-                    return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
-                else:
-                    return f"{current_header}\n\n{introduction}\n\n{original_body}\n\n"
+                return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
@@ -531,13 +528,10 @@ class SummaryAnnotationPhase(LlmPhase):
                 )
 
                 # Apply post-processing to the summary
-                summary = self._apply_post_processing(original_body, summary, **kwargs)
+                summary = self._apply_post_processing(current_body, summary, **kwargs)
 
                 # Combine the original block with the summary
-                if current_body:
-                    return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
-                else:
-                    return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
+                return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
