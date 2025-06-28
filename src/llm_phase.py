@@ -112,14 +112,15 @@ class LlmPhase(ABC):
         return self.__str__()
 
     @abstractmethod
-    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Abstract method for processing a single Markdown block.
         Subclasses must implement this to define their specific processing strategy.
 
         Args:
-            new_block (str): The markdown block to process
-            original_block (str): The original counterpart to the new block
+            current_block (str): The markdown block currently being processed
+                (may contain content from previous phases)
+            original_block (str): The completely unedited block from the original text
             **kwargs: Additional arguments to pass to the processing
 
         Returns:
@@ -133,7 +134,7 @@ class LlmPhase(ABC):
         is configured.
 
         Args:
-            original_block (str): The original markdown block
+            original_block (str): The completely unedited block from the original text
             llm_block (str): The LLM-generated block
             **kwargs: Additional context for post-processors
 
@@ -271,37 +272,37 @@ class LlmPhase(ABC):
 
     def _format_user_message(
         self,
-        new_block: str,
+        current_block: str,
         original_block: str,
-        new_title: str = None,
+        current_title: str = None,
         original_title: str = None,
     ) -> str:
         """
         Format the user message using the user prompt template.
 
         Args:
-            new_block (str): The new/transformed block content
-            original_block (str): The original block content
-            new_title (str, optional): The new/transformed title
+            current_block (str): The current block content (may contain content from previous phases)
+            original_block (str): The completely unedited block content
+            current_title (str, optional): The current/transformed title
             original_title (str, optional): The original title
 
         Returns:
             str: The formatted user message
         """
-        if not new_block and not original_block:
+        if not current_block and not original_block:
             return ""
 
         # Create a context dict with all available variables
         context = {
-            "transformed_passage": new_block,
+            "transformed_passage": current_block,
             "original_passage": original_block,
             "book_name": self.book_name,
             "author_name": self.author_name,
         }
 
         # Add titles if provided
-        if new_title is not None:
-            context["new_title"] = new_title
+        if current_title is not None:
+            context["new_title"] = current_title
         if original_title is not None:
             context["original_title"] = original_title
 
@@ -335,20 +336,20 @@ class LlmPhase(ABC):
 
         try:
             pattern = r"(#+\s.*?)(?=\n#+\s|\Z)"
-            new_blocks = re.findall(pattern, self.input_text, flags=re.DOTALL)
+            current_blocks = re.findall(pattern, self.input_text, flags=re.DOTALL)
             original_blocks = re.findall(pattern, self.original_text, flags=re.DOTALL)
-            logger.info(f"Found {len(new_blocks)} new markdown blocks to process")
-            logger.info(f"Found {len(original_blocks)} markdown blocks")
+            logger.info(f"Found {len(current_blocks)} current markdown blocks to process")
+            logger.info(f"Found {len(original_blocks)} original markdown blocks")
 
-            if not new_blocks:
+            if not current_blocks:
                 logger.warning("No markdown blocks found in the input text")
                 self.content = ""
                 return
-            elif len(new_blocks) != len(original_blocks):
-                msg = f"Block length mismatch: {len(new_blocks)} != {len(original_blocks)}"
+            elif len(current_blocks) != len(original_blocks):
+                msg = f"Block length mismatch: {len(current_blocks)} != {len(original_blocks)}"
                 raise ValueError(msg)
 
-            blocks = list(zip(new_blocks, original_blocks))
+            blocks = list(zip(current_blocks, original_blocks))
 
             # Prepare for parallel processing
             func = partial(self._process_block, **kwargs)
@@ -399,24 +400,25 @@ class StandardLlmPhase(LlmPhase):
     This maintains the original behavior of the LlmPhase class.
     """
 
-    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single Markdown block: extract header and body, run LLM on the body if present,
         and return the formatted block with header and processed content.
 
         Args:
-            new_block (str): The markdown block to process
-            original_block (str): The original counterpart to the new block
+            current_block (str): The markdown block currently being processed
+                (may contain content from previous phases)
+            original_block (str): The completely unedited block from the original text
             **kwargs: Additional arguments to pass to the chat completion
 
         Returns:
             str: The processed markdown block
         """
         try:
-            new_header, new_body = self._get_header_and_body(new_block)
+            current_header, current_body = self._get_header_and_body(current_block)
             original_header, original_body = self._get_header_and_body(original_block)
 
-            body = self._format_user_message(new_body, original_body, new_header, original_header)
+            body = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if body:
                 processed_body = self.model.chat_completion(
@@ -427,16 +429,16 @@ class StandardLlmPhase(LlmPhase):
                     **kwargs,
                 )
                 processed_body = self._apply_post_processing(original_body, processed_body, **kwargs)
-                return f"{new_header}\n\n{processed_body}\n\n"
+                return f"{current_header}\n\n{processed_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
-                return f"{new_header}\n\n"
+                return f"{current_header}\n\n"
 
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
             # Return the original block to allow processing to continue
-            return f"{new_header}\n\n{new_body if new_body else ''}\n\n"
+            return f"{current_header}\n\n{current_body if current_body else ''}\n\n"
 
 
 class IntroductionAnnotationPhase(LlmPhase):
@@ -445,24 +447,25 @@ class IntroductionAnnotationPhase(LlmPhase):
     Uses the block content as input to generate an introduction, then prepends it to the block.
     """
 
-    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single Markdown block by adding an introduction annotation at the beginning.
 
         Args:
-            new_block (str): The markdown block to process
-            original_block (str): The original counterpart to the new block
+            current_block (str): The markdown block currently being processed
+                (may contain content from previous phases)
+            original_block (str): The completely unedited block from the original text
             **kwargs: Additional arguments to pass to the chat completion
 
         Returns:
             str: The processed markdown block with introduction annotation
         """
         try:
-            new_header, new_body = self._get_header_and_body(new_block)
+            current_header, current_body = self._get_header_and_body(current_block)
             original_header, original_body = self._get_header_and_body(original_block)
 
             # Use the block content as the user prompt for generating the introduction
-            user_prompt = self._format_user_message(new_body, original_body, new_header, original_header)
+            user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
                 introduction = self.model.chat_completion(
@@ -477,19 +480,19 @@ class IntroductionAnnotationPhase(LlmPhase):
                 introduction = self._apply_post_processing(original_body, introduction, **kwargs)
 
                 # Combine the introduction with the original block
-                if new_body:
-                    return f"{new_header}\n\n{introduction}\n\n{new_body}\n\n"
+                if current_body:
+                    return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
                 else:
-                    return f"{new_header}\n\n{introduction}\n\n{original_body}\n\n"
+                    return f"{current_header}\n\n{introduction}\n\n{original_body}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
-                return f"{new_header}\n\n"
+                return f"{current_header}\n\n"
 
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
             # Return the original block to allow processing to continue
-            return f"{new_header}\n\n{new_body if new_body else original_body}\n\n"
+            return f"{current_header}\n\n{current_body if current_body else original_body}\n\n"
 
 
 class SummaryAnnotationPhase(LlmPhase):
@@ -498,24 +501,25 @@ class SummaryAnnotationPhase(LlmPhase):
     Uses the block content as input to generate a summary, then appends it to the block.
     """
 
-    def _process_block(self, new_block: str, original_block: str, **kwargs) -> str:
+    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single Markdown block by adding a summary annotation at the end.
 
         Args:
-            new_block (str): The markdown block to process
-            original_block (str): The original counterpart to the new block
+            current_block (str): The markdown block currently being processed
+                (may contain content from previous phases)
+            original_block (str): The completely unedited block from the original text
             **kwargs: Additional arguments to pass to the chat completion
 
         Returns:
             str: The processed markdown block with summary annotation
         """
         try:
-            new_header, new_body = self._get_header_and_body(new_block)
+            current_header, current_body = self._get_header_and_body(current_block)
             original_header, original_body = self._get_header_and_body(original_block)
 
             # Use the block content as the user prompt for generating the summary
-            user_prompt = self._format_user_message(new_body, original_body, new_header, original_header)
+            user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
                 summary = self.model.chat_completion(
@@ -530,16 +534,16 @@ class SummaryAnnotationPhase(LlmPhase):
                 summary = self._apply_post_processing(original_body, summary, **kwargs)
 
                 # Combine the original block with the summary
-                if new_body:
-                    return f"{new_header}\n\n{new_body}\n\n{summary}\n\n"
+                if current_body:
+                    return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
                 else:
-                    return f"{new_header}\n\n{original_body}\n\n{summary}\n\n"
+                    return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
             else:
                 logger.debug("Empty block body, returning header only")
-                return f"{new_header}\n\n"
+                return f"{current_header}\n\n"
 
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
             # Return the original block to allow processing to continue
-            return f"{new_header}\n\n{new_body if new_body else original_body}\n\n"
+            return f"{current_header}\n\n{current_body if current_body else original_body}\n\n"
