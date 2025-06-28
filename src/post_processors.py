@@ -1,3 +1,4 @@
+import difflib
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import re
@@ -46,6 +47,32 @@ class PostProcessor(ABC):
 
     def __repr__(self):
         return self.__str__()
+
+
+class RevertRemovedBlockLines(PostProcessor):
+    """
+    Restores block comment lines (starting with ' > ') that were removed by the LLM.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("revert_removed_block_lines", config)
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        original_lines = original_block.splitlines()
+        llm_lines = llm_block.splitlines()
+
+        matcher = difflib.SequenceMatcher(None, original_lines, llm_lines)
+        processed_lines = list(llm_lines)
+
+        for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
+            if tag == "delete":
+                for i in range(i2 - 1, i1 - 1, -1):
+                    line = original_lines[i]
+                    if line.strip().startswith(">"):
+                        logger.info(f"Restoring deleted block line: '{line}'")
+                        processed_lines.insert(j1, line)
+
+        return "\n".join(processed_lines)
 
 
 class NoNewHeadersPostProcessor(PostProcessor):
