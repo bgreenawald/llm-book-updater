@@ -11,7 +11,6 @@ class PhaseType(Enum):
     EDIT = auto()
     ANNOTATE = auto()
     FINAL = auto()
-    FORMATTING = auto()
     INTRODUCTION = auto()
     SUMMARY = auto()
 
