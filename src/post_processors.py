@@ -257,6 +257,8 @@ class PostProcessorChain(PostProcessor):
         """
         current_block = llm_block
 
+        logger.debug(f"Starting post-processing chain with {len(self.processors)} processors")
+
         for i, processor in enumerate(self.processors):
             try:
                 logger.debug(f"Applying post-processor {i + 1}/{len(self.processors)}: {processor.name}")
@@ -268,6 +270,7 @@ class PostProcessorChain(PostProcessor):
                 # Continue with the chain, using the block as-is
                 continue
 
+        logger.debug(f"Post-processing chain completed. Final block length: {len(current_block)} characters")
         return current_block
 
     def __len__(self):

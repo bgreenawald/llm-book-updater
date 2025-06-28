@@ -10,6 +10,7 @@ A tool for processing and updating book content using Large Language Models (LLM
 - **Configurable LLM Models**: Supports various LLM providers and models.
 - **Parallel Processing**: Process multiple sections concurrently for improved performance.
 - **Automatic Metadata**: Keeps a JSON record of each pipeline run, tracking settings, files, and phase details.
+- **Post-Processing Pipeline**: Configurable post-processing chain with detailed logging and metadata tracking.
 
 ## Installation
 
@@ -161,6 +162,56 @@ config3 = PhaseConfig(
     ],
 )
 ```
+
+### Post-Processing Logging
+
+The system provides detailed logging for post-processing operations:
+
+- **Phase Initialization**: When a phase is initialized, it logs the post-processor pipeline configuration
+- **Processing Execution**: During processing, each post-processor application is logged with progress information
+- **Chain Completion**: When the post-processing chain completes, it logs the final result
+
+Example log output:
+```
+2024-01-01 12:00:00 | INFO | Post-processing pipeline for modernize: ['no_new_headers', 'remove_trailing_whitespace', 'remove_xml_tags', 'ensure_blank_line']
+2024-01-01 12:00:00 | INFO | Post-processor count: 4
+2024-01-01 12:00:00 | DEBUG | Starting post-processing chain with 4 processors
+2024-01-01 12:00:00 | DEBUG | Applying post-processor 1/4: no_new_headers
+2024-01-01 12:00:00 | DEBUG | Post-processor no_new_headers completed successfully
+...
+2024-01-01 12:00:00 | DEBUG | Post-processing chain completed. Final block length: 1234 characters
+```
+
+### Metadata and Logging
+
+The pipeline automatically saves comprehensive metadata about each run, including post-processing information:
+
+```json
+{
+  "run_timestamp": "2024-01-01T12:00:00",
+  "book_name": "Example Book",
+  "author_name": "Example Author",
+  "phases": [
+    {
+      "phase_name": "modernize",
+      "phase_index": 0,
+      "enabled": true,
+      "model_type": "gemini-flash",
+      "temperature": 0.2,
+      "post_processors": ["no_new_headers", "remove_trailing_whitespace", "remove_xml_tags", "ensure_blank_line"],
+      "post_processor_count": 4,
+      "completed": true,
+      "output_exists": true
+    }
+  ]
+}
+```
+
+The metadata includes:
+- **post_processors**: List of post-processor names used in each phase
+- **post_processor_count**: Number of post-processors in the chain
+- **completed**: Whether the phase completed successfully
+- **output_exists**: Whether the output file was created
 
 ### Prompt Templates
 
