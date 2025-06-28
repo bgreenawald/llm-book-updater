@@ -214,6 +214,9 @@ class Pipeline:
         else:
             raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
 
+        # Set the length reduction from the run config
+        phase.length_reduction = self.config.length_reduction
+
         # Log post-processor information
         if phase.post_processor_chain:
             processor_names = [p.name for p in phase.post_processor_chain.processors]

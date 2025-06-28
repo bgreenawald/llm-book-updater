@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from src.llm_model import GEMINI_FLASH
 
@@ -74,6 +74,8 @@ class RunConfig:
     output_dir: Path
     original_file: Path
     phases: List[PhaseConfig] = field(default_factory=list)
+    # Length reduction parameter for the entire run (can be int or tuple of bounds)
+    length_reduction: Optional[Union[int, Tuple[int, int]]] = None
 
     def __str__(self):
         return (
@@ -82,7 +84,8 @@ class RunConfig:
             f"input_file={self.input_file}, "
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
-            f"phases={self.phases})"
+            f"phases={self.phases}, "
+            f"length_reduction={self.length_reduction})"
         )
 
     def __repr__(self):
@@ -92,7 +95,8 @@ class RunConfig:
             f"input_file={self.input_file}, "
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
-            f"phases={self.phases})"
+            f"phases={self.phases}, "
+            f"length_reduction={self.length_reduction})"
         )
 
     def __post_init__(self):

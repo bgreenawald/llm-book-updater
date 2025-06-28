@@ -86,6 +86,61 @@ All phases can be configured with the following:
 -   `model`: The `LlmModel` instance to use.
 -   `temperature`, `max_workers`, etc.
 
+### Run Configuration
+
+The `RunConfig` class supports the following parameters:
+
+-   `book_name`, `author_name`: Metadata for the book being processed.
+-   `input_file`, `output_dir`, `original_file`: Paths for the run.
+-   `phases`: List of `PhaseConfig` objects defining the processing pipeline.
+-   `length_reduction`: Length reduction parameter for the entire run (optional).
+
+### Length Reduction Parameter
+
+The `length_reduction` parameter allows you to control how much the edit and final phases shorten the text. This parameter is set at the run level and applies to all phases that use length reduction. It can be specified in two ways:
+
+1. **Single percentage value**: A single integer representing the target reduction percentage
+2. **Range of percentages**: A tuple of two integers representing the minimum and maximum reduction range
+
+```python
+from src.config import PhaseConfig, PhaseType, RunConfig
+
+# Single percentage (40% reduction)
+config1 = RunConfig(
+    book_name="Example Book",
+    author_name="Example Author",
+    input_file=Path("input.md"),
+    output_dir=Path("output"),
+    original_file=Path("original.md"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
+    length_reduction=40,
+)
+
+# Range of percentages (30-50% reduction)
+config2 = RunConfig(
+    book_name="Example Book",
+    author_name="Example Author",
+    input_file=Path("input.md"),
+    output_dir=Path("output"),
+    original_file=Path("original.md"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
+    length_reduction=(30, 50),
+)
+
+# No length reduction specified (uses default from prompt)
+config3 = RunConfig(
+    book_name="Example Book",
+    author_name="Example Author",
+    input_file=Path("input.md"),
+    output_dir=Path("output"),
+    original_file=Path("original.md"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
+    # length_reduction=None (default)
+)
+```
+
+The length reduction parameter is automatically formatted and injected into the system prompt templates for both the edit and final phases. See `examples/length_reduction_example.py` for complete usage examples.
+
 ### Post-Processor Types
 
 The system provides a `PostProcessorType` enum for type-safe post-processor configuration:
