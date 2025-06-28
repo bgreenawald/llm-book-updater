@@ -54,8 +54,11 @@ def test_system_prompt_metadata():
         phase = pipeline._initialize_phase(0)
 
         if phase:
-            # Save system prompt metadata
-            pipeline._save_system_prompt_metadata(phase, 0)
+            # Collect system prompt metadata
+            pipeline._collect_system_prompt_metadata(phase, 0)
+
+            # Save the collected metadata
+            pipeline._save_all_system_prompt_metadata()
 
             # Check that the metadata file was created
             metadata_files = list(output_dir.glob("system_prompt_metadata_*.json"))
@@ -70,9 +73,9 @@ def test_system_prompt_metadata():
             assert "book_name" in metadata
             assert "author_name" in metadata
             assert "length_reduction" in metadata
-            assert "phase" in metadata
+            assert "phases" in metadata
 
-            phase_metadata = metadata["phase"]
+            phase_metadata = metadata["phases"][0]
             assert "phase_name" in phase_metadata
             assert "phase_index" in phase_metadata
             assert "phase_type" in phase_metadata
