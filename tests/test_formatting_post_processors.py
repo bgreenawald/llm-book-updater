@@ -1,6 +1,11 @@
 import pytest
 
-from src.post_processors import EnsureBlankLineProcessor, RemoveTrailingWhitespaceProcessor, RemoveXmlTagsProcessor
+from src.post_processors import (
+    EnsureBlankLineProcessor,
+    OrderQuoteAnnotationProcessor,
+    RemoveTrailingWhitespaceProcessor,
+    RemoveXmlTagsProcessor,
+)
 
 
 @pytest.fixture
@@ -16,6 +21,11 @@ def remove_xml_tags_processor():
 @pytest.fixture
 def remove_trailing_whitespace_processor():
     return RemoveTrailingWhitespaceProcessor()
+
+
+@pytest.fixture
+def order_quote_annotation_processor():
+    return OrderQuoteAnnotationProcessor()
 
 
 def test_ensure_blank_line_between_elements(ensure_blank_line_processor):
@@ -173,3 +183,184 @@ def test_multiline_quotes_still_work(ensure_blank_line_processor):
         "More text."
     )
     assert ensure_blank_line_processor.process("", llm_block) == expected_output
+
+
+# OrderQuoteAnnotationProcessor tests
+def test_simple_reorder_annotation_before_quote(order_quote_annotation_processor):
+    """Test reordering when annotation comes before quote."""
+    llm_block = (
+        "Some text.\n"
+        "> **Annotation:** This is an annotation. **End annotation.**\n"
+        "> **Quote:** This is a quote. **End quote.**\n"
+        "More text."
+    )
+    expected_output = (
+        "Some text.\n"
+        "> **Quote:** This is a quote. **End quote.**\n"
+        "> **Annotation:** This is an annotation. **End annotation.**\n"
+        "More text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_simple_reorder_annotation_before_quote_with_newline(order_quote_annotation_processor):
+    """Test reordering when annotation comes before quote."""
+    llm_block = (
+        "Some text.\n"
+        "> **Annotation:** This is an annotation. **End annotation.**\n\n"
+        "> **Quote:** This is a quote. **End quote.**\n"
+        "More text."
+    )
+    expected_output = (
+        "Some text.\n"
+        "> **Quote:** This is a quote. **End quote.**\n"
+        "> **Annotation:** This is an annotation. **End annotation.**\n"
+        "More text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_multiple_quotes_and_annotations(order_quote_annotation_processor):
+    """Test reordering multiple quotes and annotations in mixed order."""
+    llm_block = (
+        "Some text.\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "More text."
+    )
+    expected_output = (
+        "Some text.\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "More text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_separate_blocks_not_affected(order_quote_annotation_processor):
+    """Test that separate blocks (separated by blank lines) are not affected."""
+    llm_block = (
+        "First paragraph.\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "\n"
+        "Second paragraph.\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "Third paragraph."
+    )
+    expected_output = (
+        "First paragraph.\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "\n"
+        "Second paragraph.\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "Third paragraph."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_quotes_only_no_change(order_quote_annotation_processor):
+    """Test that blocks with only quotes are not changed."""
+    llm_block = (
+        "Some text.\n> **Quote:** First quote. **End quote.**\n> **Quote:** Second quote. **End quote.**\nMore text."
+    )
+    expected_output = (
+        "Some text.\n> **Quote:** First quote. **End quote.**\n> **Quote:** Second quote. **End quote.**\nMore text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_annotations_only_no_change(order_quote_annotation_processor):
+    """Test that blocks with only annotations are not changed."""
+    llm_block = (
+        "Some text.\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "More text."
+    )
+    expected_output = (
+        "Some text.\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "More text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_mixed_content_with_regular_quotes(order_quote_annotation_processor):
+    """Test that regular quotes (not Quote/Annotation blocks) break uninterrupted blocks."""
+    llm_block = (
+        "Some text.\n"
+        "> **Annotation:** An annotation. **End annotation.**\n"
+        "> This is a regular quote.\n"
+        "> **Quote:** A quote block. **End quote.**\n"
+        "More text."
+    )
+    expected_output = (
+        "Some text.\n"
+        "> **Annotation:** An annotation. **End annotation.**\n"
+        "> This is a regular quote.\n"
+        "> **Quote:** A quote block. **End quote.**\n"
+        "More text."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_empty_input(order_quote_annotation_processor):
+    """Test with empty input."""
+    llm_block = ""
+    expected_output = ""
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_no_quotes_or_annotations(order_quote_annotation_processor):
+    """Test with no Quote or Annotation blocks."""
+    llm_block = "First paragraph.\nSecond paragraph.\n> Regular quote.\nThird paragraph."
+    expected_output = "First paragraph.\nSecond paragraph.\n> Regular quote.\nThird paragraph."
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output
+
+
+def test_complex_mixed_scenario(order_quote_annotation_processor):
+    """Test a complex scenario with multiple blocks and mixed content."""
+    llm_block = (
+        "Introduction.\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "\n"
+        "Middle section.\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "> **Annotation:** Third annotation. **End annotation.**\n"
+        "> **Quote:** Third quote. **End quote.**\n"
+        "> **Annotation:** Fourth annotation. **End annotation.**\n"
+        "\n"
+        "Conclusion.\n"
+        "> **Annotation:** Final annotation. **End annotation.**\n"
+        "> **Quote:** Final quote. **End quote.**\n"
+        "End."
+    )
+    expected_output = (
+        "Introduction.\n"
+        "> **Quote:** First quote. **End quote.**\n"
+        "> **Annotation:** First annotation. **End annotation.**\n"
+        "> **Annotation:** Second annotation. **End annotation.**\n"
+        "\n"
+        "Middle section.\n"
+        "> **Quote:** Second quote. **End quote.**\n"
+        "> **Quote:** Third quote. **End quote.**\n"
+        "> **Annotation:** Third annotation. **End annotation.**\n"
+        "> **Annotation:** Fourth annotation. **End annotation.**\n"
+        "\n"
+        "Conclusion.\n"
+        "> **Quote:** Final quote. **End quote.**\n"
+        "> **Annotation:** Final annotation. **End annotation.**\n"
+        "End."
+    )
+    assert order_quote_annotation_processor.process("", llm_block) == expected_output

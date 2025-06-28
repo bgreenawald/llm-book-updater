@@ -277,3 +277,82 @@ class PostProcessorChain(PostProcessor):
 
     def __repr__(self):
         return self.__str__()
+
+
+class OrderQuoteAnnotationProcessor(PostProcessor):
+    """
+    Reorders Quote and Annotation blocks so that all quotes come before all
+    annotations within uninterrupted blocks of quotes and annotations.
+
+    Blank lines separate uninterrupted blocks. Within each block, quotes are
+    ordered first (in their original order), followed by annotations (in their
+    original order).
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__("order_quote_annotation", config)
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        lines = llm_block.split("\n")
+        processed_lines = []
+        current_block = []
+        i = 0
+        n = len(lines)
+
+        def flush_block():
+            if current_block:
+                processed_lines.extend(self._reorder_block(current_block))
+                current_block.clear()
+
+        while i < n:
+            line = lines[i]
+            if self._is_quote_or_annotation_block(line):
+                current_block.append(line)
+                i += 1
+            elif not line.strip():  # Blank line
+                if current_block:
+                    # Look ahead for next non-blank line
+                    j = i + 1
+                    while j < n and not lines[j].strip():
+                        j += 1
+                    if j < n and self._is_quote_or_annotation_block(lines[j]):
+                        # Next non-blank is quote/annotation, skip this blank line
+                        i += 1
+                        continue
+                    else:
+                        flush_block()
+                        processed_lines.append(line)
+                        i += 1
+                else:
+                    processed_lines.append(line)
+                    i += 1
+            else:
+                flush_block()
+                processed_lines.append(line)
+                i += 1
+        flush_block()
+        return "\n".join(processed_lines)
+
+    def _is_quote_or_annotation_block(self, line: str) -> bool:
+        """Check if a line is a Quote or Annotation block."""
+        stripped = line.strip()
+        return stripped.startswith("> **Quote:") or stripped.startswith("> **Annotation:")
+
+    def _reorder_block(self, quote_annotation_lines: List[str]) -> List[str]:
+        """
+        Reorder Quote/Annotation lines while removing blank lines between blocks
+        """
+        # Separate quotes and annotations
+        quotes = []
+        annotations = []
+
+        for line in quote_annotation_lines:
+            if line.strip().startswith("> **Quote:"):
+                quotes.append(line)
+            elif line.strip().startswith("> **Annotation:"):
+                annotations.append(line)
+
+        # Create the reordered Quote/Annotation lines
+        reordered_qa_lines = quotes + annotations
+
+        return reordered_qa_lines
