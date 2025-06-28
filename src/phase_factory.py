@@ -23,8 +23,6 @@ class PhaseFactory:
     without having to manually configure post-processor chains for each phase type.
     """
 
-    DEFAULT_POST_PROCESSORS = {
-        """Default post-processor configurations for each phase type."""
     DEFAULT_POST_PROCESSORS: dict[PhaseType, list[PostProcessorType]] = {
         PhaseType.MODERNIZE: [
             PostProcessorType.NO_NEW_HEADERS,
@@ -158,7 +156,7 @@ class PhaseFactory:
         )
 
     @staticmethod
-    def _create_built_in_processor(processor_name: str):
+    def _create_built_in_processor(processor_name: str) -> Optional[PostProcessor]:
         """
         Create a built-in post-processor by name.
 
@@ -166,7 +164,7 @@ class PhaseFactory:
             processor_name (str): Name of the built-in processor
 
         Returns:
-            PostProcessor: The created processor or None if not found
+            Optional[PostProcessor]: The created processor or None if not found
         """
         processors = {
             "ensure_blank_line": EnsureBlankLineProcessor,
@@ -184,7 +182,7 @@ class PhaseFactory:
         return None
 
     @staticmethod
-    def _create_processor_from_enum(processor_type: PostProcessorType):
+    def _create_processor_from_enum(processor_type: PostProcessorType) -> Optional[PostProcessor]:
         """
         Create a built-in post-processor from PostProcessorType enum.
 
@@ -192,7 +190,7 @@ class PhaseFactory:
             processor_type (PostProcessorType): The post-processor type
 
         Returns:
-            PostProcessor: The created processor or None if not found
+            Optional[PostProcessor]: The created processor or None if not found
         """
         processor_mapping = {
             PostProcessorType.ENSURE_BLANK_LINE: EnsureBlankLineProcessor,

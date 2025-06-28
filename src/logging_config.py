@@ -6,12 +6,15 @@ from pathlib import Path
 from loguru import logger
 
 
-def setup_logging(log_name: str = "app"):
+def setup_logging(log_name: str = "app") -> logger:
     """
     Configure logging for the application.
 
     Args:
         log_name: Base name for the log file
+
+    Returns:
+        logger: Configured logger instance
     """
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
@@ -28,9 +31,7 @@ def setup_logging(log_name: str = "app"):
     )
 
     # Add stdout handler if not already added
-    if not any(
-        handler._sink == sys.stdout for handler in logger._core.handlers.values()
-    ):
+    if not any(handler._sink == sys.stdout for handler in logger._core.handlers.values()):
         logger.add(
             sys.stdout,
             level="INFO",

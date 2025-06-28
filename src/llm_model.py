@@ -57,9 +57,7 @@ class LlmModel:
             retry_delay:   Initial delay between retries in seconds.
             backoff_factor: Multiplier for exponential backoff.
         """
-        module_logger.info(
-            f"Initializing LLM client: model={model}, base_url={base_url}"
-        )
+        module_logger.info(f"Initializing LLM client: model={model}, base_url={base_url}")
         api_key = os.getenv(api_key_env)
         if not api_key:
             msg = f"Missing environment variable: {api_key_env}"
@@ -97,10 +95,10 @@ class LlmModel:
             backoff_factor=backoff_factor,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
 
     def _log_prompt(self, role: str, content: str) -> None:
@@ -234,9 +232,6 @@ class LlmModel:
         finish_reason = choices[0].get("finish_reason", "unknown")
 
         if finish_reason == "length":
-            module_logger.warning(
-                "Response truncated: consider increasing max_tokens or "
-                "reviewing model limits"
-            )
+            module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
 
         return content

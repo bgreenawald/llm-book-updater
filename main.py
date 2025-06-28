@@ -10,7 +10,7 @@ from src.pipeline import run_pipeline
 from src.run_settings import config
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure logging with debug level and better formatting."""
     logger.remove()  # Remove default handler
     logger.add(
@@ -25,7 +25,7 @@ def setup_logging():
     )
 
 
-def main():
+def main() -> None:
     """Main function to run the pipeline."""
     setup_logging()
     try:

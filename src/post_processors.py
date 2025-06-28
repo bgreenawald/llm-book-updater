@@ -42,13 +42,13 @@ class PostProcessor(ABC):
         """
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a string representation of the PostProcessor instance.
         """
         return f"{self.__class__.__name__}(name={self.name})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Returns a detailed string representation of the PostProcessor instance for debugging.
         """
@@ -290,16 +290,16 @@ class PostProcessorChain(PostProcessor):
         logger.debug(f"Post-processing chain completed. Final block length: {len(current_block)} characters")
         return current_block
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.processors)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a string representation of the PostProcessorChain instance.
         """
         return f"PostProcessorChain({[p.name for p in self.processors]})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Returns a detailed string representation of the PostProcessorChain instance for debugging.
         """

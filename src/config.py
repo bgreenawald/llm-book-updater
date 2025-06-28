@@ -8,6 +8,7 @@ from src.llm_model import GEMINI_FLASH
 
 class PhaseType(Enum):
     """Enumeration of available processing phases."""
+
     MODERNIZE = auto()
     EDIT = auto()
     ANNOTATE = auto()
@@ -56,7 +57,7 @@ class PhaseConfig:
     book_name: Optional[str] = None
     author_name: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Post-initialization to set default prompt paths and name if not provided.
         """
@@ -82,7 +83,7 @@ class RunConfig:
     # Default to 35-50% reduction if not specified
     length_reduction: Optional[Union[int, Tuple[int, int]]] = (35, 50)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"RunConfig(book_name={self.book_name}, "
             f"author_name={self.author_name}, "
@@ -93,7 +94,7 @@ class RunConfig:
             f"length_reduction={self.length_reduction})"
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"RunConfig(book_name={self.book_name}, "
             f"author_name={self.author_name}, "
@@ -104,7 +105,7 @@ class RunConfig:
             f"length_reduction={self.length_reduction})"
         )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Post-initialization to ensure the output directory exists.
         """

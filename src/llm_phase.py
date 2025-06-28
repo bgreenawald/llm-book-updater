@@ -348,7 +348,7 @@ class LlmPhase(ABC):
         ret = self.user_prompt.format(**context)
         return ret
 
-    def _get_header_and_body(self, block: str):
+    def _get_header_and_body(self, block: str) -> Tuple[str, str]:
         """
         Helper method to extract header and body from a markdown block.
 
@@ -356,7 +356,7 @@ class LlmPhase(ABC):
             block (str): The markdown block to parse
 
         Returns:
-            tuple: (header, body) where header is the first line and body is the rest
+            Tuple[str, str]: (header, body) where header is the first line and body is the rest
         """
         lines = block.strip().split("\n", 1)
         header = lines[0].strip()

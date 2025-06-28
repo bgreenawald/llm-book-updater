@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
@@ -59,9 +59,9 @@ class Pipeline:
         """
         self.config = config
         self._phase_instances: List[LlmPhase] = []
-        self._system_prompt_metadata: list = []  # Collect system prompt metadata for all phases
+        self._system_prompt_metadata: List[Dict[str, Any]] = []  # Collect system prompt metadata for all phases
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a string representation of the Pipeline instance.
 
@@ -70,7 +70,7 @@ class Pipeline:
         """
         return f"Pipeline(config={self.config})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Returns a detailed string representation of the Pipeline instance for debugging.
 
