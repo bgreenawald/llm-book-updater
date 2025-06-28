@@ -15,6 +15,22 @@ class PhaseType(Enum):
     SUMMARY = auto()
 
 
+class PostProcessorType(Enum):
+    """Enumeration of available post-processor types."""
+
+    # Basic formatting processors
+    ENSURE_BLANK_LINE = auto()
+    REMOVE_TRAILING_WHITESPACE = auto()
+    REMOVE_XML_TAGS = auto()
+
+    # Content preservation processors
+    NO_NEW_HEADERS = auto()
+    REVERT_REMOVED_BLOCK_LINES = auto()
+
+    # Specialized processors
+    ORDER_QUOTE_ANNOTATION = auto()
+
+
 @dataclass
 class PhaseConfig:
     """Configuration for a single phase in the pipeline."""

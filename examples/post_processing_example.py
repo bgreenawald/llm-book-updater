@@ -69,7 +69,7 @@ def example_standard_phase_with_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        post_processors=["formatting", "consistency"],
+        post_processors=["consistency"],
     )
 
     print(f"Created phase: {phase}")
@@ -133,7 +133,7 @@ def example_summary_phase_with_mixed_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        post_processors=["formatting", "validation"],
+        post_processors=["validation"],
         custom_post_processors=[custom_processor],
     )
 

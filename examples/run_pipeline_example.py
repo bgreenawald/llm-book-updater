@@ -35,10 +35,6 @@ def main():
             phase_type=PhaseType.FINAL,
             model_type=OPENAI_04_MINI,
         ),
-        PhaseConfig(
-            phase_type=PhaseType.FORMATTING,
-            model_type=GEMINI_PRO,  # Example: Use different model for formatting
-        ),
         # Example: Add annotation phases
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,

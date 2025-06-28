@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from src.config import PhaseConfig
+from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
 from src.post_processors import (
     EnsureBlankLineProcessor,
@@ -23,6 +23,49 @@ class PhaseFactory:
     without having to manually configure post-processor chains for each phase type.
     """
 
+    # Default post-processor configurations for each phase type
+    DEFAULT_POST_PROCESSORS = {
+        PhaseType.MODERNIZE: [
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+        PhaseType.EDIT: [
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+        PhaseType.FINAL: [
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+        PhaseType.INTRODUCTION: [
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+        PhaseType.SUMMARY: [
+            PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+        PhaseType.ANNOTATE: [
+            PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
+            PostProcessorType.ORDER_QUOTE_ANNOTATION,
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+        ],
+    }
+
     @staticmethod
     def create_standard_phase(config: PhaseConfig) -> StandardLlmPhase:
         """
@@ -34,7 +77,7 @@ class PhaseFactory:
         Returns:
             StandardLlmPhase: Configured standard phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
 
         return StandardLlmPhase(
             name=config.name,
@@ -63,7 +106,7 @@ class PhaseFactory:
         Returns:
             IntroductionAnnotationPhase: Configured introduction annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
 
         return IntroductionAnnotationPhase(
             name=config.name,
@@ -92,7 +135,7 @@ class PhaseFactory:
         Returns:
             SummaryAnnotationPhase: Configured summary annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(config.post_processors, config.phase_type)
 
         return SummaryAnnotationPhase(
             name=config.name,
@@ -137,6 +180,32 @@ class PhaseFactory:
         return None
 
     @staticmethod
+    def _create_processor_from_enum(processor_type: PostProcessorType):
+        """
+        Create a built-in post-processor from PostProcessorType enum.
+
+        Args:
+            processor_type (PostProcessorType): The post-processor type
+
+        Returns:
+            PostProcessor: The created processor or None if not found
+        """
+        processor_mapping = {
+            PostProcessorType.ENSURE_BLANK_LINE: EnsureBlankLineProcessor,
+            PostProcessorType.REMOVE_XML_TAGS: RemoveXmlTagsProcessor,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE: RemoveTrailingWhitespaceProcessor,
+            PostProcessorType.ORDER_QUOTE_ANNOTATION: OrderQuoteAnnotationProcessor,
+            PostProcessorType.NO_NEW_HEADERS: NoNewHeadersPostProcessor,
+            PostProcessorType.REVERT_REMOVED_BLOCK_LINES: RevertRemovedBlockLines,
+        }
+
+        processor_class = processor_mapping.get(processor_type)
+        if processor_class:
+            return processor_class()
+
+        return None
+
+    @staticmethod
     def _create_formatting_processor_chain() -> PostProcessorChain:
         """
         Create a formatting processor chain that combines multiple formatting processors.
@@ -156,7 +225,8 @@ class PhaseFactory:
 
     @staticmethod
     def _create_post_processor_chain(
-        post_processors: Optional[List[Union[str, PostProcessor]]] = None,
+        post_processors: Optional[List[Union[str, PostProcessor, PostProcessorType]]] = None,
+        phase_type: Optional[PhaseType] = None,
     ) -> Optional[PostProcessorChain]:
         """
         Create a post-processor chain from a unified list of post-processors.
@@ -164,15 +234,24 @@ class PhaseFactory:
         The list can contain:
         - Strings: Names of built-in post-processors (e.g., "ensure_blank_line")
         - PostProcessor instances: Custom post-processor objects
+        - PostProcessorType enum values: Type-safe post-processor types
         - Special aliases: "formatting" for a predefined chain of formatting processors
 
+        If no post_processors are provided and a phase_type is specified,
+        the default post-processors for that phase type will be used.
+
         Args:
-            post_processors (Optional[List[Union[str, PostProcessor]]]):
-                Unified list of post-processors (strings or instances)
+            post_processors (Optional[List[Union[str, PostProcessor, PostProcessorType]]]):
+                Unified list of post-processors (strings, instances, or enum values)
+            phase_type (Optional[PhaseType]): Phase type for default post-processors
 
         Returns:
             Optional[PostProcessorChain]: Configured post-processor chain or None
         """
+        # Use default post-processors if none provided and phase_type is specified
+        if not post_processors and phase_type:
+            post_processors = PhaseFactory.DEFAULT_POST_PROCESSORS.get(phase_type, [])
+
         if not post_processors:
             return None
 
@@ -195,6 +274,11 @@ class PhaseFactory:
             elif isinstance(processor_item, PostProcessor):
                 # Handle custom PostProcessor instances
                 chain.add_processor(processor_item)
+            elif isinstance(processor_item, PostProcessorType):
+                # Handle PostProcessorType enum values
+                processor = PhaseFactory._create_processor_from_enum(processor_item)
+                if processor:
+                    chain.add_processor(processor)
             else:
                 # Skip invalid items
                 continue

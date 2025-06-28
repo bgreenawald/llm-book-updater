@@ -29,7 +29,6 @@ def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
         PhaseType.EDIT: StandardLlmPhase,
         PhaseType.ANNOTATE: StandardLlmPhase,
         PhaseType.FINAL: StandardLlmPhase,
-        PhaseType.FORMATTING: StandardLlmPhase,
         PhaseType.INTRODUCTION: IntroductionAnnotationPhase,
         PhaseType.SUMMARY: SummaryAnnotationPhase,
     }

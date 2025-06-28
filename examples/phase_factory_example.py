@@ -32,7 +32,6 @@ def main():
         max_workers=4,
         # Unified post-processors list: mix of strings and instances
         post_processors=[
-            "formatting",  # Built-in alias
             "no_new_headers",  # Built-in processor by name
             EnsureBlankLineProcessor(),  # Custom processor instance
         ],
@@ -49,7 +48,7 @@ def main():
         original_file_path=Path("original/gatsby.md"),
         temperature=0.2,
         # Only built-in processors
-        post_processors=["formatting", "remove_xml_tags"],
+        post_processors=["remove_xml_tags"],
     )
 
     # Create a PhaseConfig for a summary annotation phase
@@ -64,7 +63,6 @@ def main():
         temperature=0.1,
         # Mix of built-in and custom processors
         post_processors=[
-            "formatting",
             "revert_removed_block_lines",
             RemoveXmlTagsProcessor(),  # Custom instance
         ],

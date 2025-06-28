@@ -85,6 +85,83 @@ All phases can be configured with the following:
 -   `model`: The `LlmModel` instance to use.
 -   `temperature`, `max_workers`, etc.
 
+### Post-Processor Types
+
+The system provides a `PostProcessorType` enum for type-safe post-processor configuration:
+
+```python
+from src.config import PostProcessorType
+
+# Available post-processor types:
+PostProcessorType.ENSURE_BLANK_LINE           # Ensures proper spacing
+PostProcessorType.REMOVE_TRAILING_WHITESPACE  # Cleans trailing whitespace
+PostProcessorType.REMOVE_XML_TAGS             # Removes XML tags (except <br>)
+PostProcessorType.NO_NEW_HEADERS              # Prevents new markdown headers
+PostProcessorType.REVERT_REMOVED_BLOCK_LINES  # Restores removed block comments
+PostProcessorType.ORDER_QUOTE_ANNOTATION      # Reorders quotes before annotations
+```
+
+### Default Post-Processor Configuration
+
+Each phase type comes with a default set of post-processors that are automatically applied when no explicit `post_processors` are specified in the configuration:
+
+- **MODERNIZE, EDIT, FINAL, INTRODUCTION**: Basic formatting and cleanup
+  - `no_new_headers`: Prevents addition of new markdown headers
+  - `remove_trailing_whitespace`: Cleans up trailing whitespace
+  - `remove_xml_tags`: Removes XML tags (except `<br>`)
+  - `ensure_blank_line`: Ensures proper spacing between elements
+
+- **SUMMARY**: Includes block restoration in addition to basic formatting
+  - `revert_removed_block_lines`: Restores removed block comment lines
+  - `no_new_headers`: Prevents addition of new markdown headers
+  - `remove_trailing_whitespace`: Cleans up trailing whitespace
+  - `remove_xml_tags`: Removes XML tags (except `<br>`)
+  - `ensure_blank_line`: Ensures proper spacing between elements
+
+- **ANNOTATE**: Includes quote/annotation ordering in addition to block restoration
+  - `revert_removed_block_lines`: Restores removed block comment lines
+  - `order_quote_annotation`: Reorders quotes before annotations
+  - `no_new_headers`: Prevents addition of new markdown headers
+  - `remove_trailing_whitespace`: Cleans up trailing whitespace
+  - `remove_xml_tags`: Removes XML tags (except `<br>`)
+  - `ensure_blank_line`: Ensures proper spacing between elements
+
+You can override these defaults by explicitly specifying the `post_processors` parameter in your `PhaseConfig`.
+
+### Specifying Post-Processors
+
+You can specify post-processors in multiple ways:
+
+```python
+from src.config import PhaseConfig, PhaseType, PostProcessorType
+from src.post_processors import RemoveTrailingWhitespaceProcessor
+
+# 1. Using string names (legacy approach)
+config1 = PhaseConfig(
+    phase_type=PhaseType.MODERNIZE,
+    post_processors=["remove_xml_tags", "ensure_blank_line"],
+)
+
+# 2. Using PostProcessorType enum (type-safe approach)
+config2 = PhaseConfig(
+    phase_type=PhaseType.MODERNIZE,
+    post_processors=[
+        PostProcessorType.REMOVE_XML_TAGS,
+        PostProcessorType.ENSURE_BLANK_LINE,
+    ],
+)
+
+# 3. Mixing different approaches
+config3 = PhaseConfig(
+    phase_type=PhaseType.ANNOTATE,
+    post_processors=[
+        "revert_removed_block_lines",  # String
+        PostProcessorType.ORDER_QUOTE_ANNOTATION,  # Enum
+        RemoveTrailingWhitespaceProcessor(),  # Instance
+    ],
+)
+```
+
 ### Prompt Templates
 
 System and user prompts can be customized with template variables like `{book_name}`, `{author_name}`, `{transformed_passage}`, and `{original_passage}`.
@@ -97,6 +174,7 @@ See the `examples/` directory for complete working examples:
 -   `run_pipeline_example.py`: Shows how to run the full pipeline.
 -   `metadata_example.py`: Example of how metadata is saved.
 -   `retry_example.py`: Example with retry logic.
+-   `default_postprocessors_example.py`: Demonstrates default post-processor configurations.
 
 ## License
 
