@@ -86,6 +86,66 @@ All phases can be configured with the following:
 -   `model`: The `LlmModel` instance to use.
 -   `temperature`, `max_workers`, etc.
 
+### Run Configuration
+
+The `RunConfig` class supports the following parameters:
+
+-   `book_name`, `author_name`: Metadata for the book being processed.
+-   `input_file`, `output_dir`, `original_file`: Paths for the run.
+-   `phases`: List of `PhaseConfig` objects defining the processing pipeline.
+-   `length_reduction`: Length reduction parameter for the entire run (optional).
+
+### Length Reduction Parameter
+
+The pipeline supports a `length_reduction` parameter that can be specified at the run level. This parameter controls how much the content should be reduced in length during the editing phase.
+
+### Usage
+
+The `length_reduction` parameter can be:
+- A single integer (e.g., `40` for 40% reduction)
+- A tuple of bounds (e.g., `(35, 50)` for 35-50% reduction)
+- `None` to use the default of `(35, 50)` (35-50% reduction)
+
+### Examples
+
+```python
+from src.config import RunConfig, PhaseConfig, PhaseType
+from src.pipeline import Pipeline
+
+# Single percentage reduction
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name", 
+    input_file=Path("input.txt"),
+    output_dir=Path("output"),
+    original_file=Path("original.txt"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
+    length_reduction=40  # 40% reduction
+)
+
+# Range reduction (default behavior)
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name",
+    input_file=Path("input.txt"), 
+    output_dir=Path("output"),
+    original_file=Path("original.txt"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)],
+    length_reduction=(35, 50)  # 35-50% reduction
+)
+
+# Use default (35-50% reduction)
+config = RunConfig(
+    book_name="My Book",
+    author_name="Author Name",
+    input_file=Path("input.txt"),
+    output_dir=Path("output"), 
+    original_file=Path("original.txt"),
+    phases=[PhaseConfig(phase_type=PhaseType.EDIT)]
+    # length_reduction defaults to (35, 50)
+)
+```
+
 ### Post-Processor Types
 
 The system provides a `PostProcessorType` enum for type-safe post-processor configuration:

@@ -25,11 +25,11 @@ def main():
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
-            enabled=False,  # Example: Disable the edit phase
+            enabled=True,  # Enable the edit phase
         ),
         PhaseConfig(
             phase_type=PhaseType.ANNOTATE,
-            model_type=GEMINI_PRO,  # Example: Use a different model
+            model_type=GEMINI_PRO,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
@@ -56,6 +56,7 @@ def main():
         output_dir=Path("books/On Liberty/markdown/Mill, On Liberty"),
         original_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),
         phases=run_phases,
+        length_reduction=(30, 50),  # Set length reduction for the entire run
     )
 
     # Run the pipeline

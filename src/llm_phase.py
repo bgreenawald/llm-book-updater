@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
+from typing import Optional, Tuple, Union
 
 from loguru import logger
 from tqdm import tqdm
@@ -31,6 +32,7 @@ class LlmPhase(ABC):
         max_workers: int = None,
         reasoning: dict = None,
         post_processor_chain: PostProcessorChain = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
     ):
         logger.info(f"Initializing LlmPhase: {name}")
         logger.debug(f"Input file: {input_file_path}")
@@ -40,6 +42,7 @@ class LlmPhase(ABC):
         logger.debug(f"User prompt path: {user_prompt_path}")
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
+        logger.debug(f"Length reduction: {length_reduction}")
         """
         Base class for LLM processing phases. Provides common functionality for
         reading files, managing prompts, and coordinating parallel processing.
@@ -72,9 +75,10 @@ class LlmPhase(ABC):
         self.model = model
         self.user_prompt_path = user_prompt_path
         self.temperature = temperature
-        self.max_workers = max_workers
+        self.max_workers = max_workers or 1
         self.reasoning = reasoning or {}
         self.post_processor_chain = post_processor_chain
+        self.length_reduction = length_reduction
 
         if self.reasoning:
             logger.debug(f"Reasoning configuration: {self.reasoning}")
@@ -105,7 +109,8 @@ class LlmPhase(ABC):
             f"model={self.model}, user_prompt_path={self.user_prompt_path}, "
             f"temperature={self.temperature}, max_workers={self.max_workers}, "
             f"reasoning={self.reasoning}, "
-            f"post_processor_chain={self.post_processor_chain})"
+            f"post_processor_chain={self.post_processor_chain}, "
+            f"length_reduction={self.length_reduction})"
         )
 
     def __repr__(self):
@@ -225,9 +230,10 @@ class LlmPhase(ABC):
     def _read_system_prompt(self) -> str:
         """
         Reads the content of the system prompt file and returns it as a string.
+        Supports formatting with parameters like length_reduction.
 
         Returns:
-            str: Content of the system prompt file
+            str: Content of the system prompt file, formatted with parameters
 
         Raises:
             FileNotFoundError: If the system prompt file does not exist
@@ -237,6 +243,25 @@ class LlmPhase(ABC):
             with self.system_prompt_path.open("r", encoding="utf-8") as f:
                 content = f.read()
                 logger.debug(f"Read system prompt from {self.system_prompt_path}")
+
+                # Format the prompt with available parameters
+                format_params = {}
+                if self.length_reduction is not None:
+                    if isinstance(self.length_reduction, int):
+                        format_params["length_reduction"] = f"{self.length_reduction}%"
+                    else:
+                        lower, upper = self.length_reduction
+                        format_params["length_reduction"] = f"{lower}-{upper}%"
+
+                if format_params:
+                    try:
+                        content = content.format(**format_params)
+                        logger.debug(f"Formatted system prompt with parameters: {format_params}")
+                    except KeyError as e:
+                        logger.warning(f"System prompt contains undefined parameter: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error formatting system prompt: {e}")
+
                 return content
 
         except FileNotFoundError:
