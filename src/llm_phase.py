@@ -427,7 +427,7 @@ class LlmPhase(ABC):
                 logger.warning("No markdown blocks found in the input text")
                 self.content = self.input_text
                 return
-            elif len(current_blocks) != len(original_blocks):
+            if len(current_blocks) != len(original_blocks):
                 msg = f"Block length mismatch: {len(current_blocks)} != {len(original_blocks)}"
                 raise ValueError(msg)
 
@@ -531,9 +531,8 @@ class StandardLlmPhase(LlmPhase):
             # Reconstruct the block
             if processed_body.strip():
                 return f"{current_header}\n\n{processed_body}\n\n"
-            else:
-                logger.debug("Empty block body, returning header only")
-                return f"{current_header}\n\n"
+            logger.debug("Empty block body, returning header only")
+            return f"{current_header}\n\n"
 
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
