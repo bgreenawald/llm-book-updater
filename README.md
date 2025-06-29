@@ -244,34 +244,54 @@ Example log output:
 
 ### Metadata and Logging
 
-The pipeline automatically saves comprehensive metadata about each run, including post-processing information:
+The pipeline automatically saves comprehensive metadata about each run, including post-processing information and system prompt details:
 
 ```json
 {
+  "metadata_version": "1.0.0",
   "run_timestamp": "2024-01-01T12:00:00",
   "book_name": "Example Book",
   "author_name": "Example Author",
+  "input_file": "input.md",
+  "original_file": "original.md",
+  "output_directory": "output/",
+  "length_reduction": [35, 50],
   "phases": [
     {
       "phase_name": "modernize",
       "phase_index": 0,
+      "phase_type": "MODERNIZE",
       "enabled": true,
       "model_type": "gemini-flash",
       "temperature": 0.2,
+      "max_workers": null,
+      "input_file": "input.md",
+      "output_file": "01-input Modernize_1.md",
+      "system_prompt_path": "./prompts/modernize_system.md",
+      "user_prompt_path": "./prompts/modernize_user.md",
+      "fully_rendered_system_prompt": "You are an expert editor...",
+      "length_reduction_parameter": [35, 50],
       "post_processors": ["no_new_headers", "remove_trailing_whitespace", "remove_xml_tags", "ensure_blank_line"],
       "post_processor_count": 4,
       "completed": true,
-      "output_exists": true
+      "output_exists": true,
+      "book_name": "Example Book",
+      "author_name": "Example Author"
     }
   ]
 }
 ```
 
-The metadata includes:
-- **post_processors**: List of post-processor names used in each phase
-- **post_processor_count**: Number of post-processors in the chain
-- **completed**: Whether the phase completed successfully
-- **output_exists**: Whether the output file was created
+The consolidated metadata includes:
+- **Metadata Version**: Version number for parser compatibility
+- **Run Information**: Timestamp, book details, file paths, and configuration
+- **Phase Details**: Complete configuration for each phase including model settings
+- **System Prompts**: Fully rendered system prompts with all template variables resolved
+- **Post-processing**: List of post-processor names and counts used in each phase
+- **Execution Status**: Whether each phase completed successfully, was disabled, or failed
+- **File Information**: Input/output file paths and existence status
+
+The metadata is saved to a single file named `pipeline_metadata_YYYYMMDD_HHMMSS.json` in the output directory.
 
 ### Prompt Templates
 
