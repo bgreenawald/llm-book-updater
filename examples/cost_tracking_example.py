@@ -63,7 +63,6 @@ This is the final section to complete our test content.
         name="modernize",
         model=model,
         temperature=0.2,
-        max_workers=1,  # Use single worker for predictable costs
         enabled=True,
         system_prompt_path=Path("prompts/modernize_system.md"),
         user_prompt_path=Path("prompts/modernize_user.md"),

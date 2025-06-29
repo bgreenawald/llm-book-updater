@@ -50,14 +50,14 @@ class PhaseConfig:
     system_prompt_path: Optional[Path] = None
     user_prompt_path: Path = None
     custom_output_path: Optional[Path] = None
-    max_workers: Optional[int] = None
     # Additional parameters for PhaseFactory integration
     name: Optional[str] = None
     input_file_path: Optional[Path] = None
     output_file_path: Optional[Path] = None
     original_file_path: Optional[Path] = None
     model: Optional["LlmModel"] = None  # LlmModel instance
-    # Unified post-processors list that can contain strings (built-in) or PostProcessor instances (custom)
+    # Unified post-processors list that can contain strings (built-in) or
+    # PostProcessor instances (custom)
     post_processors: Optional[List[Union[str, "PostProcessor", PostProcessorType]]] = None
     book_name: Optional[str] = None
     author_name: Optional[str] = None
@@ -89,6 +89,8 @@ class RunConfig:
     length_reduction: Optional[Union[int, Tuple[int, int]]] = (35, 50)
     # Tags to preserve during processing (f-string tags like {preface}, {license})
     tags_to_preserve: List[str] = field(default_factory=lambda: ["{preface}", "{license}"])
+    # Maximum number of workers for parallel processing across all phases
+    max_workers: Optional[int] = None
 
     def __str__(self) -> str:
         return (

@@ -95,7 +95,6 @@ class Pipeline:
             "enabled": phase_config.enabled,
             "model_type": phase_config.model_type,
             "temperature": phase_config.temperature,
-            "max_workers": phase_config.max_workers,
             "post_processors": post_processors_info,
             "post_processor_count": len(post_processors_info),
             "completed": completed,
@@ -294,22 +293,32 @@ class Pipeline:
             author_name=self.config.author_name,
             model=model,
             temperature=phase_config.temperature,
-            max_workers=phase_config.max_workers,
             reasoning=phase_config.reasoning,
             post_processors=phase_config.post_processors,
         )
 
-        # Create the phase instance using the factory, passing length_reduction as a kwarg
-        phase_factory_kwargs = {
-            "length_reduction": self.config.length_reduction,
-            "tags_to_preserve": self.config.tags_to_preserve,
-        }
+        # Create the phase instance using the factory with explicit arguments
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
-            phase = PhaseFactory.create_standard_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_standard_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         elif phase_config.phase_type == PhaseType.INTRODUCTION:
-            phase = PhaseFactory.create_introduction_annotation_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_introduction_annotation_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         elif phase_config.phase_type == PhaseType.SUMMARY:
-            phase = PhaseFactory.create_summary_annotation_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_summary_annotation_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         else:
             raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
 
