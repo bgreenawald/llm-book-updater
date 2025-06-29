@@ -52,6 +52,10 @@ class Config:
         self.preface_md = self.base_dir / "preface.md"
         self.license_md = self.base_dir / "license.md"
 
+        # --- Base Directory Output Paths ---
+        self.base_final_md = self.base_dir / "output-final.md"
+        self.base_annotated_md = self.base_dir / "output-annotated.md"
+
 
 def safe_relative_path(path: Path) -> str:
     """
@@ -225,6 +229,13 @@ def build(version: str, name: str):
     logger.info("--- Cleaning annotation patterns ---")
     clean_annotation_patterns(config.staged_final_md)
     clean_annotation_patterns(config.staged_annotated_md)
+
+    # --- 3.7. Copy fully rendered files to base directory ---
+    logger.info("--- Copying fully rendered files to base directory ---")
+    shutil.copy(config.staged_final_md, config.base_final_md)
+    logger.info(f"Copied final markdown to base directory: '{safe_relative_path(config.base_final_md)}'")
+    shutil.copy(config.staged_annotated_md, config.base_annotated_md)
+    logger.info(f"Copied annotated markdown to base directory: '{safe_relative_path(config.base_annotated_md)}'")
 
     # --- 4. Run Pandoc Build ---
     logger.info("--- Running Pandoc Build ---")
