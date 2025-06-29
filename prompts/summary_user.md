@@ -1,3 +1,5 @@
+# Summary
+
 Please generate a summary for the following passage from *{book_name}* by *{author_name}*:
 
 **Section Title:** {new_title}

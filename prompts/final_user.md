@@ -4,7 +4,9 @@ Please review and refine the following passages from *{book_name}* by *{author_n
 
 **Section Title:** {new_title}
 
-Original Passage
+---
+
+**Original Passage**
 
 <BEGIN_PASSAGE>
 {original_passage}
@@ -12,7 +14,7 @@ Original Passage
 
 ---
 
-Transformed Passage
+**Transformed Passage**
 
 <BEGIN_PASSAGE>
 {transformed_passage}

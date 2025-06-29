@@ -15,10 +15,12 @@ Your sole objective is to create a concise, structured introduction that provide
    * Specialized terminology first introduced here
    * Key figures, events, or concepts unique to this section
    * The section's relationship to the broader work
+
 2. **Craft the Introduction**: Create three distinct components:
    * **Overview**: Write 1-3 paragraphs framing the section's purpose and scope
    * **Key Terms/Concepts**: List only terms *first introduced* in this section
    * **Key People/Places/Events**: Include only entities *central to this section* that wouldn't be common knowledge
+
 3. **Apply Strict Formatting**: Structure the introduction exactly as specified below
 
 ## Critical Constraints (Non-Negotiable Rules)
