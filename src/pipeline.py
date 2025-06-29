@@ -204,6 +204,22 @@ class Pipeline:
         except Exception as e:
             logger.error(f"Failed to save pipeline metadata: {str(e)}")
 
+    def _save_cost_analysis(self, cost_analysis: Dict[str, Any]) -> None:
+        """
+        Save cost analysis data to a separate JSON file in the output directory.
+
+        Args:
+            cost_analysis (Dict[str, Any]): Cost analysis data from the run
+        """
+        # Save cost analysis to output directory
+        cost_file = self.config.output_dir / f"cost_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        try:
+            with open(file=cost_file, mode="w", encoding="utf-8") as f:
+                json.dump(obj=cost_analysis, fp=f, indent=2, ensure_ascii=False)
+            logger.info(f"Cost analysis saved to: {cost_file}")
+        except Exception as e:
+            logger.error(f"Failed to save cost analysis: {str(e)}")
+
     def _get_phase_output_path(self, phase_index: int) -> Path:
         """
         Generate output path for a phase.
@@ -395,13 +411,44 @@ class Pipeline:
 
             logger.success("Pipeline completed successfully")
         finally:
+            # Calculate and log costs at the end of the run
+            cost_analysis = None
+            phase_names = [phase.name for phase in completed_phases]
+            if phase_names:
+                run_costs = calculate_and_log_costs(phase_names)
+                if run_costs:
+                    # Convert RunCosts to dictionary for JSON serialization
+                    cost_analysis = {
+                        "total_phases": run_costs.total_phases,
+                        "completed_phases": run_costs.completed_phases,
+                        "total_generations": run_costs.total_generations,
+                        "total_prompt_tokens": run_costs.total_prompt_tokens,
+                        "total_completion_tokens": run_costs.total_completion_tokens,
+                        "total_tokens": run_costs.total_tokens,
+                        "total_cost": run_costs.total_cost,
+                        "currency": run_costs.currency,
+                        "phase_costs": [
+                            {
+                                "phase_name": phase.phase_name,
+                                "phase_index": phase.phase_index,
+                                "generation_ids": phase.generation_ids,
+                                "total_prompt_tokens": phase.total_prompt_tokens,
+                                "total_completion_tokens": phase.total_completion_tokens,
+                                "total_tokens": phase.total_tokens,
+                                "total_cost": phase.total_cost,
+                                "currency": phase.currency,
+                                "generation_count": phase.generation_count,
+                            }
+                            for phase in run_costs.phase_costs
+                        ],
+                    }
+
             # Save comprehensive metadata about the run (whether successful or failed)
             self._save_metadata(completed_phases=completed_phases)
 
-            # Calculate and log costs at the end of the run
-            phase_names = [phase.name for phase in completed_phases]
-            if phase_names:
-                calculate_and_log_costs(phase_names)
+            # Save cost analysis data if available
+            if cost_analysis:
+                self._save_cost_analysis(cost_analysis=cost_analysis)
 
 
 def run_pipeline(config: RunConfig) -> None:

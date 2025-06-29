@@ -4,8 +4,12 @@ Test to verify consolidated pipeline metadata saving functionality.
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
+
+# Add project root to path to allow importing from src
+sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
@@ -123,5 +127,119 @@ def test_pipeline_metadata():
         raise
 
 
+def test_cost_analysis_saving():
+    """Test that cost analysis is correctly saved as a separate JSON file."""
+    try:
+        # Create temporary directory for test
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            # Create a test config
+            test_config = RunConfig(
+                book_name="Test Book",
+                author_name="Test Author",
+                input_file=temp_path / "test_input.md",
+                output_dir=output_dir,
+                original_file=temp_path / "test_original.md",
+                phases=[],
+            )
+
+            # Create pipeline
+            pipeline = Pipeline(config=test_config)
+
+            # Create sample cost analysis data
+            cost_analysis = {
+                "total_phases": 2,
+                "completed_phases": 2,
+                "total_generations": 5,
+                "total_prompt_tokens": 1000,
+                "total_completion_tokens": 2000,
+                "total_tokens": 3000,
+                "total_cost": 0.015,
+                "currency": "USD",
+                "phase_costs": [
+                    {
+                        "phase_name": "modernize",
+                        "phase_index": 0,
+                        "generation_ids": ["gen1", "gen2"],
+                        "total_prompt_tokens": 500,
+                        "total_completion_tokens": 1000,
+                        "total_tokens": 1500,
+                        "total_cost": 0.0075,
+                        "currency": "USD",
+                        "generation_count": 2,
+                    },
+                    {
+                        "phase_name": "edit",
+                        "phase_index": 1,
+                        "generation_ids": ["gen3", "gen4", "gen5"],
+                        "total_prompt_tokens": 500,
+                        "total_completion_tokens": 1000,
+                        "total_tokens": 1500,
+                        "total_cost": 0.0075,
+                        "currency": "USD",
+                        "generation_count": 3,
+                    },
+                ],
+            }
+
+            # Save cost analysis
+            pipeline._save_cost_analysis(cost_analysis=cost_analysis)
+
+            # Check that cost analysis file was created
+            cost_files = list(output_dir.glob(pattern="cost_analysis_*.json"))
+            assert len(cost_files) == 1, f"Expected 1 cost analysis file, found {len(cost_files)}"
+
+            # Read and verify cost analysis
+            with open(file=cost_files[0], mode="r", encoding="utf-8") as f:
+                saved_cost_analysis = json.load(fp=f)
+
+            # Verify cost analysis structure
+            assert "total_phases" in saved_cost_analysis
+            assert "completed_phases" in saved_cost_analysis
+            assert "total_generations" in saved_cost_analysis
+            assert "total_prompt_tokens" in saved_cost_analysis
+            assert "total_completion_tokens" in saved_cost_analysis
+            assert "total_tokens" in saved_cost_analysis
+            assert "total_cost" in saved_cost_analysis
+            assert "currency" in saved_cost_analysis
+            assert "phase_costs" in saved_cost_analysis
+
+            # Verify specific values
+            assert saved_cost_analysis["total_phases"] == 2
+            assert saved_cost_analysis["completed_phases"] == 2
+            assert saved_cost_analysis["total_generations"] == 5
+            assert saved_cost_analysis["total_prompt_tokens"] == 1000
+            assert saved_cost_analysis["total_completion_tokens"] == 2000
+            assert saved_cost_analysis["total_tokens"] == 3000
+            assert saved_cost_analysis["total_cost"] == 0.015
+            assert saved_cost_analysis["currency"] == "USD"
+
+            # Verify phase costs
+            assert len(saved_cost_analysis["phase_costs"]) == 2
+            phase1 = saved_cost_analysis["phase_costs"][0]
+            assert phase1["phase_name"] == "modernize"
+            assert phase1["phase_index"] == 0
+            assert phase1["generation_count"] == 2
+            assert phase1["total_cost"] == 0.0075
+
+            phase2 = saved_cost_analysis["phase_costs"][1]
+            assert phase2["phase_name"] == "edit"
+            assert phase2["phase_index"] == 1
+            assert phase2["generation_count"] == 3
+            assert phase2["total_cost"] == 0.0075
+
+            print("✓ Cost analysis saving test passed")
+
+    except Exception as e:
+        print(f"✗ Cost analysis saving test failed: {e}")
+        raise
+
+
 if __name__ == "__main__":
     test_pipeline_metadata()
+    test_cost_analysis_saving()
