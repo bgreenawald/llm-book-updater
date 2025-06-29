@@ -30,6 +30,10 @@ Your sole objective is to **modernize** the provided passage. This means updatin
 *   **Markdown Structure**:
     *   Preserve all Markdown headers (`#`, `##`, etc.) exactly as they are. Do **not** add, remove, or change header levels.
     *   Keep all Markdown images (`![](...)`) in their original positions and unchanged.
+*   **Special F-String Tags**:
+    *   Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    *   Do not modify, remove, or replace these tags with any other content.
+    *   These tags are used for final book generation and must remain intact.
 *   **Identify Key Quotes**:
     *   If a sentence or phrase is especially **important, rhetorically powerful, or widely quoted**, preserve it **verbatim**.
     *   Format these key passages as a Markdown blockquote, preceded by `**Quote:**` and followed by `**End quote.**`, with blank lines before and after.

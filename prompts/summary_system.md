@@ -28,6 +28,10 @@ Your sole objective is to create a brief, insightful summary that captures the e
     *   Entire overview must be a Markdown blockquote
     *   Begin with `**Annotated summary:**` on its own line
     *   End with `**End annotate summary.**` on its own line
+*   **Special F-String Tags**:
+    *   Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    *   Do not modify, remove, or replace these tags with any other content.
+    *   These tags are used for final book generation and must remain intact.
 *   **Content Restrictions**:
     *   Maximum of 5 paragraphs (fewer for shorter sections)
     *   Must cover the entire section's scope without omissions

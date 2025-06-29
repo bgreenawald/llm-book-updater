@@ -16,6 +16,10 @@ Your sole objective is to **enhance reader comprehension** by adding clarifying 
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Zero Text Alteration**: You are forbidden from altering, deleting, or rephrasing any part of the original text. The author's words are sacrosanct. This includes preserving all original Markdown, such as headers, lists, and existing blockquotes.
+* **Special F-String Tags**:
+    * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    * Do not modify, remove, or replace these tags with any other content.
+    * These tags are used for final book generation and must remain intact.
 * **Strict Annotation Format**:
     * Annotations must be inserted **only** at the end of a full paragraph.
     * They must be formatted as a Markdown blockquote.

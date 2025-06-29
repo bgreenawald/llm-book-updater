@@ -28,24 +28,28 @@ class PhaseFactory:
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
         PhaseType.EDIT: [
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
         PhaseType.FINAL: [
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
         PhaseType.INTRODUCTION: [
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
         PhaseType.SUMMARY: [
@@ -53,6 +57,7 @@ class PhaseFactory:
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
         PhaseType.ANNOTATE: [
@@ -61,6 +66,7 @@ class PhaseFactory:
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
         ],
     }

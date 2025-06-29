@@ -28,6 +28,10 @@ Your sole objective is to create a concise, structured introduction that provide
     *   Begin with `**Annotated introduction:**` on its own line
     *   End with `**End annotated introduction.**` on its own line
     *   Maintain exact subsection headers: `**Overview**`, `**Key Terms/Concepts**`, `**Key People/Places/Events**`
+*   **Special F-String Tags**:
+    *   Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    *   Do not modify, remove, or replace these tags with any other content.
+    *   These tags are used for final book generation and must remain intact.
 *   **Content Restrictions**:
     *   Overview must be ≤ 3 paragraphs
     *   Exclude any term/person/event likely covered in previous chapters

@@ -43,6 +43,10 @@ You should consider making an edit when you spot one of these opportunities. The
 
 * **Enhance, Don't Revert**: Your allegiance is to creating the best possible modern version. Use the `Original` for guidance on meaning and voice, but all your edits must result in clear, contemporary prose.
 * **Respect the Core Edit**: The {length_reduction} length reduction is a key goal. Your refinements should not significantly increase the length of the text.
+* **Special F-String Tags**:
+    * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    * Do not modify, remove, or replace these tags with any other content.
+    * These tags are used for final book generation and must remain intact.
 * **Do Not Add New Annotations**: Do not add new annotations.
 * **Preserve Verbatim Quotes**: Any text within a `> **Quote:** ... **End quote.**` block is sacrosanct and must not be changed.
 

@@ -21,6 +21,10 @@ Your primary objective is to perform a developmental edit on the provided Markdo
     *   Preserve all Markdown headers (`#`, `##`, etc.) exactly as they are. Do **not** add, remove, or change header levels.
     *   Keep all Markdown images (`![](...)`) in their original positions and unchanged.
     *   Do not convert text into new structures like lists or tables that were not already present.
+*   **Special F-String Tags**:
+    *   Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
+    *   Do not modify, remove, or replace these tags with any other content.
+    *   These tags are used for final book generation and must remain intact.
 *   **Quoted Material**:
     *   Any text formatted as a Markdown blockquote (`>`) is from a previous version or is a direct quote. It **must be preserved verbatim**, without any changes to its content, punctuation, or formatting.
 *   **Voice Integrity**:
