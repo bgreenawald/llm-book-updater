@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from typing import Tuple
 
 import requests
 
@@ -186,12 +187,12 @@ class LlmModel:
         system_prompt: str,
         user_prompt: str,
         **kwargs,
-    ) -> str:
+    ) -> Tuple[str, str]:
         """
         Make a chat completion call using OpenRouter API with retry logic.
 
         Returns:
-            assistant reply content.
+            assistant reply content and generation ID.
 
         Raises:
             LlmModelError: When API calls fail after max retries.
@@ -234,4 +235,6 @@ class LlmModel:
         if finish_reason == "length":
             module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
 
-        return content
+        generation_id = resp_data.get("id", "unknown")
+
+        return content, generation_id

@@ -11,6 +11,7 @@ A tool for processing and updating book content using Large Language Models (LLM
 - **Parallel Processing**: Process multiple sections concurrently for improved performance.
 - **Automatic Metadata**: Keeps a JSON record of each pipeline run, tracking settings, files, and phase details.
 - **Post-Processing Pipeline**: Configurable post-processing chain with detailed logging and metadata tracking.
+- **Cost Tracking**: Monitor and log OpenRouter API usage costs per phase and total run costs (optional add-on).
 
 ## Installation
 
@@ -72,6 +73,37 @@ The system supports different processing phases:
 -   **`SummaryAnnotationPhase`**: Adds an LLM-generated summary to the end of each section.
 
 Phases can be chained together to create complex processing workflows.
+
+## Cost Tracking
+
+The system includes an optional cost tracking feature for OpenRouter API usage. This allows you to monitor and log costs for each phase and the total run without modifying existing code.
+
+### Quick Start with Cost Tracking
+
+1. Set your OpenRouter API key:
+   ```bash
+   export OPENROUTER_API_KEY="your-api-key-here"
+   ```
+
+2. Use the cost tracking wrapper in your code:
+   ```python
+   from src.cost_tracking_wrapper import add_generation_id, calculate_and_log_costs
+   
+   # After each API call, add the generation ID
+   processed_body, generation_id = self.model.chat_completion(...)
+   add_generation_id(phase_name=self.name, generation_id=generation_id)
+   
+   # At the end of your pipeline, calculate and log costs
+   phase_names = ["modernize", "edit", "final"]
+   run_costs = calculate_and_log_costs(phase_names)
+   ```
+
+3. Run the example:
+   ```bash
+   python examples/cost_tracking_example.py
+   ```
+
+For detailed information about cost tracking, see [COST_TRACKING.md](COST_TRACKING.md).
 
 ## Configuration
 
