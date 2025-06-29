@@ -323,13 +323,7 @@ class LlmPhase(ABC):
                     logger.debug(f"Formatted system prompt with parameters: {format_params}")
                 except KeyError as e:
                     logger.warning(f"System prompt contains undefined parameter: {e}")
-                    # Try formatting with only the parameters we have
-                    try:
-                        content = content.format(**format_params)
-                    except KeyError as e2:
-                        logger.warning(f"Still have undefined parameters after adding defaults: {e2}")
-                        # If still failing, return unformatted content
-                        logger.warning("Returning unformatted system prompt due to formatting errors")
+                    raise
                 except Exception as e:
                     logger.warning(f"Error formatting system prompt: {e}")
                     # Return unformatted content on any other formatting error

@@ -35,7 +35,7 @@ Your primary objective is to perform a developmental edit on the provided Markdo
   * The final text should have all of the essential ideas, arguments, and examples of the original text. The logical progression of the text should remain largely the same.
 * **Length Reduction**:
   * Systematically shorten the text by {length_reduction}. The importance of a passage should dictate the degree of reduction; critical points may be shortened less than supplementary details.
-* **Information Maintainence**: If the passage contains lines or information that appear to be metadata (author name, place of publication, etc), make sure those are preserved. These will usually appear at the beginning or end of a chapter.
+* **Information Maintenance**: If the passage contains lines or information that appear to be metadata (author name, place of publication, etc), make sure those are preserved. These will usually appear at the beginning or end of a chapter.
 
 ## Output Requirements
 

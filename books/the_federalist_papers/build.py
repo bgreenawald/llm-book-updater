@@ -214,6 +214,10 @@ def build(version: str, name: str):
 
     # --- 3. Format Markdown ---
     logger.info("--- Formatting Markdown ---")
+    if not config.preface_md.exists():
+        raise FileNotFoundError(f"Preface file not found: {safe_relative_path(config.preface_md)}")
+    if not config.license_md.exists():
+        raise FileNotFoundError(f"License file not found: {safe_relative_path(config.license_md)}")
     preface_content = config.preface_md.read_text(encoding="utf-8")
     license_content = config.license_md.read_text(encoding="utf-8")
 
@@ -358,9 +362,7 @@ def build_pdf_from_epub(epub_path: Path, pdf_path: Path, title: str, author: str
         logger.info("Converting EPUB to PDF using Calibre ebook-convert...")
 
         # Use Calibre's ebook-convert for perfect EPUB to PDF conversion
-        result = subprocess.run(
-            ["ebook-convert", str(epub_path), str(pdf_path)], capture_output=True, text=True, check=True
-        )
+        subprocess.run(["ebook-convert", str(epub_path), str(pdf_path)], capture_output=True, text=True, check=True)
 
         logger.success("Successfully created PDF using Calibre")
         return True
