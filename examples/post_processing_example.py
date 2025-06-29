@@ -7,45 +7,39 @@ post-processor configurations to clean up and improve LLM-generated content.
 
 from pathlib import Path
 
+from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_model import LlmModel
 from src.phase_factory import PhaseFactory
-from src.post_processors import CustomPostProcessor
+from src.post_processors import PostProcessor
 
 
-def create_custom_post_processor() -> CustomPostProcessor:
+def create_custom_post_processor() -> PostProcessor:
     """
     Create a custom post-processor that removes duplicate lines.
 
     Returns:
-        CustomPostProcessor: A custom post-processor instance
+        PostProcessor: A custom post-processor instance
     """
 
-    def remove_duplicates(original_block: str, llm_block: str, **kwargs) -> str:
-        """
-        Remove duplicate lines from the LLM-generated block.
+    class DuplicateRemover(PostProcessor):
+        def __init__(self):
+            super().__init__(name="duplicate_remover")
 
-        Args:
-            original_block (str): The original markdown block
-            llm_block (str): The LLM-generated block
-            **kwargs: Additional context
+        def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+            lines = llm_block.split("\n")
+            seen = set()
+            unique_lines = []
 
-        Returns:
-            str: The block with duplicates removed
-        """
-        lines = llm_block.split("\n")
-        seen = set()
-        unique_lines = []
+            for line in lines:
+                if line.strip() and line not in seen:
+                    seen.add(line)
+                    unique_lines.append(line)
+                elif not line.strip():
+                    unique_lines.append(line)
 
-        for line in lines:
-            if line.strip() and line not in seen:
-                seen.add(line)
-                unique_lines.append(line)
-            elif not line.strip():
-                unique_lines.append(line)
+            return "\n".join(unique_lines)
 
-        return "\n".join(unique_lines)
-
-    return CustomPostProcessor(name="duplicate_remover", process_func=remove_duplicates)
+    return DuplicateRemover()
 
 
 def example_standard_phase_with_post_processing():
@@ -55,10 +49,11 @@ def example_standard_phase_with_post_processing():
     print("=== Standard Phase with Post-Processing ===")
 
     # Create model (you would use your actual model configuration)
-    model = LlmModel(model_name="gpt-4", api_key="your-api-key")
+    model = LlmModel.create(model="gpt-4")
 
     # Create phase with formatting and consistency post-processors
-    phase = PhaseFactory.create_standard_phase(
+    config = PhaseConfig(
+        phase_type=PhaseType.MODERNIZE,
         name="modernize_with_cleanup",
         input_file_path=Path("input.md"),
         output_file_path=Path("output.md"),
@@ -69,11 +64,13 @@ def example_standard_phase_with_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        post_processors=["consistency"],
+        post_processors=[PostProcessorType.PRESERVE_F_STRING_TAGS],
     )
+    phase = PhaseFactory.create_standard_phase(config)
 
     print(f"Created phase: {phase}")
-    print(f"Post-processor chain: {phase.post_processor_chain}")
+    processor_names = [p.name for p in phase.post_processor_chain.processors]
+    print(f"Post-processor chain: {processor_names}")
     print()
 
 
@@ -84,13 +81,14 @@ def example_annotation_phase_with_custom_post_processing():
     print("=== Annotation Phase with Custom Post-Processing ===")
 
     # Create model (you would use your actual model configuration)
-    model = LlmModel(model_name="gpt-4", api_key="your-api-key")
+    model = LlmModel.create(model="gpt-4")
 
     # Create custom post-processor
     custom_processor = create_custom_post_processor()
 
     # Create introduction annotation phase with custom post-processor
-    phase = PhaseFactory.create_introduction_annotation_phase(
+    config = PhaseConfig(
+        phase_type=PhaseType.INTRODUCTION,
         name="introduction_with_cleanup",
         input_file_path=Path("input.md"),
         output_file_path=Path("output.md"),
@@ -101,11 +99,13 @@ def example_annotation_phase_with_custom_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        custom_post_processors=[custom_processor],
+        post_processors=[custom_processor],
     )
+    phase = PhaseFactory.create_introduction_annotation_phase(config)
 
     print(f"Created phase: {phase}")
-    print(f"Post-processor chain: {phase.post_processor_chain}")
+    processor_names = [p.name for p in phase.post_processor_chain.processors]
+    print(f"Post-processor chain: {processor_names}")
     print()
 
 
@@ -116,13 +116,14 @@ def example_summary_phase_with_mixed_post_processing():
     print("=== Summary Phase with Mixed Post-Processing ===")
 
     # Create model (you would use your actual model configuration)
-    model = LlmModel(model_name="gpt-4", api_key="your-api-key")
+    model = LlmModel.create(model="gpt-4")
 
     # Create custom post-processor
     custom_processor = create_custom_post_processor()
 
     # Create summary annotation phase with mixed post-processors
-    phase = PhaseFactory.create_summary_annotation_phase(
+    config = PhaseConfig(
+        phase_type=PhaseType.SUMMARY,
         name="summary_with_cleanup",
         input_file_path=Path("input.md"),
         output_file_path=Path("output.md"),
@@ -133,12 +134,13 @@ def example_summary_phase_with_mixed_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        post_processors=["validation"],
-        custom_post_processors=[custom_processor],
+        post_processors=[PostProcessorType.REVERT_REMOVED_BLOCK_LINES, custom_processor],
     )
+    phase = PhaseFactory.create_summary_annotation_phase(config)
 
     print(f"Created phase: {phase}")
-    print(f"Post-processor chain: {phase.post_processor_chain}")
+    processor_names = [p.name for p in phase.post_processor_chain.processors]
+    print(f"Post-processor chain: {processor_names}")
     print()
 
 
@@ -149,10 +151,11 @@ def example_phase_without_post_processing():
     print("=== Phase Without Post-Processing ===")
 
     # Create model (you would use your actual model configuration)
-    model = LlmModel(model_name="gpt-4", api_key="your-api-key")
+    model = LlmModel.create(model="gpt-4")
 
     # Create phase without post-processors
-    phase = PhaseFactory.create_standard_phase(
+    config = PhaseConfig(
+        phase_type=PhaseType.MODERNIZE,
         name="modernize_no_cleanup",
         input_file_path=Path("input.md"),
         output_file_path=Path("output.md"),
@@ -163,11 +166,16 @@ def example_phase_without_post_processing():
         author_name="Example Author",
         model=model,
         temperature=0.2,
-        # No post_processors or custom_post_processors specified
+        # No post_processors specified, so defaults will be used
     )
+    phase = PhaseFactory.create_standard_phase(config)
 
     print(f"Created phase: {phase}")
-    print(f"Post-processor chain: {phase.post_processor_chain}")
+    if phase.post_processor_chain:
+        processor_names = [p.name for p in phase.post_processor_chain.processors]
+        print(f"Post-processor chain: {processor_names}")
+    else:
+        print("No post-processors configured")
     print()
 
 
