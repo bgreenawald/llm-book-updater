@@ -28,6 +28,7 @@ class PostProcessorType(Enum):
     # Content preservation processors
     NO_NEW_HEADERS = auto()
     REVERT_REMOVED_BLOCK_LINES = auto()
+    PRESERVE_F_STRING_TAGS = auto()
 
     # Specialized processors
     ORDER_QUOTE_ANNOTATION = auto()

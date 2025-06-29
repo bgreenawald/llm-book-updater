@@ -4,6 +4,7 @@ from src.post_processors import (
     NoNewHeadersPostProcessor,
     PostProcessor,
     PostProcessorChain,
+    PreserveFStringTagsProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
@@ -313,6 +314,269 @@ class TestRevertRemovedBlockLines:
         result = revert_removed_block_lines_processor.process(original_block=original_block, llm_block=llm_block)
 
         assert result == ""
+
+
+# ============================================================================
+# PreserveFStringTagsProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def preserve_fstring_tags_processor():
+    return PreserveFStringTagsProcessor()
+
+
+@pytest.fixture
+def custom_tags_processor():
+    return PreserveFStringTagsProcessor(config={"tags_to_preserve": ["{custom}", "{special}"]})
+
+
+class TestPreserveFStringTagsProcessor:
+    """Test suite for PreserveFStringTagsProcessor."""
+
+    def test_no_tags_in_original(self, preserve_fstring_tags_processor):
+        """Test when no special tags are present in the original."""
+        original_block = "This is a regular paragraph with no special tags."
+        llm_block = "This is the processed content."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_tags_preserved_in_llm(self, preserve_fstring_tags_processor):
+        """Test when tags are already preserved in the LLM output."""
+        original_block = "This is a paragraph with {preface} and {license} tags."
+        llm_block = "This is the processed content with {preface} and {license} tags."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_restore_single_tag(self, preserve_fstring_tags_processor):
+        """Test restoring a single missing tag."""
+        original_block = "{preface}"
+        llm_block = "This is the processed content."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "This is the processed content.\n{preface}"
+        assert result == expected
+
+    def test_restore_multiple_tags(self, preserve_fstring_tags_processor):
+        """Test restoring multiple missing tags."""
+        original_block = "{preface}\n{license}"
+        llm_block = "This is the processed content."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "This is the processed content.\n{preface}\n{license}"
+        assert result == expected
+
+    def test_restore_tag_at_same_position(self, preserve_fstring_tags_processor):
+        """Test restoring a tag at the same position as in the original."""
+        original_block = "Some content\n{preface}\nMore content"
+        llm_block = "Some content\nMore content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}\nMore content"
+        assert result == expected
+
+    def test_restore_tag_at_end_of_line(self, preserve_fstring_tags_processor):
+        """Test restoring a tag at the end of content."""
+        original_block = "Some content\n{preface}"
+        llm_block = "Some content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}"
+        assert result == expected
+
+    def test_restore_tag_at_beginning_of_line(self, preserve_fstring_tags_processor):
+        """Test restoring a tag at the beginning of content."""
+        original_block = "{preface}\nSome content"
+        llm_block = "Some content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "{preface}\nSome content"
+        assert result == expected
+
+    def test_restore_tags_in_multiple_lines(self, preserve_fstring_tags_processor):
+        """Test restoring tags in multiple lines."""
+        original_block = "Line 1\n{preface}\nLine 2\n{license}\nLine 3"
+        llm_block = "Line 1\nLine 2\nLine 3"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Line 1\n{preface}\nLine 2\n{license}\nLine 3"
+        assert result == expected
+
+    def test_restore_tags_with_context_matching(self, preserve_fstring_tags_processor):
+        """Test restoring tags when similar context is found."""
+        original_block = "Some content\n{preface}\nMore content"
+        llm_block = "Some content\nMore content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}\nMore content"
+        assert result == expected
+
+    def test_restore_tags_when_no_similar_line_found(self, preserve_fstring_tags_processor):
+        """Test restoring tags when no similar line is found."""
+        original_block = "Original line\n{preface}"
+        llm_block = "Completely different content."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Completely different content.\n{preface}"
+        assert result == expected
+
+    def test_restore_tags_with_context_before(self, preserve_fstring_tags_processor):
+        """Test restoring tags using context before the tag."""
+        original_block = "Some content\n{preface}"
+        llm_block = "Some content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}"
+        assert result == expected
+
+    def test_restore_tags_with_context_after(self, preserve_fstring_tags_processor):
+        """Test restoring tags using context after the tag."""
+        original_block = "Some content\n{preface}\nMore content"
+        llm_block = "Some content\nMore content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}\nMore content"
+        assert result == expected
+
+    def test_custom_tags_configuration(self, custom_tags_processor):
+        """Test using custom tags configuration."""
+        original_block = "{custom}\n{special}"
+        llm_block = "Some content"
+
+        result = custom_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{custom}\n{special}"
+        assert result == expected
+
+    def test_empty_config(self):
+        """Test with empty tags configuration."""
+        processor = PreserveFStringTagsProcessor(config={"tags_to_preserve": []})
+        original_block = "{preface}"
+        llm_block = "Some content"
+
+        result = processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Should return LLM block unchanged since no tags to preserve
+        assert result == llm_block
+
+    def test_none_config(self):
+        """Test with None config."""
+        processor = PreserveFStringTagsProcessor(config=None)
+        original_block = "{preface}"
+        llm_block = "Some content"
+
+        result = processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}"
+        assert result == expected
+
+    def test_multiple_occurrences_of_same_tag(self, preserve_fstring_tags_processor):
+        """Test handling multiple occurrences of the same tag."""
+        original_block = "{preface}\nSome content\n{preface}"
+        llm_block = "Some content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}\n{preface}"
+        assert result == expected
+
+    def test_tags_with_whitespace_variations(self, preserve_fstring_tags_processor):
+        """Test handling tags with different whitespace patterns."""
+        original_block = "  {preface}  "
+        llm_block = "Some content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n  {preface}  "
+        assert result == expected
+
+    def test_tags_in_complex_markdown(self, preserve_fstring_tags_processor):
+        """Test handling tags in complex markdown content."""
+        original_block = """# Header
+
+{preface}
+
+This is a paragraph.
+
+> **Quote:** This is a quote. **End quote.**
+
+{license}
+
+- List item
+- Another item"""
+
+        llm_block = """# Header
+
+This is a paragraph.
+
+> **Quote:** This is a quote. **End quote.**
+
+- List item
+- Another item"""
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = """# Header
+
+{preface}
+
+This is a paragraph.
+
+> **Quote:** This is a quote. **End quote.**
+
+{license}
+
+- List item
+- Another item"""
+        assert result == expected
+
+    def test_similarity_threshold(self, preserve_fstring_tags_processor):
+        """Test the similarity threshold for line matching."""
+        original_block = "Some content\n{preface}\nMore content"
+        llm_block = "Some content\nMore content"
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Some content\n{preface}\nMore content"
+        assert result == expected
+
+    def test_dissimilar_lines(self, preserve_fstring_tags_processor):
+        """Test handling of completely dissimilar lines."""
+        original_block = "Original content\n{preface}"
+        llm_block = "Completely different content with no similarity."
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        expected = "Completely different content with no similarity.\n{preface}"
+        assert result == expected
+
+    def test_empty_blocks(self, preserve_fstring_tags_processor):
+        """Test handling of empty blocks."""
+        original_block = ""
+        llm_block = ""
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_processor_string_representation(self, preserve_fstring_tags_processor):
+        """Test string representation of the processor."""
+        assert "PreserveFStringTagsProcessor" in str(preserve_fstring_tags_processor)
+        assert "preserve_fstring_tags" in str(preserve_fstring_tags_processor)
 
 
 # ============================================================================
