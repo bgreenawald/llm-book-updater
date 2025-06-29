@@ -414,7 +414,8 @@ class LlmPhase(ABC):
         """
         try:
             # Pattern to match markdown headers and their content
-            pattern = r"^#{1,6}\s+.*?(?=^#{1,6}\s+|$)"
+            # Use a different approach that works better with re.DOTALL
+            pattern = r"(?:^|\n)(#{1,6}\s+.*?)(?=\n#{1,6}\s+|\n*$)"
             logger.info(f"Starting to process markdown blocks with {self.max_workers} workers")
 
             # Find all markdown blocks in both current and original text
