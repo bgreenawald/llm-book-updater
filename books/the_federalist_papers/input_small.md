@@ -1,11 +1,8 @@
-
-# THE FEDERALIST PAPERS
-
-## Preface (Modern Edition)
+# Preface (Modern Edition)
 
 {preface}
 
-## No. I. - General Introduction
+# No. I. - General Introduction
 
 For the Independent Journal.
 
@@ -43,7 +40,7 @@ PUBLIUS.
 
 
 
-## No. II. - Concerning Dangers from Foreign Force and Influence
+# No. II. - Concerning Dangers from Foreign Force and Influence
 
 For the Independent Journal.
 
@@ -82,3 +79,6 @@ It is worthy of remark that not only the first, but every succeeding Congress, a
 
 PUBLIUS.
 
+# License
+
+{license}

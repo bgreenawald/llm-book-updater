@@ -107,10 +107,10 @@ class Pipeline:
         if phase:
             metadata.update(
                 {
-                    "input_file": str(phase.input_file_path),
-                    "output_file": str(phase.output_file_path),
-                    "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
-                    "user_prompt_path": str(phase.user_prompt_path) if phase.user_prompt_path else None,
+                    "input_file": phase.input_file_path.as_posix(),
+                    "output_file": phase.output_file_path.as_posix(),
+                    "system_prompt_path": phase.system_prompt_path.as_posix() if phase.system_prompt_path else None,
+                    "user_prompt_path": phase.user_prompt_path.as_posix() if phase.user_prompt_path else None,
                     "fully_rendered_system_prompt": phase.system_prompt,
                     "length_reduction_parameter": phase.length_reduction,
                     "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
@@ -122,10 +122,12 @@ class Pipeline:
                 {
                     "input_file": None,
                     "output_file": None,
-                    "system_prompt_path": str(phase_config.system_prompt_path)
+                    "system_prompt_path": phase_config.system_prompt_path.as_posix()
                     if phase_config.system_prompt_path
                     else None,
-                    "user_prompt_path": str(phase_config.user_prompt_path) if phase_config.user_prompt_path else None,
+                    "user_prompt_path": phase_config.user_prompt_path.as_posix()
+                    if phase_config.user_prompt_path
+                    else None,
                     "fully_rendered_system_prompt": None,
                     "length_reduction_parameter": self.config.length_reduction,
                     "output_exists": False,
@@ -158,9 +160,9 @@ class Pipeline:
             "run_timestamp": datetime.now().isoformat(),
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
-            "input_file": str(self.config.input_file),
-            "original_file": str(self.config.original_file),
-            "output_directory": str(self.config.output_dir),
+            "input_file": self.config.input_file.as_posix(),
+            "original_file": self.config.original_file.as_posix(),
+            "output_directory": self.config.output_dir.as_posix(),
             "length_reduction": self.config.length_reduction,
             "phases": self._phase_metadata,
         }

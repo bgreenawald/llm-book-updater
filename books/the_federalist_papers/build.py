@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -113,13 +114,70 @@ def replace_br_tags(input_path: Path) -> None:
     logger.info(f"Replaced <br> tags with spaces in '{safe_relative_path(input_path)}'")
 
 
+def clean_annotation_patterns(input_path: Path) -> None:
+    """
+    Removes specific annotation end patterns and cleans up resulting empty lines.
+
+    Removes the following patterns (case insensitive):
+    - **End annotation.**
+    - **End annotated introduction.**
+    - **End annotated summary.**
+    - **End quote.**
+
+    If removal results in an empty line or a line with only '>', deletes that line.
+
+    Args:
+        input_path: Path to the markdown file to process.
+    """
+    content = input_path.read_text(encoding="utf-8")
+
+    # Patterns to remove (case insensitive)
+    patterns_to_remove = [
+        r"\*\*End annotation\.\*\*",
+        r"\*\*End annotated introduction\.\*\*",
+        r"\*\*End annotated summary\.\*\*",
+        r"\*\*End quote\.\*\*",
+    ]
+
+    # Split into lines to track which ones are affected
+    lines = content.split("\n")
+    affected_lines = set()
+
+    # Process each line and track which ones are affected by substitutions
+    for i, line in enumerate(lines):
+        original_line = line
+        modified_line = line
+
+        # Apply each pattern substitution
+        for pattern in patterns_to_remove:
+            modified_line = re.sub(pattern, "", modified_line, flags=re.IGNORECASE)
+
+        # If the line was modified, mark it as affected
+        if modified_line != original_line:
+            affected_lines.add(i)
+            lines[i] = modified_line
+
+    # Now filter out empty lines or lines with only '>' only if they were affected
+    cleaned_lines = []
+    for i, line in enumerate(lines):
+        stripped_line = line.strip()
+        # Keep the line if it wasn't affected, or if it's not empty and not just '>'
+        if i not in affected_lines or (stripped_line and stripped_line != ">"):
+            cleaned_lines.append(line)
+
+    # Rejoin the lines
+    cleaned_content = "\n".join(cleaned_lines)
+
+    input_path.write_text(cleaned_content, encoding="utf-8")
+    logger.info(f"Cleaned annotation patterns from '{safe_relative_path(input_path)}'")
+
+
 def format_markdown_file(input_path: Path, preface_content: str, license_content: str):
     """
     Reads a Markdown file, replaces placeholders, and writes it back.
     """
     content = input_path.read_text(encoding="utf-8")
-    content = content.format(preface=preface_content)
-    content = content.format(license=license_content)
+    content = content.format(preface=preface_content, license=license_content)
     input_path.write_text(content, encoding="utf-8")
     logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface and license.")
 
@@ -162,6 +220,11 @@ def build(version: str, name: str):
     replace_br_tags(config.staged_final_md)
     replace_br_tags(config.staged_annotated_md)
 
+    # --- 3.6. Clean annotation patterns ---
+    logger.info("--- Cleaning annotation patterns ---")
+    clean_annotation_patterns(config.staged_final_md)
+    clean_annotation_patterns(config.staged_annotated_md)
+
     # --- 4. Run Pandoc Build ---
     logger.info("--- Running Pandoc Build ---")
     metadata = {}
@@ -174,7 +237,7 @@ def build(version: str, name: str):
 
     pandoc_args = [
         "--toc",
-        "--toc-depth=2",
+        "--toc-depth=1",
         "--split-level=1",
         f"--css={safe_relative_path(config.epub_css)}",
     ]
