@@ -7,7 +7,7 @@ import requests
 from src.logging_config import setup_logging
 
 # Initialize module-level logger
-module_logger = setup_logging("llm_model")
+module_logger = setup_logging(log_name="llm_model")
 
 # Model constants
 GROK_3_MINI = "x-ai/grok-3-mini"
@@ -57,9 +57,7 @@ class LlmModel:
             retry_delay:   Initial delay between retries in seconds.
             backoff_factor: Multiplier for exponential backoff.
         """
-        module_logger.info(
-            f"Initializing LLM client: model={model}, base_url={base_url}"
-        )
+        module_logger.info(f"Initializing LLM client: model={model}, base_url={base_url}")
         api_key = os.getenv(api_key_env)
         if not api_key:
             msg = f"Missing environment variable: {api_key_env}"
@@ -97,13 +95,20 @@ class LlmModel:
             backoff_factor=backoff_factor,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
 
     def _log_prompt(self, role: str, content: str) -> None:
+        """
+        Logs a preview of the prompt content.
+
+        Args:
+            role (str): The role of the prompt (e.g., "System", "User").
+            content (str): The full content of the prompt.
+        """
         preview = content if len(content) <= 200 else content[:200] + "..."
         module_logger.trace(f"{role} prompt: {preview}")
 
@@ -120,7 +125,20 @@ class LlmModel:
         return False
 
     def _make_api_call(self, headers: dict, data: dict) -> dict:
-        """Make a single API call with retry logic."""
+        """
+        Makes a single API call to OpenRouter with retry logic.
+
+        Args:
+            headers (dict): HTTP headers for the request.
+            data (dict): JSON payload for the request.
+
+        Returns:
+            dict: The JSON response from the API.
+
+        Raises:
+            LlmModelError: If the API call fails after all retries.
+            json.JSONDecodeError: If the response cannot be decoded as JSON.
+        """
         last_error = None
 
         for attempt in range(self.max_retries + 1):
@@ -128,7 +146,7 @@ class LlmModel:
                 response = requests.post(
                     url=f"{self.base_url}/chat/completions",
                     headers=headers,
-                    data=json.dumps(data),
+                    data=json.dumps(obj=data),
                     timeout=30,  # Add timeout to prevent hanging requests
                 )
                 response.raise_for_status()
@@ -136,7 +154,7 @@ class LlmModel:
 
             except requests.exceptions.RequestException as e:
                 last_error = e
-                if attempt < self.max_retries and self._should_retry(e):
+                if attempt < self.max_retries and self._should_retry(error=e):
                     delay = self.retry_delay * (self.backoff_factor**attempt)
                     module_logger.warning(
                         f"API call failed (attempt {attempt + 1}/"
@@ -179,8 +197,8 @@ class LlmModel:
             LlmModelError: When API calls fail after max retries.
             ValueError: On empty/malformed response.
         """
-        self._log_prompt("System", system_prompt)
-        self._log_prompt("User", user_prompt)
+        self._log_prompt(role="System", content=system_prompt)
+        self._log_prompt(role="User", content=user_prompt)
 
         # Prepare headers
         headers = {
@@ -200,7 +218,7 @@ class LlmModel:
 
         # Make the API call with retry logic
         try:
-            resp_data = self._make_api_call(headers, data)
+            resp_data = self._make_api_call(headers=headers, data=data)
         except LlmModelError:
             # Re-raise LlmModelError to stop the pipeline
             raise
@@ -214,9 +232,6 @@ class LlmModel:
         finish_reason = choices[0].get("finish_reason", "unknown")
 
         if finish_reason == "length":
-            module_logger.warning(
-                "Response truncated: consider increasing max_tokens or "
-                "reviewing model limits"
-            )
+            module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
 
         return content
