@@ -13,6 +13,9 @@ dependencies = [
     "streamlit-ace>=0.1.1",
     "tqdm>=4.67.1",
     "weasyprint>=63.1",
+    "PyPDF2>=3.0.0",
+    "Pillow>=10.0.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]

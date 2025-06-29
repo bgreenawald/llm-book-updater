@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pypandoc
 from loguru import logger
+from PIL import Image
+from PyPDF2 import PdfReader, PdfWriter
 
 
 class Config:
@@ -270,6 +272,20 @@ def build(version: str, name: str):
     )
     if success:
         logger.success(f"  -> Created '{safe_relative_path(config.build_final_pdf)}'")
+
+        # Inject cover into the PDF
+        logger.info("Injecting cover into final PDF...")
+        cover_success = inject_cover_into_pdf(
+            pdf_path=config.build_final_pdf,
+            cover_image_path=config.cover_image,
+            title=config.BOOK_TITLE,
+            author=config.BOOK_AUTHOR,
+            version=metadata["book_version"],
+        )
+        if cover_success:
+            logger.success("  -> Successfully injected cover into final PDF")
+        else:
+            logger.warning("  -> Failed to inject cover into final PDF")
     else:
         logger.error(f"  -> Failed to create '{safe_relative_path(config.build_final_pdf)}'")
 
@@ -301,6 +317,20 @@ def build(version: str, name: str):
     )
     if success:
         logger.success(f"  -> Created '{safe_relative_path(config.build_annotated_pdf)}'")
+
+        # Inject cover into the PDF
+        logger.info("Injecting cover into annotated PDF...")
+        cover_success = inject_cover_into_pdf(
+            pdf_path=config.build_annotated_pdf,
+            cover_image_path=config.cover_image,
+            title=f"{config.BOOK_TITLE}: AI Edit",
+            author=f"{config.BOOK_AUTHOR}, LLM",
+            version=metadata["book_version"],
+        )
+        if cover_success:
+            logger.success("  -> Successfully injected cover into annotated PDF")
+        else:
+            logger.warning("  -> Failed to inject cover into annotated PDF")
     else:
         logger.error(f"  -> Failed to create '{safe_relative_path(config.build_annotated_pdf)}'")
 
@@ -327,6 +357,96 @@ def build(version: str, name: str):
     logger.success(f"\nBuild complete for {name} v{version}!")
 
 
+def inject_cover_into_pdf(pdf_path: Path, cover_image_path: Path, title: str, author: str, version: str) -> bool:
+    """
+    Manually injects a cover image into a PDF file.
+
+    Args:
+        pdf_path: Path to the PDF file to modify
+        cover_image_path: Path to the cover image
+        title: Book title for the cover
+        author: Book author for the cover
+        version: Book version for the cover
+
+    Returns:
+        True if cover was successfully injected, False otherwise
+    """
+    cover_pdf_path = None
+    try:
+        logger.info(f"Injecting cover into PDF: {safe_relative_path(pdf_path)}")
+
+        # Create a temporary PDF with the cover image
+        cover_pdf_path = pdf_path.parent / f"temp_cover_{pdf_path.stem}.pdf"
+
+        # Convert image to PDF using reportlab
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+
+        # Get image dimensions
+        with Image.open(cover_image_path) as img:
+            img_width, img_height = img.size
+
+        # Calculate scaling to fit on letter page (612x792 points)
+        page_width, page_height = letter
+        scale_x = page_width / img_width
+        scale_y = page_height / img_height
+        scale = min(scale_x, scale_y)  # Use full size that fits on page
+
+        # Calculate centered position
+        scaled_width = img_width * scale
+        scaled_height = img_height * scale
+        x = (page_width - scaled_width) / 2
+        y = (page_height - scaled_height) / 2
+
+        # Create cover PDF
+        c = canvas.Canvas(str(cover_pdf_path), pagesize=letter)
+
+        # Add the cover image at full size
+        c.drawImage(str(cover_image_path), x, y, width=scaled_width, height=scaled_height)
+
+        c.save()
+
+        # Read the original PDF and cover PDF
+        from io import BytesIO
+
+        # Read PDF content into memory
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_content = pdf_file.read()
+        pdf_reader = PdfReader(BytesIO(pdf_content))
+
+        with open(cover_pdf_path, "rb") as cover_file:
+            cover_content = cover_file.read()
+        cover_reader = PdfReader(BytesIO(cover_content))
+
+        # Create a new PDF writer
+        pdf_writer = PdfWriter()
+
+        # Add the cover page first
+        pdf_writer.add_page(cover_reader.pages[0])
+
+        # Add all pages from the original PDF
+        for page in pdf_reader.pages:
+            pdf_writer.add_page(page)
+
+        # Write the combined PDF back to the original file
+        with open(pdf_path, "wb") as output_file:
+            pdf_writer.write(output_file)
+
+        logger.success("Successfully injected cover into PDF")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to inject cover into PDF: {str(e)}")
+        return False
+    finally:
+        # Clean up temporary cover PDF
+        if cover_pdf_path and cover_pdf_path.exists():
+            try:
+                cover_pdf_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary cover PDF: {str(e)}")
+
+
 def build_pdf_from_epub(epub_path: Path, pdf_path: Path, title: str, author: str, version: str, css_path: Path) -> bool:
     """
     Builds PDF from EPUB using WeasyPrint for optimal CSS rendering.
@@ -351,6 +471,8 @@ def build_pdf_from_epub(epub_path: Path, pdf_path: Path, title: str, author: str
             extra_args=[
                 f"--css={safe_relative_path(css_path)}",
                 "--pdf-engine=weasyprint",
+                "--toc",
+                "--toc-depth=1",
                 "--variable=geometry:margin=1in",
                 "--variable=fontsize:11pt",
                 f'--metadata=title:"{title}"',
