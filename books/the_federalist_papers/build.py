@@ -177,15 +177,17 @@ def clean_annotation_patterns(input_path: Path) -> None:
     logger.info(f"Cleaned annotation patterns from '{safe_relative_path(input_path)}'")
 
 
-def format_markdown_file(input_path: Path, preface_content: str, license_content: str):
-    """
-    Reads a Markdown file, replaces placeholders, and writes it back.
-    """
-    content = input_path.read_text(encoding="utf-8")
-    content = content.format(preface=preface_content, license=license_content)
-    input_path.write_text(content, encoding="utf-8")
-    logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface and license.")
-
+ def format_markdown_file(input_path: Path, preface_content: str, license_content: str):
+     """
+     Reads a Markdown file, replaces placeholders, and writes it back.
+     """
+     content = input_path.read_text(encoding="utf-8")
+-    content = content.format(preface=preface_content, license=license_content)
++    # Use specific placeholder replacement to avoid issues with braces in content
++    content = content.replace("{preface}", preface_content)
++    content = content.replace("{license}", license_content)
+     input_path.write_text(content, encoding="utf-8")
+     logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface and license.")
 
 def build(version: str, name: str):
     """
