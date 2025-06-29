@@ -27,9 +27,9 @@ Your sole objective is to create a brief, insightful summary that captures the e
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Format Requirements**:
-  * Entire overview must be a Markdown blockquote
+  * Entire overview must be a Markdown blockquote (inline HTML is allowed for <br>)
   * Begin with `**Annotated summary:**` on its own line
-  * End with `**End annotate summary.**` on its own line
+  * End with `**End annotated summary.**` on its own line
 * **Special F-String Tags**:
   * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
   * Do not modify, remove, or replace these tags with any other content.
