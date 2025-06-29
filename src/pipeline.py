@@ -19,34 +19,7 @@ module_logger = setup_logging(log_name="pipeline")
 METADATA_VERSION = "1.0.0"
 
 
-def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
-    """
-    Factory function to create the appropriate phase instance based on PhaseType.
 
-    Args:
-        phase_type (PhaseType): The type of phase to create
-        **kwargs: Arguments to pass to the phase constructor
-
-    Returns:
-        LlmPhase: An instance of the appropriate phase class
-
-    Raises:
-        ValueError: If the phase type is not supported
-    """
-    phase_mapping = {
-        PhaseType.MODERNIZE: StandardLlmPhase,
-        PhaseType.EDIT: StandardLlmPhase,
-        PhaseType.ANNOTATE: StandardLlmPhase,
-        PhaseType.FINAL: StandardLlmPhase,
-        PhaseType.INTRODUCTION: IntroductionAnnotationPhase,
-        PhaseType.SUMMARY: SummaryAnnotationPhase,
-    }
-
-    phase_class = phase_mapping.get(phase_type)
-    if phase_class is None:
-        raise ValueError(f"Unsupported phase type: {phase_type}")
-
-    return phase_class(**kwargs)
 
 
 class Pipeline:

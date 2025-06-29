@@ -12,7 +12,7 @@ from pathlib import Path
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType
+from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.post_processors import EnsureBlankLineProcessor, RemoveXmlTagsProcessor
 
 
@@ -32,7 +32,7 @@ def main():
         max_workers=4,
         # Unified post-processors list: mix of strings and instances
         post_processors=[
-            "no_new_headers",  # Built-in processor by name
+            PostProcessorType.NO_NEW_HEADERS,  # Built-in processor by enum
             EnsureBlankLineProcessor(),  # Custom processor instance
         ],
     )
@@ -48,7 +48,7 @@ def main():
         original_file_path=Path("original/gatsby.md"),
         temperature=0.2,
         # Only built-in processors
-        post_processors=["remove_xml_tags"],
+        post_processors=[PostProcessorType.REMOVE_XML_TAGS],
     )
 
     # Create a PhaseConfig for a summary annotation phase
@@ -63,7 +63,7 @@ def main():
         temperature=0.1,
         # Mix of built-in and custom processors
         post_processors=[
-            "revert_removed_block_lines",
+            PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
             RemoveXmlTagsProcessor(),  # Custom instance
         ],
     )

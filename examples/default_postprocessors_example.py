@@ -23,66 +23,17 @@ def main():
 
     # Create PhaseConfig instances for each phase type without specifying post_processors
     phase_configs = {
-        PhaseType.MODERNIZE: PhaseConfig(
-            phase_type=PhaseType.MODERNIZE,
-            name="modernize_content",
+        phase_type: PhaseConfig(
+            phase_type=phase_type,
+            name=f"{phase_type.name.lower()}_content",
             book_name="The Great Gatsby",
             author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/modernize.md"),
-            output_file_path=Path("output/modernize.md"),
-            original_file_path=Path("original/gatsby.md"),
-            temperature=0.3,
-        ),
-        PhaseType.EDIT: PhaseConfig(
-            phase_type=PhaseType.EDIT,
-            name="edit_content",
-            book_name="The Great Gatsby",
-            author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/edit.md"),
-            output_file_path=Path("output/edit.md"),
+            input_file_path=Path(f"input/{phase_type.name.lower()}.md"),
+            output_file_path=Path(f"output/{phase_type.name.lower()}.md"),
             original_file_path=Path("original/gatsby.md"),
             temperature=0.2,
-        ),
-        PhaseType.FINAL: PhaseConfig(
-            phase_type=PhaseType.FINAL,
-            name="final_content",
-            book_name="The Great Gatsby",
-            author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/final.md"),
-            output_file_path=Path("output/final.md"),
-            original_file_path=Path("original/gatsby.md"),
-            temperature=0.1,
-        ),
-        PhaseType.INTRODUCTION: PhaseConfig(
-            phase_type=PhaseType.INTRODUCTION,
-            name="add_introductions",
-            book_name="The Great Gatsby",
-            author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/intro.md"),
-            output_file_path=Path("output/intro.md"),
-            original_file_path=Path("original/gatsby.md"),
-            temperature=0.2,
-        ),
-        PhaseType.SUMMARY: PhaseConfig(
-            phase_type=PhaseType.SUMMARY,
-            name="add_summaries",
-            book_name="The Great Gatsby",
-            author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/summary.md"),
-            output_file_path=Path("output/summary.md"),
-            original_file_path=Path("original/gatsby.md"),
-            temperature=0.1,
-        ),
-        PhaseType.ANNOTATE: PhaseConfig(
-            phase_type=PhaseType.ANNOTATE,
-            name="add_annotations",
-            book_name="The Great Gatsby",
-            author_name="F. Scott Fitzgerald",
-            input_file_path=Path("input/annotate.md"),
-            output_file_path=Path("output/annotate.md"),
-            original_file_path=Path("original/gatsby.md"),
-            temperature=0.2,
-        ),
+        )
+        for phase_type in PhaseType
     }
 
     # Display the default post-processor configurations
@@ -92,8 +43,8 @@ def main():
 
     for phase_type, default_processors in PhaseFactory.DEFAULT_POST_PROCESSORS.items():
         print(f"{phase_type.name}:")
-        for i, processor in enumerate(default_processors, 1):
-            print(f"  {i}. {processor.name}")
+        for i, processor_type in enumerate(default_processors, 1):
+            print(f"  {i}. {processor_type.name}")
         print()
 
     # Demonstrate creating phases with default post-processors
@@ -117,7 +68,8 @@ def main():
 
         # Display the post-processor chain
         if phase.post_processor_chain:
-            print(f"  Post-processor chain: {phase.post_processor_chain}")
+            processor_names = [p.name for p in phase.post_processor_chain.processors]
+            print(f"  Post-processor chain: {processor_names}")
             print(f"  Number of processors: {len(phase.post_processor_chain)}")
         else:
             print("  No post-processors configured")
@@ -143,8 +95,9 @@ def main():
     )
 
     string_phase = PhaseFactory.create_standard_phase(string_config)
+    processor_names = [p.name for p in string_phase.post_processor_chain.processors]
     print("1. Using string names:")
-    print(f"   Post-processor chain: {string_phase.post_processor_chain}")
+    print(f"   Post-processor chain: {processor_names}")
     print()
 
     # Example 2: Using PostProcessorType enum (type-safe approach)
@@ -165,8 +118,9 @@ def main():
     )
 
     enum_phase = PhaseFactory.create_standard_phase(enum_config)
+    processor_names = [p.name for p in enum_phase.post_processor_chain.processors]
     print("2. Using PostProcessorType enum:")
-    print(f"   Post-processor chain: {enum_phase.post_processor_chain}")
+    print(f"   Post-processor chain: {processor_names}")
     print()
 
     # Example 3: Mixing different approaches
@@ -191,8 +145,9 @@ def main():
     )
 
     mixed_phase = PhaseFactory.create_standard_phase(mixed_config)
+    processor_names = [p.name for p in mixed_phase.post_processor_chain.processors]
     print("3. Mixing different approaches:")
-    print(f"   Post-processor chain: {mixed_phase.post_processor_chain}")
+    print(f"   Post-processor chain: {processor_names}")
     print()
 
     print("Benefits of PostProcessorType enum:")

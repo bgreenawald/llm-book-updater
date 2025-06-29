@@ -11,8 +11,9 @@ This example shows how to:
 
 from pathlib import Path
 
+from src.config import PhaseConfig, PhaseType, RunConfig
 from src.llm_model import LlmModel
-from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
+from src.pipeline import Pipeline
 
 
 def main():
@@ -29,170 +30,129 @@ def main():
     original_file = Path("original.md")
     output_dir = Path("output")
 
+    # Create dummy files for the example to run
+    input_file.touch()
+    original_file.touch()
+
     # Prompt paths
     system_prompts_dir = Path("prompts")
-    introduction_prompt = system_prompts_dir / "introduction_annotation.md"
-    summary_prompt = system_prompts_dir / "summary_annotation.md"
+    introduction_prompt = system_prompts_dir / "introduction_system.md"
+    summary_prompt = system_prompts_dir / "summary_system.md"
     standard_prompt = system_prompts_dir / "edit_system.md"  # Example standard prompt
 
     # User prompt paths (optional)
-    user_prompts_dir = Path("user_prompts")
-    user_prompt = user_prompts_dir / "custom_user_prompt.md"  # Example user prompt
+    user_prompts_dir = Path("prompts")
+    user_prompt = user_prompts_dir / "edit_user.md"  # Example user prompt
 
     # Initialize the LLM model
     model = LlmModel(
-        model_name="gpt-4",
-        api_key="your-api-key-here",  # Replace with actual API key
-        base_url="https://api.openai.com/v1",
+        model="gpt-4",
+        temperature=temperature,
     )
 
     # Example 1: Add introduction annotations to each section
     print("Running introduction annotation phase...")
-    intro_phase = IntroductionAnnotationPhase(
-        name="introduction_annotation",
-        input_file_path=input_file,
-        output_file_path=output_dir / "with_introductions.md",
-        original_file_path=original_file,
-        system_prompt_path=introduction_prompt,
-        user_prompt_path=user_prompt,
+    intro_config = RunConfig(
         book_name=book_name,
         author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
+        input_file=input_file,
+        output_dir=output_dir,
+        original_file=original_file,
+        phases=[
+            PhaseConfig(
+                phase_type=PhaseType.INTRODUCTION,
+                model_type=model.model_id,
+                temperature=temperature,
+                max_workers=max_workers,
+                system_prompt_path=introduction_prompt,
+                user_prompt_path=user_prompt,
+            )
+        ],
     )
-
-    intro_phase.run()
+    intro_pipeline = Pipeline(config=intro_config)
+    intro_pipeline.run()
     print("Introduction annotations completed!")
 
     # Example 2: Add summary annotations to each section
     print("Running summary annotation phase...")
-    summary_phase = SummaryAnnotationPhase(
-        name="summary_annotation",
-        input_file_path=input_file,
-        output_file_path=output_dir / "with_summaries.md",
-        original_file_path=original_file,
-        system_prompt_path=summary_prompt,
-        user_prompt_path=user_prompt,
+    summary_config = RunConfig(
         book_name=book_name,
         author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
+        input_file=input_file,
+        output_dir=output_dir,
+        original_file=original_file,
+        phases=[
+            PhaseConfig(
+                phase_type=PhaseType.SUMMARY,
+                model_type=model.model_id,
+                temperature=temperature,
+                max_workers=max_workers,
+                system_prompt_path=summary_prompt,
+                user_prompt_path=user_prompt,
+            )
+        ],
     )
-
-    summary_phase.run()
+    summary_pipeline = Pipeline(config=summary_config)
+    summary_pipeline.run()
     print("Summary annotations completed!")
 
     # Example 3: Use the standard phase for content replacement
     print("Running standard content replacement phase...")
-    standard_phase = StandardLlmPhase(
-        name="content_replacement",
-        input_file_path=input_file,
-        output_file_path=output_dir / "replaced_content.md",
-        original_file_path=original_file,
-        system_prompt_path=standard_prompt,
-        user_prompt_path=user_prompt,
+    standard_config = RunConfig(
         book_name=book_name,
         author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
+        input_file=input_file,
+        output_dir=output_dir,
+        original_file=original_file,
+        phases=[
+            PhaseConfig(
+                phase_type=PhaseType.EDIT,
+                model_type=model.model_id,
+                temperature=temperature,
+                max_workers=max_workers,
+                system_prompt_path=standard_prompt,
+                user_prompt_path=user_prompt,
+            )
+        ],
     )
-
-    standard_phase.run()
+    standard_pipeline = Pipeline(config=standard_config)
+    standard_pipeline.run()
     print("Content replacement completed!")
 
-    # Example 4: Use phases with custom user prompts that include titles
-    print("Running phases with custom user prompts...")
-
-    # Standard phase with user prompt that uses titles
-    standard_with_user_prompt = StandardLlmPhase(
-        name="content_replacement_with_user_prompt",
-        input_file_path=input_file,
-        output_file_path=output_dir / "replaced_with_user_prompt.md",
-        original_file_path=original_file,
-        system_prompt_path=standard_prompt,
-        user_prompt_path=user_prompt,  # User prompt with title variables
-        book_name=book_name,
-        author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
-    )
-
-    standard_with_user_prompt.run()
-    print("Content replacement with user prompt completed!")
-
-    # Example 5: Chain phases together
+    # Example 4: Chain phases together
     print("Running chained phases...")
-
-    # First, add introductions
-    intro_phase = IntroductionAnnotationPhase(
-        name="chained_intro",
-        input_file_path=input_file,
-        output_file_path=output_dir / "temp_with_intros.md",
-        original_file_path=original_file,
-        system_prompt_path=introduction_prompt,
-        user_prompt_path=user_prompt,
+    chained_config = RunConfig(
         book_name=book_name,
         author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
+        input_file=input_file,
+        output_dir=output_dir,
+        original_file=original_file,
+        phases=[
+            PhaseConfig(
+                phase_type=PhaseType.INTRODUCTION,
+                model_type=model.model_id,
+                temperature=temperature,
+                max_workers=max_workers,
+                system_prompt_path=introduction_prompt,
+                user_prompt_path=user_prompt,
+            ),
+            PhaseConfig(
+                phase_type=PhaseType.SUMMARY,
+                model_type=model.model_id,
+                temperature=temperature,
+                max_workers=max_workers,
+                system_prompt_path=summary_prompt,
+                user_prompt_path=user_prompt,
+            ),
+        ],
     )
-    intro_phase.run()
-
-    # Then, add summaries to the result
-    summary_phase = SummaryAnnotationPhase(
-        name="chained_summary",
-        input_file_path=output_dir / "temp_with_intros.md",
-        output_file_path=output_dir / "with_intros_and_summaries.md",
-        original_file_path=original_file,
-        system_prompt_path=summary_prompt,
-        user_prompt_path=user_prompt,
-        book_name=book_name,
-        author_name=author_name,
-        model=model,
-        temperature=temperature,
-        max_workers=max_workers,
-    )
-    summary_phase.run()
+    chained_pipeline = Pipeline(config=chained_config)
+    chained_pipeline.run()
 
     print("Chained phases completed!")
     print(f"Results saved in {output_dir}/")
 
 
-def create_example_user_prompt():
-    """Create an example user prompt file that demonstrates title usage."""
-    user_prompt_content = """# Section Analysis Request
-
-Please analyze the following section and provide your response.
-
-**Section Title:** {current_header}
-**Original Title:** {original_title}
-
-**Current Content:**
-{current_body}
-
-**Original Content:**
-{original_body}
-
-Please process this section according to the system instructions.
-"""
-
-    user_prompts_dir = Path("user_prompts")
-    user_prompts_dir.mkdir(exist_ok=True)
-
-    with open(user_prompts_dir / "custom_user_prompt.md", "w") as f:
-        f.write(user_prompt_content)
-
-    print("Created example user prompt file: user_prompts/custom_user_prompt.md")
-
-
 if __name__ == "__main__":
-    # Create example user prompt file
-    create_example_user_prompt()
-
     # Run the main example
     main()

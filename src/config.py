@@ -1,9 +1,13 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from src.llm_model import GEMINI_FLASH
+
+if TYPE_CHECKING:
+    from src.llm_model import LlmModel
+    from src.post_processors import PostProcessor
 
 
 class PhaseType(Enum):
@@ -52,9 +56,9 @@ class PhaseConfig:
     input_file_path: Optional[Path] = None
     output_file_path: Optional[Path] = None
     original_file_path: Optional[Path] = None
-    model: Optional[object] = None  # LlmModel instance
+    model: Optional["LlmModel"] = None  # LlmModel instance
     # Unified post-processors list that can contain strings (built-in) or PostProcessor instances (custom)
-    post_processors: Optional[List[Union[str, object]]] = None
+    post_processors: Optional[List[Union[str, "PostProcessor", PostProcessorType]]] = None
     book_name: Optional[str] = None
     author_name: Optional[str] = None
 
