@@ -1,3 +1,5 @@
+# Final
+
 Please review and refine the following passages from *{book_name}* by *{author_name}*:
 
 **Section Title:** {new_title}
