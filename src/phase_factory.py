@@ -8,6 +8,7 @@ from src.post_processors import (
     OrderQuoteAnnotationProcessor,
     PostProcessor,
     PostProcessorChain,
+    PreserveFStringTagsProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
@@ -211,6 +212,7 @@ class PhaseFactory:
             PostProcessorType.ORDER_QUOTE_ANNOTATION: OrderQuoteAnnotationProcessor,
             PostProcessorType.NO_NEW_HEADERS: NoNewHeadersPostProcessor,
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES: RevertRemovedBlockLines,
+            PostProcessorType.PRESERVE_F_STRING_TAGS: PreserveFStringTagsProcessor,
         }
 
         processor_class = processor_mapping.get(processor_type)
