@@ -29,6 +29,44 @@ A tool for processing and updating book content using Large Language Models (LLM
 
 3.  **Configure your LLM API credentials** (e.g., set `OPENROUTER_API_KEY` as an environment variable).
 
+## System Requirements
+
+For PDF generation functionality, you'll need to install additional system dependencies:
+
+### LaTeX Distribution
+A LaTeX distribution is required for some PDF processing features. Install one of the following:
+
+- **TeX Live** (recommended for Linux/macOS):
+  ```bash
+  # Ubuntu/Debian
+  sudo apt-get install texlive-full
+  
+  # macOS (using Homebrew)
+  brew install --cask mactex
+  
+  # Or install basic TeX Live
+  brew install texlive
+  ```
+
+- **MiKTeX** (recommended for Windows):
+  - Download and install from [MiKTeX website](https://miktex.org/download)
+
+### WeasyPrint
+WeasyPrint is used for optimal CSS rendering in PDF generation:
+
+```bash
+# Install WeasyPrint and its dependencies
+pip install weasyprint
+
+# On Ubuntu/Debian, you may also need:
+sudo apt-get install build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
+
+# On macOS:
+brew install cairo pango gdk-pixbuf libffi
+```
+
+*Note: WeasyPrint provides the best CSS rendering and formatting support for PDF generation.*
+
 ## Usage
 
 The workflow is typically a two-step process:

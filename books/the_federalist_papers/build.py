@@ -258,18 +258,20 @@ def build(version: str, name: str):
     )
     logger.success(f"  -> Created '{safe_relative_path(config.build_final_epub)}'")
 
-    pypandoc.convert_file(
-        str(config.staged_final_md),
-        "pdf",
-        outputfile=str(config.build_final_pdf),
-        extra_args=pandoc_args
-        + [
-            f'--metadata=title:"{config.BOOK_TITLE}"',
-            f'--metadata=author:"{config.BOOK_AUTHOR}"',
-            f'--metadata=version:"{metadata["book_version"]}"',
-        ],
+    # Build PDF from EPUB for better formatting
+    logger.info("Building PDF from EPUB for final version...")
+    success = build_pdf_from_epub(
+        epub_path=config.build_final_epub,
+        pdf_path=config.build_final_pdf,
+        title=config.BOOK_TITLE,
+        author=config.BOOK_AUTHOR,
+        version=metadata["book_version"],
+        css_path=config.epub_css,
     )
-    logger.success(f"  -> Created '{safe_relative_path(config.build_final_pdf)}'")
+    if success:
+        logger.success(f"  -> Created '{safe_relative_path(config.build_final_pdf)}'")
+    else:
+        logger.error(f"  -> Failed to create '{safe_relative_path(config.build_final_pdf)}'")
 
     # Build Annotated Version
     logger.info(f"Building annotated version for '{config.BOOK_TITLE}'...")
@@ -287,18 +289,20 @@ def build(version: str, name: str):
     )
     logger.success(f"  -> Created '{safe_relative_path(config.build_annotated_epub)}'")
 
-    pypandoc.convert_file(
-        str(config.staged_annotated_md),
-        "pdf",
-        outputfile=str(config.build_annotated_pdf),
-        extra_args=pandoc_args
-        + [
-            f'--metadata=title:"{config.BOOK_TITLE}: AI Edit"',
-            f'--metadata=author:"{config.BOOK_AUTHOR}, LLM"',
-            f'--metadata=version:"{metadata["book_version"]}"',
-        ],
+    # Build PDF from EPUB for better formatting
+    logger.info("Building PDF from EPUB for annotated version...")
+    success = build_pdf_from_epub(
+        epub_path=config.build_annotated_epub,
+        pdf_path=config.build_annotated_pdf,
+        title=f"{config.BOOK_TITLE}: AI Edit",
+        author=f"{config.BOOK_AUTHOR}, LLM",
+        version=metadata["book_version"],
+        css_path=config.epub_css,
     )
-    logger.success(f"  -> Created '{safe_relative_path(config.build_annotated_pdf)}'")
+    if success:
+        logger.success(f"  -> Created '{safe_relative_path(config.build_annotated_pdf)}'")
+    else:
+        logger.error(f"  -> Failed to create '{safe_relative_path(config.build_annotated_pdf)}'")
 
     # --- 5. Copy Final Artifacts ---
     logger.info("--- Copying Final Artifacts to Build Directory ---")
@@ -321,6 +325,44 @@ def build(version: str, name: str):
     logger.info(f"Cleaned up staging directory: '{safe_relative_path(config.staging_dir)}'")
 
     logger.success(f"\nBuild complete for {name} v{version}!")
+
+
+def build_pdf_from_epub(epub_path: Path, pdf_path: Path, title: str, author: str, version: str, css_path: Path) -> bool:
+    """
+    Builds PDF from EPUB using WeasyPrint for optimal CSS rendering.
+
+    Args:
+        epub_path: Path to the source EPUB file
+        pdf_path: Path for the output PDF file
+        title: Book title for metadata
+        author: Book author for metadata
+        version: Book version for metadata
+        css_path: Path to CSS file for styling
+
+    Returns:
+        True if PDF was successfully created, False otherwise
+    """
+    try:
+        logger.info("Building PDF using WeasyPrint for optimal CSS rendering...")
+        pypandoc.convert_file(
+            str(epub_path),
+            "pdf",
+            outputfile=str(pdf_path),
+            extra_args=[
+                f"--css={safe_relative_path(css_path)}",
+                "--pdf-engine=weasyprint",
+                "--variable=geometry:margin=1in",
+                "--variable=fontsize:11pt",
+                f'--metadata=title:"{title}"',
+                f'--metadata=author:"{author}"',
+                f'--metadata=version:"{version}"',
+            ],
+        )
+        logger.success("Successfully created PDF using WeasyPrint")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create PDF with WeasyPrint: {str(e)}")
+        return False
 
 
 def main():
