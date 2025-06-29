@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-Example demonstrating the metadata saving functionality of the pipeline.
+Example demonstrating the consolidated metadata saving functionality of the pipeline.
 
-This example shows how metadata is automatically saved when running the pipeline.
+This example shows how comprehensive metadata is automatically saved when running the pipeline.
 """
 
+import sys
 from pathlib import Path
+
+# Add project root to path to allow importing from src
+sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
 
 
 def main():
-    """Demonstrate metadata saving functionality."""
+    """Demonstrate consolidated metadata saving functionality."""
 
     # Create a simple configuration
     config = RunConfig(
@@ -35,28 +39,32 @@ def main():
     # Create and run the pipeline
     pipeline = Pipeline(config)
 
-    print("Running pipeline with metadata saving...")
+    print("Running pipeline with consolidated metadata saving...")
     print(f"Output directory: {config.output_dir}")
 
     # Note: This will fail if the input file doesn't exist, but metadata will still be saved
     try:
         pipeline.run()
-        print("✓ Pipeline completed - metadata saved once for the entire run")
+        print("✓ Pipeline completed - consolidated metadata saved once for the entire run")
     except FileNotFoundError:
         print("Input file not found, but metadata saving functionality is demonstrated.")
         print("Check the output directory for metadata files.")
 
     print("\nMetadata files will be saved as:")
-    print("run_metadata_YYYYMMDD_HHMMSS.json")
-    print("\nThe metadata includes:")
+    print("pipeline_metadata_YYYYMMDD_HHMMSS.json")
+    print("\nThe consolidated metadata includes:")
+    print("- Metadata version for parser compatibility")
     print("- Run timestamp")
     print("- Book and author information")
     print("- Input and output file paths")
     print("- Phase configurations and completion status")
     print("- Model settings for each phase")
+    print("- System prompt information (including fully rendered prompts)")
+    print("- Post-processor configurations")
+    print("- Execution status for all phases (completed, disabled, failed)")
 
     print("\nNote: Metadata is saved ONCE per complete pipeline run, not for each individual phase.")
-    print("To save metadata for individual phases, use: pipeline.run_phase(phase_type, save_metadata=True)")
+    print("The consolidated system includes both run metadata and system prompt metadata in a single file.")
 
 
 if __name__ == "__main__":

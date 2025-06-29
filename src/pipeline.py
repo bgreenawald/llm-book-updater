@@ -14,6 +14,9 @@ from src.phase_factory import PhaseFactory
 # Initialize module-level logger
 module_logger = setup_logging(log_name="pipeline")
 
+# Metadata version for compatibility
+METADATA_VERSION = "1.0.0"
+
 
 def create_phase(phase_type: PhaseType, **kwargs) -> LlmPhase:
     """
@@ -63,7 +66,7 @@ class Pipeline:
         """
         self.config = config
         self._phase_instances: List[LlmPhase] = []
-        self._system_prompt_metadata: List[Dict[str, Any]] = []  # Collect system prompt metadata for all phases
+        self._phase_metadata: List[Dict[str, Any]] = []  # Collect comprehensive metadata for all phases
 
     def __str__(self) -> str:
         """
@@ -83,43 +86,104 @@ class Pipeline:
         """
         return f"Pipeline(config={self.config})"
 
-    def _collect_system_prompt_metadata(self, phase: LlmPhase, phase_index: int) -> None:
+    def _collect_phase_metadata(self, phase: Optional[LlmPhase], phase_index: int, completed: bool = False) -> None:
         """
-        Collect metadata about the fully rendered system prompt for a phase.
+        Collect comprehensive metadata about a phase.
 
-        This method collects comprehensive metadata about a phase's system prompt
-        including the phase configuration, model settings, and the fully rendered
-        prompt content. The metadata is stored for later saving.
+        This method collects detailed metadata about a phase including configuration,
+        model settings, prompt information, and execution status. The metadata is
+        stored for later saving.
 
         Args:
-            phase (LlmPhase): The phase instance to collect metadata from
+            phase (Optional[LlmPhase]): The phase instance to collect metadata from,
+                or None for disabled/failed phases
             phase_index (int): The index of the phase in the pipeline sequence
+            completed (bool): Whether the phase completed successfully
         """
+        phase_config = self.config.phases[phase_index]
+
+        # Get post-processor information
+        post_processors_info = []
+        if phase and phase.post_processor_chain:
+            post_processors_info = [p.name for p in phase.post_processor_chain.processors]
+        elif phase_config.post_processors:
+            # Convert post-processors to readable names
+            for processor in phase_config.post_processors:
+                if hasattr(processor, "name"):
+                    post_processors_info.append(processor.name)
+                elif isinstance(processor, str):
+                    post_processors_info.append(processor)
+                else:
+                    post_processors_info.append(str(processor))
+
+        # Base metadata that's always available
         metadata = {
-            "phase_name": phase.name,
+            "phase_name": phase.name if phase else phase_config.phase_type.name.lower(),
             "phase_index": phase_index,
-            "phase_type": self.config.phases[phase_index].phase_type.name,
-            "model_type": self.config.phases[phase_index].model_type,
-            "temperature": self.config.phases[phase_index].temperature,
-            "input_file": str(phase.input_file_path),
-            "output_file": str(phase.output_file_path),
-            "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
-            "fully_rendered_system_prompt": phase.system_prompt,
-            "length_reduction_parameter": phase.length_reduction,
+            "phase_type": phase_config.phase_type.name,
+            "enabled": phase_config.enabled,
+            "model_type": phase_config.model_type,
+            "temperature": phase_config.temperature,
+            "max_workers": phase_config.max_workers,
+            "post_processors": post_processors_info,
+            "post_processor_count": len(post_processors_info),
+            "completed": completed,
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
         }
-        self._system_prompt_metadata.append(metadata)
 
-    def _save_all_system_prompt_metadata(self) -> None:
+        # Add phase-specific information if phase exists
+        if phase:
+            metadata.update(
+                {
+                    "input_file": str(phase.input_file_path),
+                    "output_file": str(phase.output_file_path),
+                    "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
+                    "user_prompt_path": str(phase.user_prompt_path) if phase.user_prompt_path else None,
+                    "fully_rendered_system_prompt": phase.system_prompt,
+                    "length_reduction_parameter": phase.length_reduction,
+                    "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
+                }
+            )
+        else:
+            # For disabled/failed phases, add default values
+            metadata.update(
+                {
+                    "input_file": None,
+                    "output_file": None,
+                    "system_prompt_path": str(phase_config.system_prompt_path)
+                    if phase_config.system_prompt_path
+                    else None,
+                    "user_prompt_path": str(phase_config.user_prompt_path) if phase_config.user_prompt_path else None,
+                    "fully_rendered_system_prompt": None,
+                    "length_reduction_parameter": self.config.length_reduction,
+                    "output_exists": False,
+                }
+            )
+
+        # Add reason for non-completion if applicable
+        if not completed:
+            if not phase_config.enabled:
+                metadata["reason"] = "disabled"
+            else:
+                metadata["reason"] = "not_run"
+
+        self._phase_metadata.append(metadata)
+
+    def _save_metadata(self, completed_phases: List[LlmPhase]) -> None:
         """
-        Save all collected system prompt metadata to a single file at the end of the run.
+        Save comprehensive metadata about the pipeline run to the output directory.
 
         This method creates a comprehensive JSON file containing metadata about
-        all phases' system prompts, including the run configuration and timestamp.
-        The file is saved to the output directory with a timestamped filename.
+        the entire pipeline run, including information about all phases (both
+        completed and not run), their configurations, execution status, and
+        system prompt information.
+
+        Args:
+            completed_phases (List[LlmPhase]): List of phases that were successfully completed
         """
         metadata = {
+            "metadata_version": METADATA_VERSION,
             "run_timestamp": datetime.now().isoformat(),
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
@@ -127,103 +191,17 @@ class Pipeline:
             "original_file": str(self.config.original_file),
             "output_directory": str(self.config.output_dir),
             "length_reduction": self.config.length_reduction,
-            "phases": self._system_prompt_metadata,
+            "phases": self._phase_metadata,
         }
-        metadata_file = (
-            self.config.output_dir / f"system_prompt_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
-        try:
-            with open(file=metadata_file, mode="w", encoding="utf-8") as f:
-                json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
-            logger.info(f"System prompt metadata saved to: {metadata_file}")
-        except Exception as e:
-            logger.error(f"Failed to save system prompt metadata: {str(e)}")
-
-    def _save_run_metadata(self, completed_phases: List[LlmPhase]) -> None:
-        """
-        Save metadata about the pipeline run to the output directory.
-
-        This method creates a comprehensive JSON file containing metadata about
-        the entire pipeline run, including information about all phases (both
-        completed and not run), their configurations, and execution status.
-
-        Args:
-            completed_phases (List[LlmPhase]): List of phases that were successfully completed
-        """
-        metadata = {
-            "run_timestamp": datetime.now().isoformat(),
-            "book_name": self.config.book_name,
-            "author_name": self.config.author_name,
-            "input_file": str(self.config.input_file),
-            "original_file": str(self.config.original_file),
-            "output_directory": str(self.config.output_dir),
-            "phases": [],
-        }
-
-        # Add information about each completed phase
-        for i, phase in enumerate(completed_phases):
-            phase_config = self.config.phases[i]
-
-            # Get post-processor information
-            post_processors_info = []
-            if phase.post_processor_chain:
-                post_processors_info = [p.name for p in phase.post_processor_chain.processors]
-
-            phase_metadata = {
-                "phase_name": phase.name,
-                "phase_index": i,
-                "enabled": phase_config.enabled,
-                "model_type": phase_config.model_type,
-                "temperature": phase_config.temperature,
-                "input_file": str(phase.input_file_path),
-                "output_file": str(phase.output_file_path),
-                "system_prompt": str(phase.system_prompt_path) if phase.system_prompt_path else None,
-                "user_prompt": str(phase.user_prompt_path) if phase.user_prompt_path else None,
-                "max_workers": phase_config.max_workers,
-                "post_processors": post_processors_info,
-                "post_processor_count": len(post_processors_info),
-                "completed": True,
-                "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
-            }
-            metadata["phases"].append(phase_metadata)
-
-        # Add information about phases that were configured but not run
-        for i, phase_config in enumerate(self.config.phases):
-            if i >= len(completed_phases):
-                # Get post-processor information from config
-                post_processors_info = []
-                if phase_config.post_processors:
-                    # Convert post-processors to readable names
-                    for processor in phase_config.post_processors:
-                        if hasattr(processor, "name"):
-                            post_processors_info.append(processor.name)
-                        elif isinstance(processor, str):
-                            post_processors_info.append(processor)
-                        else:
-                            post_processors_info.append(str(processor))
-
-                phase_metadata = {
-                    "phase_name": phase_config.phase_type.name.lower(),
-                    "phase_index": i,
-                    "enabled": phase_config.enabled,
-                    "model_type": phase_config.model_type,
-                    "temperature": phase_config.temperature,
-                    "max_workers": phase_config.max_workers,
-                    "post_processors": post_processors_info,
-                    "post_processor_count": len(post_processors_info),
-                    "completed": False,
-                    "reason": "disabled" if not phase_config.enabled else "not_run",
-                }
-                metadata["phases"].append(phase_metadata)
 
         # Save metadata to output directory
-        metadata_file = self.config.output_dir / f"run_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        metadata_file = self.config.output_dir / f"pipeline_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         try:
             with open(file=metadata_file, mode="w", encoding="utf-8") as f:
                 json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
-            logger.info(f"Run metadata saved to: {metadata_file}")
+            logger.info(f"Pipeline metadata saved to: {metadata_file}")
         except Exception as e:
-            logger.error(f"Failed to save run metadata: {str(e)}")
+            logger.error(f"Failed to save pipeline metadata: {str(e)}")
 
     def _get_phase_output_path(self, phase_index: int) -> Path:
         """
@@ -374,6 +352,8 @@ class Pipeline:
             for i, phase_config in enumerate(self.config.phases):
                 if not phase_config.enabled:
                     logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
+                    # Collect metadata for disabled phases
+                    self._collect_phase_metadata(phase=None, phase_index=i, completed=False)
                     continue
 
                 logger.info(f"Proceeding with phase: {phase_config.phase_type.name}")
@@ -381,6 +361,8 @@ class Pipeline:
                 phase = self._initialize_phase(phase_index=i)
                 if not phase:
                     logger.warning(f"Could not initialize phase: {phase_config.phase_type.name}")
+                    # Collect metadata for phases that couldn't be initialized
+                    self._collect_phase_metadata(phase=None, phase_index=i, completed=False)
                     continue
 
                 self._phase_instances.append(phase)
@@ -389,26 +371,28 @@ class Pipeline:
                     logger.info(f"Starting phase: {phase.name}")
                     logger.debug(f"Input file: {phase.input_file_path}")
                     logger.debug(f"Output file: {phase.output_file_path}")
-                    # Collect system prompt metadata right before processing starts
-                    self._collect_system_prompt_metadata(phase=phase, phase_index=i)
                     phase.run(**kwargs)
                     logger.success(f"Successfully completed phase: {phase.name}")
                     logger.debug(f"Output written to: {phase.output_file_path}")
                     completed_phases.append(phase)
+                    # Collect metadata for completed phases
+                    self._collect_phase_metadata(phase=phase, phase_index=i, completed=True)
                 except LlmModelError as e:
                     logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
                     logger.error("Pipeline stopped due to LLM model failure after max retries")
+                    # Collect metadata for failed phases
+                    self._collect_phase_metadata(phase=phase, phase_index=i, completed=False)
                     raise
                 except Exception as e:
                     logger.error(f"Error in phase {phase.name}: {str(e)}", exc_info=True)
+                    # Collect metadata for failed phases
+                    self._collect_phase_metadata(phase=phase, phase_index=i, completed=False)
                     raise
 
             logger.success("Pipeline completed successfully")
         finally:
-            # Save metadata about the run (whether successful or failed)
-            self._save_run_metadata(completed_phases=completed_phases)
-            # Save all system prompt metadata at the end of the run
-            self._save_all_system_prompt_metadata()
+            # Save comprehensive metadata about the run (whether successful or failed)
+            self._save_metadata(completed_phases=completed_phases)
 
 
 def run_pipeline(config: RunConfig) -> None:
