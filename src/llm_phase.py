@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 from loguru import logger
 from tqdm import tqdm
 
+from src.cost_tracking_wrapper import add_generation_id
 from src.logging_config import setup_logging
 
 # Initialize module-level logger
@@ -557,10 +558,13 @@ class StandardLlmPhase(LlmPhase):
             )
 
             # Get LLM response
-            processed_body = self.model.chat_completion(
+            processed_body, generation_id = self.model.chat_completion(
                 system_prompt=self.system_prompt,
                 user_prompt=body,
             )
+
+            # Track generation ID for cost calculation
+            add_generation_id(phase_name=self.name, generation_id=generation_id)
 
             # Apply post-processing
             processed_body = self._apply_post_processing(
@@ -612,13 +616,16 @@ class IntroductionAnnotationPhase(LlmPhase):
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
-                introduction = self.model.chat_completion(
+                introduction, generation_id = self.model.chat_completion(
                     system_prompt=self.system_prompt,
                     user_prompt=user_prompt,
                     temperature=self.temperature,
                     reasoning=self.reasoning,
                     **kwargs,
                 )
+
+                # Track generation ID for cost calculation
+                add_generation_id(phase_name=self.name, generation_id=generation_id)
 
                 # Apply post-processing to the introduction
                 introduction = self._apply_post_processing(current_body, introduction, **kwargs)
@@ -670,13 +677,16 @@ class SummaryAnnotationPhase(LlmPhase):
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
-                summary = self.model.chat_completion(
+                summary, generation_id = self.model.chat_completion(
                     system_prompt=self.system_prompt,
                     user_prompt=user_prompt,
                     temperature=self.temperature,
                     reasoning=self.reasoning,
                     **kwargs,
                 )
+
+                # Track generation ID for cost calculation
+                add_generation_id(phase_name=self.name, generation_id=generation_id)
 
                 # Apply post-processing to the summary
                 summary = self._apply_post_processing(current_body, summary, **kwargs)

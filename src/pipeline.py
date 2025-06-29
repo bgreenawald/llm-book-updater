@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
+from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import IntroductionAnnotationPhase, LlmPhase, StandardLlmPhase, SummaryAnnotationPhase
 from src.logging_config import setup_logging
@@ -396,6 +397,11 @@ class Pipeline:
         finally:
             # Save comprehensive metadata about the run (whether successful or failed)
             self._save_metadata(completed_phases=completed_phases)
+
+            # Calculate and log costs at the end of the run
+            phase_names = [phase.name for phase in completed_phases]
+            if phase_names:
+                calculate_and_log_costs(phase_names)
 
 
 def run_pipeline(config: RunConfig) -> None:

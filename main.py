@@ -15,7 +15,7 @@ def setup_logging() -> None:
     logger.remove()  # Remove default handler
     logger.add(
         sink=sys.stderr,
-        level="DEBUG",
+        level="INFO",
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "
