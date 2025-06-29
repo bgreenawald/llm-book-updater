@@ -311,7 +311,10 @@ class Pipeline:
         )
 
         # Create the phase instance using the factory, passing length_reduction as a kwarg
-        phase_factory_kwargs = {"length_reduction": self.config.length_reduction}
+        phase_factory_kwargs = {
+            "length_reduction": self.config.length_reduction,
+            "tags_to_preserve": self.config.tags_to_preserve,
+        }
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
             phase = PhaseFactory.create_standard_phase(config=factory_config, **phase_factory_kwargs)
         elif phase_config.phase_type == PhaseType.INTRODUCTION:

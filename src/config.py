@@ -83,6 +83,8 @@ class RunConfig:
     # Length reduction parameter for the entire run (can be int or tuple of bounds)
     # Default to 35-50% reduction if not specified
     length_reduction: Optional[Union[int, Tuple[int, int]]] = (35, 50)
+    # Tags to preserve during processing (f-string tags like {preface}, {license})
+    tags_to_preserve: List[str] = field(default_factory=lambda: ["{preface}", "{license}"])
 
     def __str__(self) -> str:
         return (
@@ -92,7 +94,8 @@ class RunConfig:
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
             f"phases={self.phases}, "
-            f"length_reduction={self.length_reduction})"
+            f"length_reduction={self.length_reduction}, "
+            f"tags_to_preserve={self.tags_to_preserve})"
         )
 
     def __repr__(self) -> str:
@@ -103,7 +106,8 @@ class RunConfig:
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
             f"phases={self.phases}, "
-            f"length_reduction={self.length_reduction})"
+            f"length_reduction={self.length_reduction}, "
+            f"tags_to_preserve={self.tags_to_preserve})"
         )
 
     def __post_init__(self) -> None:

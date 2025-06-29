@@ -83,8 +83,11 @@ class PhaseFactory:
         Returns:
             StandardLlmPhase: Configured standard phase
         """
+        # Extract tags_to_preserve from kwargs if present
+        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
+
         post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type
+            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
         return StandardLlmPhase(
@@ -115,8 +118,11 @@ class PhaseFactory:
         Returns:
             IntroductionAnnotationPhase: Configured introduction annotation phase
         """
+        # Extract tags_to_preserve from kwargs if present
+        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
+
         post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type
+            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
         return IntroductionAnnotationPhase(
@@ -147,8 +153,11 @@ class PhaseFactory:
         Returns:
             SummaryAnnotationPhase: Configured summary annotation phase
         """
+        # Extract tags_to_preserve from kwargs if present
+        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
+
         post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type
+            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
         return SummaryAnnotationPhase(
@@ -195,12 +204,15 @@ class PhaseFactory:
         return None
 
     @staticmethod
-    def _create_processor_from_enum(processor_type: PostProcessorType) -> Optional[PostProcessor]:
+    def _create_processor_from_enum(
+        processor_type: PostProcessorType, tags_to_preserve: Optional[List[str]] = None
+    ) -> Optional[PostProcessor]:
         """
         Create a built-in post-processor from PostProcessorType enum.
 
         Args:
             processor_type (PostProcessorType): The post-processor type
+            tags_to_preserve (Optional[List[str]]): Tags to preserve for PreserveFStringTagsProcessor
 
         Returns:
             Optional[PostProcessor]: The created processor or None if not found
@@ -217,7 +229,10 @@ class PhaseFactory:
 
         processor_class = processor_mapping.get(processor_type)
         if processor_class:
-            return processor_class()
+            if processor_type == PostProcessorType.PRESERVE_F_STRING_TAGS and tags_to_preserve:
+                return processor_class(config={"tags_to_preserve": tags_to_preserve})
+            else:
+                return processor_class()
 
         return None
 
@@ -243,6 +258,7 @@ class PhaseFactory:
     def _create_post_processor_chain(
         post_processors: Optional[List[Union[str, PostProcessor, PostProcessorType]]] = None,
         phase_type: Optional[PhaseType] = None,
+        tags_to_preserve: Optional[List[str]] = None,
     ) -> Optional[PostProcessorChain]:
         """
         Create a post-processor chain from a unified list of post-processors.
@@ -260,6 +276,7 @@ class PhaseFactory:
             post_processors (Optional[List[Union[str, PostProcessor, PostProcessorType]]]):
                 Unified list of post-processors (strings, instances, or enum values)
             phase_type (Optional[PhaseType]): Phase type for default post-processors
+            tags_to_preserve (Optional[List[str]]): Tags to preserve for PreserveFStringTagsProcessor
 
         Returns:
             Optional[PostProcessorChain]: Configured post-processor chain or None
@@ -292,7 +309,9 @@ class PhaseFactory:
                 chain.add_processor(processor=processor_item)
             elif isinstance(processor_item, PostProcessorType):
                 # Handle PostProcessorType enum values
-                processor = PhaseFactory._create_processor_from_enum(processor_type=processor_item)
+                processor = PhaseFactory._create_processor_from_enum(
+                    processor_type=processor_item, tags_to_preserve=tags_to_preserve
+                )
                 if processor:
                     chain.add_processor(processor=processor)
             else:

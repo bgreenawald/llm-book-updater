@@ -401,6 +401,37 @@ class LlmPhase(ABC):
         body = lines[1].strip() if len(lines) > 1 else ""
         return header, body
 
+    def _contains_only_special_tags(self, body: str) -> bool:
+        """
+        Check if a body contains only special tags (like {preface}, {license}) after removing blank lines.
+
+        Args:
+            body (str): The body content to check
+
+        Returns:
+            bool: True if the body contains only special tags, False otherwise
+        """
+        if not body.strip():
+            return True
+
+        # Get the tags to preserve from the post-processor chain if available
+        tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+        if self.post_processor_chain:
+            for processor in self.post_processor_chain.processors:
+                if hasattr(processor, "tags_to_preserve"):
+                    tags_to_preserve = processor.tags_to_preserve
+                    break
+
+        # Split into lines and remove blank lines
+        lines = [line.strip() for line in body.split("\n") if line.strip()]
+
+        # Check if all non-blank lines are special tags
+        for line in lines:
+            if line not in tags_to_preserve:
+                return False
+
+        return len(lines) > 0  # Must have at least one tag to be considered "only tags"
+
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
         Process all markdown blocks in the input text.
@@ -510,6 +541,13 @@ class StandardLlmPhase(LlmPhase):
             current_header, current_body = self._get_header_and_body(block=current_block)
             original_header, original_body = self._get_header_and_body(block=original_block)
 
+            # Check if there's any content to process (not empty and not just special tags)
+            if (not current_body.strip() and not original_body.strip()) or (
+                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            ):
+                logger.debug("Empty block content or content with only special tags, returning block as-is")
+                return f"{current_header}\n\n{current_body}\n\n"
+
             # Format the user message
             body = self._format_user_message(
                 current_body=current_body,
@@ -563,6 +601,13 @@ class IntroductionAnnotationPhase(LlmPhase):
             current_header, current_body = self._get_header_and_body(current_block)
             original_header, original_body = self._get_header_and_body(original_block)
 
+            # Check if there's any content to process (not empty and not just special tags)
+            if (not current_body.strip() and not original_body.strip()) or (
+                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            ):
+                logger.debug("Empty block content or content with only special tags, returning block as-is")
+                return f"{current_header}\n\n{current_body}\n\n"
+
             # Use the block content as the user prompt for generating the introduction
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
@@ -613,6 +658,13 @@ class SummaryAnnotationPhase(LlmPhase):
         try:
             current_header, current_body = self._get_header_and_body(current_block)
             original_header, original_body = self._get_header_and_body(original_block)
+
+            # Check if there's any content to process (not empty and not just special tags)
+            if (not current_body.strip() and not original_body.strip()) or (
+                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            ):
+                logger.debug("Empty block content or content with only special tags, returning block as-is")
+                return f"{current_header}\n\n{current_body}\n\n"
 
             # Use the block content as the user prompt for generating the summary
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
