@@ -1,11 +1,11 @@
 Please review and refine the following passages from *{book_name}* by *{author_name}*:
 
-**Section Title:** {new_title}
+**Section Title:** {current_header}
 
 Original Passage
 
 <BEGIN_PASSAGE>
-{original_passage}
+{original_body}
 <END_PASSAGE>
 
 ---
@@ -13,7 +13,7 @@ Original Passage
 Transformed Passage
 
 <BEGIN_PASSAGE>
-{transformed_passage}
+{current_body}
 <END_PASSAGE>
 
 ---

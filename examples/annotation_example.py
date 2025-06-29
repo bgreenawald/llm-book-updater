@@ -12,11 +12,7 @@ This example shows how to:
 from pathlib import Path
 
 from src.llm_model import LlmModel
-from src.llm_phase import (
-    IntroductionAnnotationPhase,
-    StandardLlmPhase,
-    SummaryAnnotationPhase,
-)
+from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
 
 
 def main():
@@ -173,14 +169,14 @@ def create_example_user_prompt():
 
 Please analyze the following section and provide your response.
 
-**Section Title:** {transformed_title}
+**Section Title:** {current_header}
 **Original Title:** {original_title}
 
 **Current Content:**
-{transformed_passage}
+{current_body}
 
 **Original Content:**
-{original_passage}
+{original_body}
 
 Please process this section according to the system instructions.
 """

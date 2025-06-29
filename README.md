@@ -295,7 +295,7 @@ The metadata is saved to a single file named `pipeline_metadata_YYYYMMDD_HHMMSS.
 
 ### Prompt Templates
 
-System and user prompts can be customized with template variables like `{book_name}`, `{author_name}`, `{transformed_passage}`, and `{original_passage}`.
+System and user prompts can be customized with template variables like `{book_name}`, `{author_name}`, `{current_body}`, and `{original_body}`.
 
 ## Examples
 
