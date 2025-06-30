@@ -55,6 +55,7 @@ class Config:
         # --- Base Directory Output Paths ---
         self.base_final_md = self.base_dir / "output-final.md"
         self.base_annotated_md = self.base_dir / "output-annotated.md"
+        self.base_metadata_json = self.base_dir / "metadata.json"
 
 
 def safe_relative_path(path: Path) -> str:
@@ -187,6 +188,8 @@ def format_markdown_file(input_path: Path, preface_content: str, license_content
     content = content.replace("{license}", license_content)
     input_path.write_text(content, encoding="utf-8")
     logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface and license.")
+
+
 def build(version: str, name: str):
     """
     The main build function.
@@ -250,6 +253,9 @@ def build(version: str, name: str):
             metadata["book_version"] = config.version
         with open(config.staged_metadata_json, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=4)
+        # Copy updated metadata to base directory
+        shutil.copy(config.staged_metadata_json, config.base_metadata_json)
+        logger.info(f"Copied updated metadata to base directory: '{safe_relative_path(config.base_metadata_json)}'")
 
     pandoc_args = [
         "--toc",
