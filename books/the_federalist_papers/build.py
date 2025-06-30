@@ -17,6 +17,7 @@ class Config:
 
     BOOK_TITLE = "The Federalist Papers (Modern AI Edition)"
     BOOK_AUTHOR = "Alexander Hamilton, James Madison, and John Jay"
+    CLEAN_BOOK_TITLE = "The-Federalist-Papers-Modern-AI-Edition"
 
     def __init__(self, name: str, version: str):
         self.name = name
@@ -37,14 +38,14 @@ class Config:
 
         # --- Build Output Paths ---
         self.build_dir = Path("build") / self.name / self.version
-        self.build_final_md = self.build_dir / f"{self.BOOK_TITLE}-final.md"
-        self.build_annotated_md = self.build_dir / f"{self.BOOK_TITLE}-annotated.md"
-        self.build_original_md = self.build_dir / f"{self.BOOK_TITLE}-original.md"
-        self.build_metadata_json = self.build_dir / f"{self.BOOK_TITLE}-metadata.json"
-        self.build_final_epub = self.build_dir / f"{self.BOOK_TITLE}-final.epub"
-        self.build_final_pdf = self.build_dir / f"{self.BOOK_TITLE}-final.pdf"
-        self.build_annotated_epub = self.build_dir / f"{self.BOOK_TITLE}-annotated.epub"
-        self.build_annotated_pdf = self.build_dir / f"{self.BOOK_TITLE}-annotated.pdf"
+        self.build_final_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.md"
+        self.build_annotated_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.md"
+        self.build_original_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-original.md"
+        self.build_metadata_json = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-metadata.json"
+        self.build_final_epub = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.epub"
+        self.build_final_pdf = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.pdf"
+        self.build_annotated_epub = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.epub"
+        self.build_annotated_pdf = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.pdf"
 
         # --- Asset Paths ---
         self.cover_image = self.base_dir / "cover.png"
