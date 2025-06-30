@@ -29,7 +29,6 @@ def main():
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
         temperature=0.3,
-        max_workers=4,
         # Unified post-processors list: mix of strings and instances
         post_processors=[
             PostProcessorType.NO_NEW_HEADERS,  # Built-in processor by enum

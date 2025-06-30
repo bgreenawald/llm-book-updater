@@ -1,8 +1,16 @@
-/books
-
 # Python files
 *.pyc
 .python-version
 /logs
 /.vscode
+
+# Temporary files
+*.tmp
+tmp
+
+# Settings files
 /src/run_settings.py
+
+# Output
+output/
+/build

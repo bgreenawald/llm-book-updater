@@ -8,7 +8,7 @@ from loguru import logger
 from src.config import PhaseType, RunConfig
 from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import LlmModel, LlmModelError
-from src.llm_phase import IntroductionAnnotationPhase, LlmPhase, StandardLlmPhase, SummaryAnnotationPhase
+from src.llm_phase import LlmPhase
 from src.logging_config import setup_logging
 from src.phase_factory import PhaseFactory
 
@@ -17,9 +17,6 @@ module_logger = setup_logging(log_name="pipeline")
 
 # Metadata version for compatibility
 METADATA_VERSION = "1.0.0"
-
-
-
 
 
 class Pipeline:
@@ -98,7 +95,6 @@ class Pipeline:
             "enabled": phase_config.enabled,
             "model_type": phase_config.model_type,
             "temperature": phase_config.temperature,
-            "max_workers": phase_config.max_workers,
             "post_processors": post_processors_info,
             "post_processor_count": len(post_processors_info),
             "completed": completed,
@@ -110,10 +106,10 @@ class Pipeline:
         if phase:
             metadata.update(
                 {
-                    "input_file": str(phase.input_file_path),
-                    "output_file": str(phase.output_file_path),
-                    "system_prompt_path": str(phase.system_prompt_path) if phase.system_prompt_path else None,
-                    "user_prompt_path": str(phase.user_prompt_path) if phase.user_prompt_path else None,
+                    "input_file": phase.input_file_path.as_posix(),
+                    "output_file": phase.output_file_path.as_posix(),
+                    "system_prompt_path": phase.system_prompt_path.as_posix() if phase.system_prompt_path else None,
+                    "user_prompt_path": phase.user_prompt_path.as_posix() if phase.user_prompt_path else None,
                     "fully_rendered_system_prompt": phase.system_prompt,
                     "length_reduction_parameter": phase.length_reduction,
                     "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
@@ -125,10 +121,12 @@ class Pipeline:
                 {
                     "input_file": None,
                     "output_file": None,
-                    "system_prompt_path": str(phase_config.system_prompt_path)
+                    "system_prompt_path": phase_config.system_prompt_path.as_posix()
                     if phase_config.system_prompt_path
                     else None,
-                    "user_prompt_path": str(phase_config.user_prompt_path) if phase_config.user_prompt_path else None,
+                    "user_prompt_path": phase_config.user_prompt_path.as_posix()
+                    if phase_config.user_prompt_path
+                    else None,
                     "fully_rendered_system_prompt": None,
                     "length_reduction_parameter": self.config.length_reduction,
                     "output_exists": False,
@@ -161,9 +159,9 @@ class Pipeline:
             "run_timestamp": datetime.now().isoformat(),
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
-            "input_file": str(self.config.input_file),
-            "original_file": str(self.config.original_file),
-            "output_directory": str(self.config.output_dir),
+            "input_file": self.config.input_file.as_posix(),
+            "original_file": self.config.original_file.as_posix(),
+            "output_directory": self.config.output_dir.as_posix(),
             "length_reduction": self.config.length_reduction,
             "phases": self._phase_metadata,
         }
@@ -295,22 +293,32 @@ class Pipeline:
             author_name=self.config.author_name,
             model=model,
             temperature=phase_config.temperature,
-            max_workers=phase_config.max_workers,
             reasoning=phase_config.reasoning,
             post_processors=phase_config.post_processors,
         )
 
-        # Create the phase instance using the factory, passing length_reduction as a kwarg
-        phase_factory_kwargs = {
-            "length_reduction": self.config.length_reduction,
-            "tags_to_preserve": self.config.tags_to_preserve,
-        }
+        # Create the phase instance using the factory with explicit arguments
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
-            phase = PhaseFactory.create_standard_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_standard_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         elif phase_config.phase_type == PhaseType.INTRODUCTION:
-            phase = PhaseFactory.create_introduction_annotation_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_introduction_annotation_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         elif phase_config.phase_type == PhaseType.SUMMARY:
-            phase = PhaseFactory.create_summary_annotation_phase(config=factory_config, **phase_factory_kwargs)
+            phase = PhaseFactory.create_summary_annotation_phase(
+                config=factory_config,
+                length_reduction=self.config.length_reduction,
+                tags_to_preserve=self.config.tags_to_preserve,
+                max_workers=self.config.max_workers,
+            )
         else:
             raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
 

@@ -8,6 +8,7 @@ dependencies = [
     "loguru>=0.7.3",
     "marker-pdf[full]>=1.7.3",
     "openai>=1.82.0",
+    "pypandoc>=1.15",
     "streamlit>=1.45.1",
     "streamlit-ace>=0.1.1",
     "tqdm>=4.67.1",

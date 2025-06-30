@@ -26,7 +26,7 @@ def setup_logging(log_name: str = "app") -> logger:
     logger.add(
         sink=log_dir / f"{log_name}.log",
         rotation="10 MB",
-        level="INFO",
+        level="DEBUG",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     )
 

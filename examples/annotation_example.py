@@ -20,19 +20,14 @@ def main():
     """Run the annotation example."""
 
     # Configuration
-    book_name = "Example Book"
-    author_name = "Example Author"
+    book_name = "The Great Gatsby"
+    author_name = "F. Scott Fitzgerald"
+    input_file = Path("examples/annotation_input.md")
+    output_dir = Path("examples/annotation_output")
     temperature = 0.2
-    max_workers = 4
 
     # File paths
-    input_file = Path("input.md")
     original_file = Path("original.md")
-    output_dir = Path("output")
-
-    # Create dummy files for the example to run
-    input_file.touch()
-    original_file.touch()
 
     # Prompt paths
     system_prompts_dir = Path("prompts")
@@ -63,7 +58,6 @@ def main():
                 phase_type=PhaseType.INTRODUCTION,
                 model_type=model.model_id,
                 temperature=temperature,
-                max_workers=max_workers,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -86,7 +80,6 @@ def main():
                 phase_type=PhaseType.SUMMARY,
                 model_type=model.model_id,
                 temperature=temperature,
-                max_workers=max_workers,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -109,7 +102,6 @@ def main():
                 phase_type=PhaseType.EDIT,
                 model_type=model.model_id,
                 temperature=temperature,
-                max_workers=max_workers,
                 system_prompt_path=standard_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -132,7 +124,6 @@ def main():
                 phase_type=PhaseType.INTRODUCTION,
                 model_type=model.model_id,
                 temperature=temperature,
-                max_workers=max_workers,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
             ),
@@ -140,7 +131,6 @@ def main():
                 phase_type=PhaseType.SUMMARY,
                 model_type=model.model_id,
                 temperature=temperature,
-                max_workers=max_workers,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
             ),

@@ -304,13 +304,31 @@ class LlmPhase(ABC):
                 else:
                     format_params["length_reduction"] = str(self.length_reduction)
 
+                # Get tags to preserve from post-processor chain if available
+                tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+                if self.post_processor_chain:
+                    for processor in self.post_processor_chain.processors:
+                        if hasattr(processor, "tags_to_preserve"):
+                            tags_to_preserve = processor.tags_to_preserve
+                            break
+
+                # Add all tags_to_preserve as format parameters with their original values
+                for tag in tags_to_preserve:
+                    # Extract the tag name without braces
+                    tag_name = tag.strip("{}")
+                    format_params[tag_name] = tag
+
                 try:
                     content = content.format(**format_params)
                     logger.debug(f"Formatted system prompt with parameters: {format_params}")
                 except KeyError as e:
                     logger.warning(f"System prompt contains undefined parameter: {e}")
+                    raise
                 except Exception as e:
                     logger.warning(f"Error formatting system prompt: {e}")
+                    # Return unformatted content on any other formatting error
+                    logger.warning("Returning unformatted system prompt due to formatting errors")
+                    raise
 
             return content
         except FileNotFoundError:

@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
@@ -73,19 +73,24 @@ class PhaseFactory:
     }
 
     @staticmethod
-    def create_standard_phase(config: PhaseConfig, **kwargs) -> StandardLlmPhase:
+    def create_standard_phase(
+        config: PhaseConfig,
+        length_reduction: Optional[Any] = None,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> StandardLlmPhase:
         """
         Create a standard LLM phase with optional post-processors.
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
+            length_reduction: Length reduction parameter for the phase
+            tags_to_preserve: Tags to preserve during processing
+            max_workers: Maximum number of workers for parallel processing
 
         Returns:
             StandardLlmPhase: Configured standard phase
         """
-        # Extract tags_to_preserve from kwargs if present
-        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
-
         post_processor_chain = PhaseFactory._create_post_processor_chain(
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
@@ -101,26 +106,31 @@ class PhaseFactory:
             author_name=config.author_name,
             model=config.model,
             temperature=config.temperature,
-            max_workers=config.max_workers,
+            max_workers=max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
-            **kwargs,
+            length_reduction=length_reduction,
         )
 
     @staticmethod
-    def create_introduction_annotation_phase(config: PhaseConfig, **kwargs) -> IntroductionAnnotationPhase:
+    def create_introduction_annotation_phase(
+        config: PhaseConfig,
+        length_reduction: Optional[Any] = None,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> IntroductionAnnotationPhase:
         """
         Create an introduction annotation phase with optional post-processors.
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
+            length_reduction: Length reduction parameter for the phase
+            tags_to_preserve: Tags to preserve during processing
+            max_workers: Maximum number of workers for parallel processing
 
         Returns:
             IntroductionAnnotationPhase: Configured introduction annotation phase
         """
-        # Extract tags_to_preserve from kwargs if present
-        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
-
         post_processor_chain = PhaseFactory._create_post_processor_chain(
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
@@ -136,26 +146,31 @@ class PhaseFactory:
             author_name=config.author_name,
             model=config.model,
             temperature=config.temperature,
-            max_workers=config.max_workers,
+            max_workers=max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
-            **kwargs,
+            length_reduction=length_reduction,
         )
 
     @staticmethod
-    def create_summary_annotation_phase(config: PhaseConfig, **kwargs) -> SummaryAnnotationPhase:
+    def create_summary_annotation_phase(
+        config: PhaseConfig,
+        length_reduction: Optional[Any] = None,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> SummaryAnnotationPhase:
         """
         Create a summary annotation phase with optional post-processors.
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
+            length_reduction: Length reduction parameter for the phase
+            tags_to_preserve: Tags to preserve during processing
+            max_workers: Maximum number of workers for parallel processing
 
         Returns:
             SummaryAnnotationPhase: Configured summary annotation phase
         """
-        # Extract tags_to_preserve from kwargs if present
-        tags_to_preserve = kwargs.pop("tags_to_preserve", None)
-
         post_processor_chain = PhaseFactory._create_post_processor_chain(
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
@@ -171,10 +186,10 @@ class PhaseFactory:
             author_name=config.author_name,
             model=config.model,
             temperature=config.temperature,
-            max_workers=config.max_workers,
+            max_workers=max_workers,
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
-            **kwargs,
+            length_reduction=length_reduction,
         )
 
     @staticmethod

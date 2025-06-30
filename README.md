@@ -29,6 +29,18 @@ A tool for processing and updating book content using Large Language Models (LLM
 
 3.  **Configure your LLM API credentials** (e.g., set `OPENROUTER_API_KEY` as an environment variable).
 
+## System Requirements
+
+For PDF generation functionality, you'll need to install additional system dependencies:
+
+### LaTeX Distribution
+A LaTeX distribution is required for some PDF processing features. See the [LaTeX installation guide](https://www.latex-project.org/get/) for your platform.
+
+### Calibre
+Calibre is used for EPUB to PDF conversion with perfect formatting and working table of contents. See the [Calibre installation guide](https://calibre-ebook.com/download) for your platform.
+
+*Note: Calibre's ebook-convert provides the best EPUB to PDF conversion with working table of contents, proper formatting, and cover support.*
+
 ## Usage
 
 The workflow is typically a two-step process:
