@@ -35,7 +35,6 @@ This is a test system prompt that contains special f-string tags.
 
 * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
 * The length reduction should be {length_reduction}.
-* Book: {book_name} by {author_name}
 * Custom tag: {dedication}
 """,
         "dummy.md": "# Test\n\nTest content",

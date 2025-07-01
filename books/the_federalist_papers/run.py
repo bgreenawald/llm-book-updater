@@ -3,39 +3,39 @@ from pathlib import Path
 from typing import List
 
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import DEEPSEEK, GEMINI_FLASH, GEMINI_PRO
+from src.llm_model import GEMINI_FLASH_LITE
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model_type=GEMINI_FLASH,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model_type=GEMINI_PRO,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model_type=DEEPSEEK,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model_type=GEMINI_FLASH,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model_type=GEMINI_FLASH,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model_type=GEMINI_FLASH,
+        model_type=GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
 ]

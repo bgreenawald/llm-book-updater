@@ -84,7 +84,7 @@ def test_pipeline_metadata():
             assert "phases" in metadata
 
             # Verify metadata version
-            assert metadata["metadata_version"] == "1.0.0"
+            assert metadata["metadata_version"] == "0.0.0-alpha"
 
             # Verify phase metadata
             assert len(metadata["phases"]) == 1

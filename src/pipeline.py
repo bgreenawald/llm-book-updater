@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -56,6 +57,25 @@ class Pipeline:
             str: Detailed string representation of the pipeline
         """
         return f"Pipeline(config={self.config})"
+
+    def _copy_input_file_to_output(self) -> None:
+        """
+        Copy the input file to the output directory with index "00".
+
+        This method copies the original input file to the output directory
+        with a filename that starts with "00-" to maintain the proper
+        ordering of files in the pipeline output.
+        """
+        input_filename = self.config.input_file.name
+        output_filename = f"00-{input_filename}"
+        output_path = self.config.output_dir / output_filename
+
+        try:
+            shutil.copy2(src=self.config.input_file, dst=output_path)
+            logger.info(f"Copied input file to output directory: {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to copy input file to output directory: {str(e)}")
+            raise
 
     def _collect_phase_metadata(self, phase: Optional[LlmPhase], phase_index: int, completed: bool = False) -> None:
         """
@@ -346,6 +366,9 @@ class Pipeline:
         """
         phase_order = self.config.get_phase_order()
         logger.info(f"Starting pipeline with phases: {[p.name for p in phase_order]}")
+
+        # Copy input file to output directory with index "00"
+        self._copy_input_file_to_output()
 
         completed_phases: List[LlmPhase] = []
 

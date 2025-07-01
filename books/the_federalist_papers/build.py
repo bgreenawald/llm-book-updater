@@ -9,6 +9,27 @@ import pypandoc
 from loguru import logger
 
 
+def find_original_file_in_output(output_dir: Path) -> Path | None:
+    """
+    Find the original file in the output directory (file starting with "00-").
+
+    Args:
+        output_dir: Path to the output directory
+
+    Returns:
+        Path to the original file if found, None otherwise
+    """
+    if not output_dir.exists():
+        return None
+
+    # Look for files starting with "00-"
+    for file_path in output_dir.glob("00-*"):
+        if file_path.is_file():
+            return file_path
+
+    return None
+
+
 class Config:
     """
     Configuration class for the build script.
@@ -28,13 +49,16 @@ class Config:
         self.source_output_dir = self.base_dir / "output"
         self.final_book_path = self.source_output_dir / "03-input_small Final_1.md"
         self.annotated_book_path = self.source_output_dir / "06-input_small Annotate_1.md"
-        self.original_file_path = self.base_dir / "input_small.md"
+
+        # Find the original file in the output directory (00-indexed)
+        self.original_file_path = find_original_file_in_output(self.source_output_dir)
 
         # --- Intermediate (Staging) Paths ---
         self.staging_dir = self.base_dir / "staging"
         self.staged_final_md = self.staging_dir / "final.md"
         self.staged_annotated_md = self.staging_dir / "annotated.md"
         self.staged_metadata_json = self.staging_dir / "metadata.json"
+        self.staged_original_md = self.staging_dir / "original.md"
 
         # --- Build Output Paths ---
         self.build_dir = Path("build") / self.name / self.version
@@ -56,6 +80,7 @@ class Config:
         # --- Base Directory Output Paths ---
         self.base_final_md = self.base_dir / "output-final.md"
         self.base_annotated_md = self.base_dir / "output-annotated.md"
+        self.base_original_md = self.base_dir / "output-original.md"
         self.base_metadata_json = self.base_dir / "metadata.json"
 
 
@@ -209,6 +234,15 @@ def build(version: str, name: str):
     shutil.copy(config.annotated_book_path, config.staged_annotated_md)
     logger.info(f"Copied '{safe_relative_path(config.annotated_book_path)}' to staging area.")
 
+    # Copy original file to staging if it exists
+    if config.original_file_path and config.original_file_path.exists():
+        shutil.copy(config.original_file_path, config.staged_original_md)
+        logger.info(f"Copied '{safe_relative_path(config.original_file_path)}' to staging area.")
+    else:
+        logger.warning(
+            f"Original file not found at '{safe_relative_path(config.original_file_path) if config.original_file_path else 'None'}'"
+        )
+
     latest_metadata = get_latest_metadata_file(config.source_output_dir)
     if latest_metadata:
         shutil.copy(latest_metadata, config.staged_metadata_json)
@@ -228,15 +262,23 @@ def build(version: str, name: str):
     format_markdown_file(config.staged_final_md, preface_content, license_content)
     format_markdown_file(config.staged_annotated_md, preface_content, license_content)
 
+    # Format original file if it exists
+    if config.staged_original_md.exists():
+        format_markdown_file(config.staged_original_md, preface_content, license_content)
+
     # --- 3.5. Replace <br> tags with spaces ---
     logger.info("--- Replacing <br> tags with spaces ---")
     replace_br_tags(config.staged_final_md)
     replace_br_tags(config.staged_annotated_md)
+    if config.staged_original_md.exists():
+        replace_br_tags(config.staged_original_md)
 
     # --- 3.6. Clean annotation patterns ---
     logger.info("--- Cleaning annotation patterns ---")
     clean_annotation_patterns(config.staged_final_md)
     clean_annotation_patterns(config.staged_annotated_md)
+    if config.staged_original_md.exists():
+        clean_annotation_patterns(config.staged_original_md)
 
     # --- 3.7. Copy fully rendered files to base directory ---
     logger.info("--- Copying fully rendered files to base directory ---")
@@ -244,6 +286,9 @@ def build(version: str, name: str):
     logger.info(f"Copied final markdown to base directory: '{safe_relative_path(config.base_final_md)}'")
     shutil.copy(config.staged_annotated_md, config.base_annotated_md)
     logger.info(f"Copied annotated markdown to base directory: '{safe_relative_path(config.base_annotated_md)}'")
+    if config.staged_original_md.exists():
+        shutil.copy(config.staged_original_md, config.base_original_md)
+        logger.info(f"Copied original markdown to base directory: '{safe_relative_path(config.base_original_md)}'")
 
     # --- 4. Run Pandoc Build ---
     logger.info("--- Running Pandoc Build ---")
@@ -333,11 +378,11 @@ def build(version: str, name: str):
     logger.info(f"Copied final markdown to '{safe_relative_path(config.build_final_md)}'")
     shutil.copy(config.staged_annotated_md, config.build_annotated_md)
     logger.info(f"Copied annotated markdown to '{safe_relative_path(config.build_annotated_md)}'")
-    if config.original_file_path.exists():
-        shutil.copy(config.original_file_path, config.build_original_md)
+    if config.staged_original_md.exists():
+        shutil.copy(config.staged_original_md, config.build_original_md)
         logger.info(f"Copied original manuscript to '{safe_relative_path(config.build_original_md)}'")
     else:
-        logger.warning(f"Original file not found at '{safe_relative_path(config.original_file_path)}'")
+        logger.warning("Original file not found in staging area")
 
     if config.staged_metadata_json.exists():
         shutil.copy(config.staged_metadata_json, config.build_metadata_json)
