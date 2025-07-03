@@ -47,7 +47,7 @@ class Config:
         # --- Source Paths ---
         self.base_dir = Path(f"books/{self.name}")
         self.source_output_dir = self.base_dir / "output"
-        self.final_book_path = self.source_output_dir / "03-input_small Final_1.md"
+        self.modernized_book_path = self.source_output_dir / "03-input_small Final_1.md"
         self.annotated_book_path = self.source_output_dir / "06-input_small Annotate_1.md"
 
         # Find the original file in the output directory (00-indexed)
@@ -55,19 +55,19 @@ class Config:
 
         # --- Intermediate (Staging) Paths ---
         self.staging_dir = self.base_dir / "staging"
-        self.staged_final_md = self.staging_dir / "final.md"
+        self.staged_modernized_md = self.staging_dir / "modernized.md"
         self.staged_annotated_md = self.staging_dir / "annotated.md"
         self.staged_metadata_json = self.staging_dir / "metadata.json"
         self.staged_original_md = self.staging_dir / "original.md"
 
         # --- Build Output Paths ---
         self.build_dir = Path("build") / self.name / self.version
-        self.build_final_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.md"
+        self.build_modernized_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-modernized.md"
         self.build_annotated_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.md"
         self.build_original_md = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-original.md"
         self.build_metadata_json = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-metadata.json"
-        self.build_final_epub = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.epub"
-        self.build_final_pdf = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-final.pdf"
+        self.build_modernized_epub = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-modernized.epub"
+        self.build_modernized_pdf = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-modernized.pdf"
         self.build_annotated_epub = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.epub"
         self.build_annotated_pdf = self.build_dir / f"{self.CLEAN_BOOK_TITLE}-annotated.pdf"
 
@@ -78,7 +78,7 @@ class Config:
         self.license_md = self.base_dir / "license.md"
 
         # --- Base Directory Output Paths ---
-        self.base_final_md = self.base_dir / "output-final.md"
+        self.base_modernized_md = self.base_dir / "output-modernized.md"
         self.base_annotated_md = self.base_dir / "output-annotated.md"
         self.base_original_md = self.base_dir / "output-original.md"
         self.base_metadata_json = self.base_dir / "metadata.json"
@@ -119,8 +119,8 @@ def ensure_directories_exist(config: Config) -> None:
         logger.debug(f"Ensured directory exists: {safe_relative_path(directory)}")
 
     # Verify that source files exist
-    if not config.final_book_path.exists():
-        raise FileNotFoundError(f"Final book file not found: {safe_relative_path(config.final_book_path)}")
+    if not config.modernized_book_path.exists():
+        raise FileNotFoundError(f"Modernized book file not found: {safe_relative_path(config.modernized_book_path)}")
     if not config.annotated_book_path.exists():
         raise FileNotFoundError(f"Annotated book file not found: {safe_relative_path(config.annotated_book_path)}")
 
@@ -229,8 +229,8 @@ def build(version: str, name: str):
 
     # --- 2. Copy and Prepare Files ---
     logger.info("--- Preparing Source Files ---")
-    shutil.copy(config.final_book_path, config.staged_final_md)
-    logger.info(f"Copied '{safe_relative_path(config.final_book_path)}' to staging area.")
+    shutil.copy(config.modernized_book_path, config.staged_modernized_md)
+    logger.info(f"Copied '{safe_relative_path(config.modernized_book_path)}' to staging area.")
     shutil.copy(config.annotated_book_path, config.staged_annotated_md)
     logger.info(f"Copied '{safe_relative_path(config.annotated_book_path)}' to staging area.")
 
@@ -259,7 +259,7 @@ def build(version: str, name: str):
     preface_content = config.preface_md.read_text(encoding="utf-8")
     license_content = config.license_md.read_text(encoding="utf-8")
 
-    format_markdown_file(config.staged_final_md, preface_content, license_content)
+    format_markdown_file(config.staged_modernized_md, preface_content, license_content)
     format_markdown_file(config.staged_annotated_md, preface_content, license_content)
 
     # Format original file if it exists
@@ -268,22 +268,22 @@ def build(version: str, name: str):
 
     # --- 3.5. Replace <br> tags with spaces ---
     logger.info("--- Replacing <br> tags with spaces ---")
-    replace_br_tags(config.staged_final_md)
+    replace_br_tags(config.staged_modernized_md)
     replace_br_tags(config.staged_annotated_md)
     if config.staged_original_md.exists():
         replace_br_tags(config.staged_original_md)
 
     # --- 3.6. Clean annotation patterns ---
     logger.info("--- Cleaning annotation patterns ---")
-    clean_annotation_patterns(config.staged_final_md)
+    clean_annotation_patterns(config.staged_modernized_md)
     clean_annotation_patterns(config.staged_annotated_md)
     if config.staged_original_md.exists():
         clean_annotation_patterns(config.staged_original_md)
 
     # --- 3.7. Copy fully rendered files to base directory ---
     logger.info("--- Copying fully rendered files to base directory ---")
-    shutil.copy(config.staged_final_md, config.base_final_md)
-    logger.info(f"Copied final markdown to base directory: '{safe_relative_path(config.base_final_md)}'")
+    shutil.copy(config.staged_modernized_md, config.base_modernized_md)
+    logger.info(f"Copied modernized markdown to base directory: '{safe_relative_path(config.base_modernized_md)}'")
     shutil.copy(config.staged_annotated_md, config.base_annotated_md)
     logger.info(f"Copied annotated markdown to base directory: '{safe_relative_path(config.base_annotated_md)}'")
     if config.staged_original_md.exists():
@@ -310,12 +310,12 @@ def build(version: str, name: str):
         f"--css={safe_relative_path(config.epub_css)}",
     ]
 
-    # Build Final Version
-    logger.info(f"Building final version for '{config.BOOK_TITLE}'...")
+    # Build Modernized Version
+    logger.info(f"Building modernized version for '{config.BOOK_TITLE}'...")
     pypandoc.convert_file(
-        str(config.staged_final_md),
+        str(config.staged_modernized_md),
         "epub",
-        outputfile=str(config.build_final_epub),
+        outputfile=str(config.build_modernized_epub),
         extra_args=pandoc_args
         + [
             f"--epub-cover-image={safe_relative_path(config.cover_image)}",
@@ -324,22 +324,22 @@ def build(version: str, name: str):
             f'--metadata=version:"{metadata["book_version"]}"',
         ],
     )
-    logger.success(f"  -> Created '{safe_relative_path(config.build_final_epub)}'")
+    logger.success(f"  -> Created '{safe_relative_path(config.build_modernized_epub)}'")
 
     # Build PDF from EPUB for better formatting
-    logger.info("Building PDF from EPUB for final version...")
+    logger.info("Building PDF from EPUB for modernized version...")
     success = build_pdf_from_epub(
-        epub_path=config.build_final_epub,
-        pdf_path=config.build_final_pdf,
+        epub_path=config.build_modernized_epub,
+        pdf_path=config.build_modernized_pdf,
         title=config.BOOK_TITLE,
         author=config.BOOK_AUTHOR,
         version=metadata["book_version"],
         css_path=config.epub_css,
     )
     if success:
-        logger.success(f"  -> Created '{safe_relative_path(config.build_final_pdf)}'")
+        logger.success(f"  -> Created '{safe_relative_path(config.build_modernized_pdf)}'")
     else:
-        logger.error(f"  -> Failed to create '{safe_relative_path(config.build_final_pdf)}'")
+        logger.error(f"  -> Failed to create '{safe_relative_path(config.build_modernized_pdf)}'")
 
     # Build Annotated Version
     logger.info(f"Building annotated version for '{config.BOOK_TITLE}'...")
@@ -374,8 +374,8 @@ def build(version: str, name: str):
 
     # --- 5. Copy Final Artifacts ---
     logger.info("--- Copying Final Artifacts to Build Directory ---")
-    shutil.copy(config.staged_final_md, config.build_final_md)
-    logger.info(f"Copied final markdown to '{safe_relative_path(config.build_final_md)}'")
+    shutil.copy(config.staged_modernized_md, config.build_modernized_md)
+    logger.info(f"Copied modernized markdown to '{safe_relative_path(config.build_modernized_md)}'")
     shutil.copy(config.staged_annotated_md, config.build_annotated_md)
     logger.info(f"Copied annotated markdown to '{safe_relative_path(config.build_annotated_md)}'")
     if config.staged_original_md.exists():
