@@ -32,7 +32,7 @@ The build system consists of:
 
 ## Directory Structure
 
-```
+```text
 books/
 ├── base_builder.py              # Shared base class
 ├── build_template.py            # Template for new books

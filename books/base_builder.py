@@ -412,7 +412,7 @@ class BaseBookBuilder(ABC):
             # Copy updated metadata to base directory
             shutil.copy(self.config.staged_metadata_json, self.config.base_metadata_json)
             logger.info(
-                f"Copied updated metadata to base directory: '{self.safe_relative_path(self.config.base_metadata_json)}'"
+                f"Copied updated metadata to base directory: {self.safe_relative_path(self.config.base_metadata_json)}'"
             )
 
         pandoc_args = [
@@ -599,6 +599,11 @@ def create_build_parser() -> argparse.ArgumentParser:
 def auto_detect_book_name() -> str:
     """
     Auto-detect the book name from the calling module path.
+
+    Detection strategy (in order):
+    1. Direct script execution: Extract from path like books/{book_name}/build.py
+    2. Module execution: Extract from module path like books.{book_name}.build
+    3. Current working directory: Extract from CWD if it contains books/{book_name}
 
     Returns:
         The book name extracted from the module path
