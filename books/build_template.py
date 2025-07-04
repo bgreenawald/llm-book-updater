@@ -1,8 +1,8 @@
 """
-Build script for The Federalist Papers (Modern AI Edition).
+Template for creating book-specific build scripts.
 
-This script uses the shared BaseBookBuilder to create consistent builds
-while allowing for book-specific customization.
+This template shows how to create a build script for a specific book
+by extending the BaseBookBuilder class and implementing the required methods.
 """
 
 from pathlib import Path
@@ -11,9 +11,9 @@ from typing import Dict, Optional
 from books.base_builder import BaseBookBuilder, BookConfig, auto_detect_book_name, create_build_parser
 
 
-class FederalistPapersBuilder(BaseBookBuilder):
+class YourBookBuilder(BaseBookBuilder):
     """
-    Book-specific builder for The Federalist Papers.
+    Book-specific builder for [Your Book Name].
 
     This class implements the abstract methods required by BaseBookBuilder
     to specify where the source files are located for this particular book.
@@ -21,7 +21,10 @@ class FederalistPapersBuilder(BaseBookBuilder):
 
     def get_source_files(self) -> Dict[str, Path]:
         """
-        Get the source file paths for The Federalist Papers.
+        Get the source file paths for this specific book.
+
+        Override this method to specify where your book's source files are located.
+        The file naming may vary between different books.
 
         Returns:
             Dictionary mapping file types to their source paths
@@ -33,7 +36,10 @@ class FederalistPapersBuilder(BaseBookBuilder):
 
     def get_original_file(self) -> Optional[Path]:
         """
-        Get the original source file for The Federalist Papers.
+        Get the original source file if it exists.
+
+        Override this method to specify where the original file is located.
+        Different books may have different naming conventions for the original file.
 
         Returns:
             Path to the original file, or None if not available
@@ -51,7 +57,7 @@ class FederalistPapersBuilder(BaseBookBuilder):
 
 def build(version: str, name: str):
     """
-    Build function for The Federalist Papers.
+    Build function for this specific book.
 
     Args:
         version: Version string for the build
@@ -61,12 +67,14 @@ def build(version: str, name: str):
     config = BookConfig(
         name=name,
         version=version,
-        title="The Federalist Papers (Modern AI Edition)",
-        author="Alexander Hamilton, James Madison, and John Jay",
+        title="[Your Book Title Here]",
+        author="[Your Book Author Here]",
+        # Optional: specify a custom clean title for filenames
+        # clean_title="Your-Custom-Clean-Title"
     )
 
     # Create and run the builder
-    builder = FederalistPapersBuilder(config=config)
+    builder = YourBookBuilder(config=config)
     builder.build()
 
 
