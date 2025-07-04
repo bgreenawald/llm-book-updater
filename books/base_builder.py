@@ -607,39 +607,97 @@ def auto_detect_book_name() -> str:
 
     Returns:
         The book name extracted from the module path
+
+    Raises:
+        ValueError: If book name cannot be detected from any strategy
     """
-    import os
     import sys
 
-    # Get the calling module's path
-    if len(sys.argv) > 0:
-        script_path = sys.argv[0]
-        # Extract the book name from paths like:
-        # - books/the_federalist_papers/build.py
-        # - /path/to/books/the_federalist_papers/build.py
-        # - -m books.the_federalist_papers.build
-        if script_path.endswith(".py"):
-            # Handle direct script execution
-            path_parts = script_path.replace("\\", "/").split("/")
-            if "books" in path_parts:
-                books_index = path_parts.index("books")
-                if books_index + 1 < len(path_parts):
-                    return path_parts[books_index + 1]
-        elif script_path == "-m":
-            # Handle module execution like "python -m books.the_federalist_papers.build"
-            if len(sys.argv) > 1:
-                module_path = sys.argv[1]
-                if module_path.startswith("books."):
-                    parts = module_path.split(".")
-                    if len(parts) >= 2:
-                        return parts[1]  # books.the_federalist_papers.build -> the_federalist_papers
+    # Strategy 1: Direct script execution
+    if len(sys.argv) > 0 and sys.argv[0].endswith(".py"):
+        name = _extract_from_script_path(sys.argv[0])
+        if name:
+            return name
 
-    # Fallback: try to detect from current working directory
+    # Strategy 2: Module execution
+    if len(sys.argv) > 1 and sys.argv[0] == "-m":
+        name = _extract_from_module_path(sys.argv[1])
+        if name:
+            return name
+
+    # Strategy 3: Current working directory
+    name = _extract_from_cwd()
+    if name:
+        return name
+
+    raise ValueError("Could not auto-detect book name. Please provide --name argument.")
+
+
+def _extract_from_script_path(script_path: str) -> Optional[str]:
+    """
+    Extract book name from script path.
+
+    Args:
+        script_path: Path to the script file
+
+    Returns:
+        Book name if found, None otherwise
+
+    Examples:
+        >>> _extract_from_script_path("books/the_federalist_papers/build.py")
+        "the_federalist_papers"
+        >>> _extract_from_script_path("/path/to/books/example_book/build.py")
+        "example_book"
+    """
+    path_parts = script_path.replace("\\", "/").split("/")
+    if "books" in path_parts:
+        books_index = path_parts.index("books")
+        if books_index + 1 < len(path_parts):
+            return path_parts[books_index + 1]
+    return None
+
+
+def _extract_from_module_path(module_path: str) -> Optional[str]:
+    """
+    Extract book name from module path.
+
+    Args:
+        module_path: Module path string
+
+    Returns:
+        Book name if found, None otherwise
+
+    Examples:
+        >>> _extract_from_module_path("books.the_federalist_papers.build")
+        "the_federalist_papers"
+        >>> _extract_from_module_path("books.example_book.build")
+        "example_book"
+    """
+    if module_path.startswith("books."):
+        parts = module_path.split(".")
+        if len(parts) >= 2:
+            return parts[1]  # books.the_federalist_papers.build -> the_federalist_papers
+    return None
+
+
+def _extract_from_cwd() -> Optional[str]:
+    """
+    Extract book name from current working directory.
+
+    Returns:
+        Book name if found, None otherwise
+
+    Examples:
+        >>> # When CWD is /path/to/books/the_federalist_papers
+        >>> _extract_from_cwd()
+        "the_federalist_papers"
+    """
+    import os
+
     cwd = os.getcwd()
     cwd_parts = cwd.replace("\\", "/").split("/")
     if "books" in cwd_parts:
         books_index = cwd_parts.index("books")
         if books_index + 1 < len(cwd_parts):
             return cwd_parts[books_index + 1]
-
-    raise ValueError("Could not auto-detect book name. Please provide --name argument.")
+    return None
