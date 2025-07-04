@@ -204,16 +204,23 @@ def clean_annotation_patterns(input_path: Path) -> None:
     logger.info(f"Cleaned annotation patterns from '{safe_relative_path(input_path)}'")
 
 
-def format_markdown_file(input_path: Path, preface_content: str, license_content: str):
+def format_markdown_file(input_path: Path, preface_content: str, license_content: str, version: str):
     """
     Reads a Markdown file, replaces placeholders, and writes it back.
+
+    Args:
+        input_path: Path to the markdown file to format
+        preface_content: Content to replace {preface} placeholder
+        license_content: Content to replace {license} placeholder
+        version: Version string to replace {version} placeholder
     """
     content = input_path.read_text(encoding="utf-8")
     # Use specific placeholder replacement to avoid issues with braces in content
     content = content.replace("{preface}", preface_content)
     content = content.replace("{license}", license_content)
+    content = content.replace("{version}", version)
     input_path.write_text(content, encoding="utf-8")
-    logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface and license.")
+    logger.info(f"Formatted '{safe_relative_path(input_path)}' with preface, license, and version.")
 
 
 def build(version: str, name: str):
@@ -259,12 +266,12 @@ def build(version: str, name: str):
     preface_content = config.preface_md.read_text(encoding="utf-8")
     license_content = config.license_md.read_text(encoding="utf-8")
 
-    format_markdown_file(config.staged_modernized_md, preface_content, license_content)
-    format_markdown_file(config.staged_annotated_md, preface_content, license_content)
+    format_markdown_file(config.staged_modernized_md, preface_content, license_content, config.version)
+    format_markdown_file(config.staged_annotated_md, preface_content, license_content, config.version)
 
     # Format original file if it exists
     if config.staged_original_md.exists():
-        format_markdown_file(config.staged_original_md, preface_content, license_content)
+        format_markdown_file(config.staged_original_md, preface_content, license_content, config.version)
 
     # --- 3.5. Replace <br> tags with spaces ---
     logger.info("--- Replacing <br> tags with spaces ---")
