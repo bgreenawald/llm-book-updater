@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import requests
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
@@ -39,6 +40,7 @@ class Pipeline:
         self.config = config
         self._phase_instances: List[LlmPhase] = []
         self._phase_metadata: List[Dict[str, Any]] = []  # Collect comprehensive metadata for all phases
+        self._model_cache: Dict[str, Dict[str, str]] = {}  # Cache for model information
 
     def __str__(self) -> str:
         """
@@ -107,13 +109,15 @@ class Pipeline:
                 else:
                     post_processors_info.append(str(processor))
 
+        # Get model metadata
+        model_metadata = self._get_model_metadata(model_type=phase_config.model_type)
+
         # Base metadata that's always available
         metadata = {
             "phase_name": phase.name if phase else phase_config.phase_type.name.lower(),
             "phase_index": phase_index,
             "phase_type": phase_config.phase_type.name,
             "enabled": phase_config.enabled,
-            "model_type": phase_config.model_type,
             "temperature": phase_config.temperature,
             "post_processors": post_processors_info,
             "post_processor_count": len(post_processors_info),
@@ -121,6 +125,12 @@ class Pipeline:
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
         }
+
+        # Add model metadata
+        metadata.update(model_metadata)
+
+        # Add max_workers to metadata
+        metadata["max_workers"] = getattr(self.config, "max_workers", None)
 
         # Add phase-specific information if phase exists
         if phase:
@@ -351,6 +361,69 @@ class Pipeline:
             logger.info(f"No post-processors configured for {phase.name}")
 
         return phase
+
+    def _fetch_model_info(self, model_id: str) -> Optional[Dict[str, str]]:
+        """
+        Fetch model information from OpenRouter API.
+
+        This method retrieves model information from the OpenRouter API
+        to get the clean name and other details for a given model ID.
+
+        Args:
+            model_id (str): The model ID to look up
+
+        Returns:
+            Optional[Dict[str, str]]: Model information with 'id' and 'name' keys,
+                or None if the model is not found or API call fails
+        """
+        # Check cache first
+        if model_id in self._model_cache:
+            return self._model_cache[model_id]
+
+        try:
+            url = "https://openrouter.ai/api/v1/models"
+            response = requests.get(url=url, timeout=10)
+            response.raise_for_status()
+
+            data = response.json()
+            models = data.get("data", [])
+
+            # Find the model by ID
+            for model in models:
+                if model.get("id") == model_id:
+                    model_info = {"id": model["id"], "name": model["name"]}
+                    # Cache the result
+                    self._model_cache[model_id] = model_info
+                    return model_info
+
+            # Model not found
+            logger.warning(f"Model not found in OpenRouter API: {model_id}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch model info for {model_id}: {str(e)}")
+            return None
+
+    def _get_model_metadata(self, model_type: str) -> Dict[str, Any]:
+        """
+        Get model metadata including both the original model_type and clean model info.
+
+        Args:
+            model_type (str): The original model type string
+
+        Returns:
+            Dict[str, Any]: Model metadata with both original and clean information
+        """
+        model_info = self._fetch_model_info(model_id=model_type)
+
+        if model_info:
+            return {
+                "model_type": model_type,  # Keep original for backward compatibility
+                "model": model_info,
+            }
+        else:
+            # Fallback to just the model_type if we can't fetch clean info
+            return {"model_type": model_type, "model": {"id": model_type, "name": model_type}}
 
     def run(self, **kwargs) -> None:
         """
