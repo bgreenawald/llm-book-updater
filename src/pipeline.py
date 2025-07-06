@@ -102,10 +102,10 @@ class Pipeline:
         elif phase_config.post_processors:
             # Convert post-processors to readable names
             for processor in phase_config.post_processors:
-                if hasattr(processor, "name"):
-                    post_processors_info.append(processor.name)
-                elif isinstance(processor, str):
+                if isinstance(processor, str):
                     post_processors_info.append(processor)
+                elif hasattr(processor, "name"):
+                    post_processors_info.append(processor.name)
                 else:
                     post_processors_info.append(str(processor))
 
@@ -122,6 +122,7 @@ class Pipeline:
             "post_processors": post_processors_info,
             "post_processor_count": len(post_processors_info),
             "completed": completed,
+            "book_id": self.config.book_id,
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
         }
@@ -187,6 +188,7 @@ class Pipeline:
         metadata = {
             "metadata_version": METADATA_VERSION,
             "run_timestamp": datetime.now().isoformat(),
+            "book_id": self.config.book_id,
             "book_name": self.config.book_name,
             "author_name": self.config.author_name,
             "input_file": self.config.input_file.as_posix(),
