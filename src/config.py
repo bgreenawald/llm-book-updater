@@ -46,9 +46,9 @@ class PhaseConfig:
     enabled: bool = True
     model_type: str = GEMINI_FLASH
     temperature: float = 0.2
-    reasoning: Optional[Dict[str, Dict[str, str]]] = None
+    reasoning: Optional[Dict[str, str]] = None
     system_prompt_path: Optional[Path] = None
-    user_prompt_path: Path = None
+    user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None
     # Additional parameters for PhaseFactory integration
     name: Optional[str] = None
@@ -78,6 +78,7 @@ class PhaseConfig:
 class RunConfig:
     """Configuration for a complete run of the pipeline."""
 
+    book_id: str
     book_name: str
     author_name: str
     input_file: Path
@@ -94,7 +95,8 @@ class RunConfig:
 
     def __str__(self) -> str:
         return (
-            f"RunConfig(book_name={self.book_name}, "
+            f"RunConfig(book_id={self.book_id}, "
+            f"book_name={self.book_name}, "
             f"author_name={self.author_name}, "
             f"input_file={self.input_file}, "
             f"output_dir={self.output_dir}, "
@@ -106,7 +108,8 @@ class RunConfig:
 
     def __repr__(self) -> str:
         return (
-            f"RunConfig(book_name={self.book_name}, "
+            f"RunConfig(book_id={self.book_id}, "
+            f"book_name={self.book_name}, "
             f"author_name={self.author_name}, "
             f"input_file={self.input_file}, "
             f"output_dir={self.output_dir}, "

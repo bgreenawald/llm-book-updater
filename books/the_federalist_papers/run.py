@@ -42,7 +42,8 @@ run_phases: List[PhaseConfig] = [
 
 # Main configuration object for the pipeline run.
 config = RunConfig(
-    book_name="the_federalist_papers",
+    book_id="the_federalist_papers",
+    book_name="The Federalist Papers",
     author_name="Alexander Hamilton, James Madison, John Jay",
     input_file=Path(r"books/the_federalist_papers/input_small.md"),
     output_dir=Path(r"books/the_federalist_papers/output"),
