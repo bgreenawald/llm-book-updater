@@ -18,6 +18,7 @@ DEEPSEEK = "deepseek/deepseek-r1-0528"
 OPENAI_04_MINI = "openai/o4-mini-high"
 CLAUDE_4_SONNET = "anthropic/claude-sonnet-4"
 GEMINI_FLASH_LITE = "google/gemini-2.5-flash-lite-preview-06-17"
+KIMI_K2 = "moonshotai/kimi-k2:free"
 
 
 class LlmModelError(Exception):

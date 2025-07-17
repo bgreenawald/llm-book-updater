@@ -2,6 +2,10 @@
 
 {preface}
 
+# License
+
+{license}
+
 # No. I. - General Introduction
 
 For the Independent Journal.
@@ -79,6 +83,3 @@ It is worthy of remark that not only the first, but every succeeding Congress, a
 
 PUBLIUS.
 
-# License
-
-{license}
