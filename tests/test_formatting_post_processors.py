@@ -239,6 +239,25 @@ class TestEnsureBlankLineProcessor:
         result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
+    def test_unicode_and_emoji_handling(self, ensure_blank_line_processor):
+        """Test handling of Unicode characters, emojis, and non-Latin scripts."""
+        llm_block = (
+            "Introduction with café ☕\n"
+            '> **Quote:** 中文引用："你好世界" **End quote.**\n'
+            "Arabic text: مرحبا بالعالم\n"
+            "> **Annotation:** Русский: Привет мир! 🌍 **End annotation.**\n"
+            "Japanese: こんにちは 📚"
+        )
+        expected_output = (
+            "Introduction with café ☕\n\n"
+            '> **Quote:** 中文引用："你好世界" **End quote.**\n\n'
+            "Arabic text: مرحبا بالعالم\n\n"
+            "> **Annotation:** Русский: Привет мир! 🌍 **End annotation.**\n\n"
+            "Japanese: こんにちは 📚"
+        )
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
 
 # ============================================================================
 # RemoveBlankLinesInListProcessor Tests
@@ -313,6 +332,27 @@ class TestRemoveBlankLinesInListProcessor:
         """Test input with no list."""
         llm_block = "Some text.\n\nMore text."
         expected_output = "Some text.\n\nMore text."
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_unicode_list_items(self, remove_blank_lines_in_list_processor):
+        """Test list processing with Unicode characters and emojis."""
+        llm_block = (
+            "* 咖啡 ☕ - Chinese coffee\n\n"
+            "* العربية - Arabic text\n\n"
+            "* Русский язык 🇷🇺\n\n"
+            "* 日本語 📖 with nested\n\n"
+            "  Indented content こんにちは\n\n"
+            "* Émojis and accénts"
+        )
+        expected_output = (
+            "* 咖啡 ☕ - Chinese coffee\n"
+            "* العربية - Arabic text\n"
+            "* Русский язык 🇷🇺\n"
+            "* 日本語 📖 with nested\n"
+            "  Indented content こんにちは\n"
+            "* Émojis and accénts"
+        )
         result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
@@ -397,6 +437,19 @@ class TestRemoveXmlTagsProcessor:
         """Test handling of malformed XML tags."""
         llm_block = "<p>Text</p>\n<unclosed>\n<br>\n<malformed"
         expected_output = "Text\n\n<br>\n<malformed"
+        result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_unicode_content_in_xml_tags(self, remove_xml_tags_processor):
+        """Test XML tag removal with Unicode content inside tags."""
+        llm_block = (
+            '<p class="chinese">中文内容</p>\n'
+            '<div lang="ar">النص العربي</div>\n'
+            "<span>Русский текст с émojis 🌟</span>\n"
+            "<br>\n"
+            "<strong>日本語: こんにちは</strong>"
+        )
+        expected_output = "中文内容\nالنص العربي\nРусский текст с émojis 🌟\n<br>\n日本語: こんにちは"
         result = remove_xml_tags_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
@@ -953,6 +1006,28 @@ class TestOrderQuoteAnnotationProcessor:
             "> **Annotation:** An annotation. **End annotation.**\n"
             "> **Annotation:** Another annotation. **End annotation.**\n"
             "  "
+        )
+        result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_unicode_content_handling(self, order_quote_annotation_processor):
+        """Test handling of Unicode characters in various languages."""
+        llm_block = (
+            "Introduction with café and münü.\n"
+            "> **Annotation:** 中文注释。 **End annotation.**\n"
+            '> **Quote:** "العربية quote" **End quote.**\n'
+            "Conclusion with émojis: 🎉📚\n"
+            "> **Quote:** Russian: Привет мир **End quote.**\n"
+            "> **Annotation:** Japanese: こんにちは世界 **End annotation.**"
+        )
+        # The processor treats each group separately (separated by non-quote content)
+        expected_output = (
+            "Introduction with café and münü.\n"
+            '> **Quote:** "العربية quote" **End quote.**\n'
+            "> **Annotation:** 中文注释。 **End annotation.**\n"
+            "Conclusion with émojis: 🎉📚\n"
+            "> **Quote:** Russian: Привет мир **End quote.**\n"
+            "> **Annotation:** Japanese: こんにちは世界 **End annotation.**"
         )
         result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output

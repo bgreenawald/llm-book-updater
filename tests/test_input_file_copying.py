@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from src.config import RunConfig
 from src.pipeline import Pipeline
 
@@ -398,3 +400,216 @@ class TestBuildScriptOriginalFileDetection:
             assert "This is the license content." in content
             assert "{preface}" not in content
             assert "{license}" not in content
+
+
+class TestFileSystemPermissions:
+    """Test cases for file system permission edge cases."""
+
+    def test_readonly_output_directory(self):
+        """Test behavior when output directory is read-only."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create input file
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Content")
+
+            # Create output directory and make it read-only
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+            output_dir.chmod(0o444)  # Read-only
+
+            try:
+                # Create mock config
+                mock_config = Mock(spec=RunConfig)
+                mock_config.input_file = input_file
+                mock_config.output_dir = output_dir
+                mock_config.book_name = "test_book"
+                mock_config.author_name = "test_author"
+                mock_config.original_file = input_file
+                mock_config.length_reduction = [50]
+                mock_config.phases = []
+                mock_config.get_phase_order.return_value = []
+
+                pipeline = Pipeline(config=mock_config)
+
+                # Should raise an exception when trying to copy to read-only directory
+                with pytest.raises(Exception) as exc_info:
+                    pipeline._copy_input_file_to_output()
+
+                # Should be a permission-related error
+                assert "Permission denied" in str(exc_info.value) or "Read-only" in str(exc_info.value)
+
+            finally:
+                # Restore permissions for cleanup
+                output_dir.chmod(0o755)
+
+    def test_nonexistent_parent_directory(self):
+        """Test behavior when parent directory doesn't exist."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create input file
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Content")
+
+            # Use non-existent output directory
+            output_dir = temp_path / "nonexistent" / "deeply" / "nested" / "output"
+
+            # Create mock config
+            mock_config = Mock(spec=RunConfig)
+            mock_config.input_file = input_file
+            mock_config.output_dir = output_dir
+            mock_config.book_name = "test_book"
+            mock_config.author_name = "test_author"
+            mock_config.original_file = input_file
+            mock_config.length_reduction = [50]
+            mock_config.phases = []
+            mock_config.get_phase_order.return_value = []
+
+            pipeline = Pipeline(config=mock_config)
+
+            # Should handle missing parent directories gracefully
+            with pytest.raises(Exception) as exc_info:
+                pipeline._copy_input_file_to_output()
+
+            # Should be a file not found or directory-related error
+            assert "No such file or directory" in str(exc_info.value) or "FileNotFoundError" in str(
+                type(exc_info.value)
+            )
+
+    def test_input_file_permissions_readonly(self):
+        """Test behavior when input file is read-only."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create input file and make it read-only
+            input_file = temp_path / "readonly_input.md"
+            input_file.write_text("# Read-only Content")
+            input_file.chmod(0o444)  # Read-only
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            try:
+                # Create mock config
+                mock_config = Mock(spec=RunConfig)
+                mock_config.input_file = input_file
+                mock_config.output_dir = output_dir
+                mock_config.book_name = "test_book"
+                mock_config.author_name = "test_author"
+                mock_config.original_file = input_file
+                mock_config.length_reduction = [50]
+                mock_config.phases = []
+                mock_config.get_phase_order.return_value = []
+
+                pipeline = Pipeline(config=mock_config)
+
+                # Should still be able to copy read-only files
+                pipeline._copy_input_file_to_output()
+
+                # Verify the file was copied
+                expected_output_file = output_dir / "00-readonly_input.md"
+                assert expected_output_file.exists()
+                assert expected_output_file.read_text() == "# Read-only Content"
+
+            finally:
+                # Restore permissions for cleanup
+                input_file.chmod(0o644)
+
+    def test_output_directory_space_constraints(self):
+        """Test behavior when output directory has limited space (simulated)."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create a large input file that might cause space issues
+            large_content = "Large content line.\n" * 100000  # ~2MB
+            input_file = temp_path / "large_input.md"
+            input_file.write_text(large_content)
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            # Create mock config
+            mock_config = Mock(spec=RunConfig)
+            mock_config.input_file = input_file
+            mock_config.output_dir = output_dir
+            mock_config.book_name = "test_book"
+            mock_config.author_name = "test_author"
+            mock_config.original_file = input_file
+            mock_config.length_reduction = [50]
+            mock_config.phases = []
+            mock_config.get_phase_order.return_value = []
+
+            pipeline = Pipeline(config=mock_config)
+
+            # Should successfully copy large files
+            pipeline._copy_input_file_to_output()
+
+            # Verify the large file was copied correctly
+            expected_output_file = output_dir / "00-large_input.md"
+            assert expected_output_file.exists()
+            assert expected_output_file.stat().st_size == input_file.stat().st_size
+
+    def test_concurrent_file_access(self):
+        """Test behavior when multiple processes try to access the same files."""
+        import threading
+        import time
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create input file
+            input_file = temp_path / "concurrent_input.md"
+            input_file.write_text("# Concurrent Access Test")
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            results = []
+            exceptions = []
+
+            def copy_file_worker(worker_id):
+                try:
+                    # Create mock config for this worker
+                    mock_config = Mock(spec=RunConfig)
+                    mock_config.input_file = input_file
+                    mock_config.output_dir = output_dir
+                    mock_config.book_name = f"test_book_{worker_id}"
+                    mock_config.author_name = "test_author"
+                    mock_config.original_file = input_file
+                    mock_config.length_reduction = [50]
+                    mock_config.phases = []
+                    mock_config.get_phase_order.return_value = []
+
+                    pipeline = Pipeline(config=mock_config)
+
+                    # Add small delay to increase chance of concurrent access
+                    time.sleep(0.1)
+
+                    pipeline._copy_input_file_to_output()
+                    results.append(f"Worker {worker_id} succeeded")
+
+                except Exception as e:
+                    exceptions.append(f"Worker {worker_id} failed: {str(e)}")
+
+            # Start multiple worker threads
+            threads = []
+            for i in range(3):
+                thread = threading.Thread(target=copy_file_worker, args=(i,))
+                threads.append(thread)
+                thread.start()
+
+            # Wait for all threads to complete
+            for thread in threads:
+                thread.join(timeout=10)
+
+            # At least one worker should succeed
+            assert len(results) >= 1, f"No workers succeeded. Exceptions: {exceptions}"
+
+            # At least one output file should exist
+            output_files = list(output_dir.glob("00-concurrent_input.md"))
+            assert len(output_files) >= 1, "No output files were created"
