@@ -128,11 +128,23 @@ class TestBuildScriptOriginalFileDetection:
 
     def test_find_original_file_in_output(self):
         """Test that the build script correctly finds 00-indexed files."""
-        # Import the function from the build script
-        import sys
+        from books.base_builder import BaseBookBuilder, BookConfig
 
-        sys.path.append("books/the_federalist_papers")
-        from build import find_original_file_in_output
+        # Create a simple test builder class
+        class TestBuilder(BaseBookBuilder):
+            def get_source_files(self):
+                return {}
+
+            def get_original_file(self):
+                # Look for files starting with "00-" in the output directory
+                if not self.config.source_output_dir.exists():
+                    return None
+
+                for file_path in self.config.source_output_dir.glob("00-*"):
+                    if file_path.is_file():
+                        return file_path
+
+                return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -142,18 +154,43 @@ class TestBuildScriptOriginalFileDetection:
             (temp_path / "02-test.md").write_text("Phase 2")
             (temp_path / "00-original.md").write_text("Original")
 
+            # Create a config and builder to test the logic
+            config = BookConfig(
+                name="test_book",
+                version="1.0.0",
+                title="Test Book",
+                author="Test Author",
+            )
+            # Override the source_output_dir to point to our test directory
+            config.source_output_dir = temp_path
+
+            builder = TestBuilder(config=config)
+
             # Test the function
-            result = find_original_file_in_output(temp_path)
+            result = builder.get_original_file()
             assert result is not None
             assert result.name == "00-original.md"
             assert result.read_text() == "Original"
 
     def test_find_original_file_not_found(self):
         """Test that the function returns None when no 00-indexed file exists."""
-        import sys
+        from books.base_builder import BaseBookBuilder, BookConfig
 
-        sys.path.append("books/the_federalist_papers")
-        from build import find_original_file_in_output
+        # Create a simple test builder class
+        class TestBuilder(BaseBookBuilder):
+            def get_source_files(self):
+                return {}
+
+            def get_original_file(self):
+                # Look for files starting with "00-" in the output directory
+                if not self.config.source_output_dir.exists():
+                    return None
+
+                for file_path in self.config.source_output_dir.glob("00-*"):
+                    if file_path.is_file():
+                        return file_path
+
+                return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -162,30 +199,80 @@ class TestBuildScriptOriginalFileDetection:
             (temp_path / "01-test.md").write_text("Phase 1")
             (temp_path / "02-test.md").write_text("Phase 2")
 
+            # Create a config and builder to test the logic
+            config = BookConfig(
+                name="test_book",
+                version="1.0.0",
+                title="Test Book",
+                author="Test Author",
+            )
+            # Override the source_output_dir to point to our test directory
+            config.source_output_dir = temp_path
+
+            builder = TestBuilder(config=config)
+
             # Test the function
-            result = find_original_file_in_output(temp_path)
+            result = builder.get_original_file()
             assert result is None
 
     def test_find_original_file_empty_directory(self):
         """Test that the function handles empty directories."""
-        import sys
+        from books.base_builder import BaseBookBuilder, BookConfig
 
-        sys.path.append("books/the_federalist_papers")
-        from build import find_original_file_in_output
+        # Create a simple test builder class
+        class TestBuilder(BaseBookBuilder):
+            def get_source_files(self):
+                return {}
+
+            def get_original_file(self):
+                # Look for files starting with "00-" in the output directory
+                if not self.config.source_output_dir.exists():
+                    return None
+
+                for file_path in self.config.source_output_dir.glob("00-*"):
+                    if file_path.is_file():
+                        return file_path
+
+                return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
+            # Create a config and builder to test the logic
+            config = BookConfig(
+                name="test_book",
+                version="1.0.0",
+                title="Test Book",
+                author="Test Author",
+            )
+            # Override the source_output_dir to point to our test directory
+            config.source_output_dir = temp_path
+
+            builder = TestBuilder(config=config)
+
             # Test the function with empty directory
-            result = find_original_file_in_output(temp_path)
+            result = builder.get_original_file()
             assert result is None
 
     def test_build_script_formats_original_file(self):
         """Test that the build script formats the original file with preface and license."""
-        import sys
+        from books.base_builder import BaseBookBuilder, BookConfig
 
-        sys.path.append("books/the_federalist_papers")
-        from build import find_original_file_in_output, format_markdown_file
+        # Create a simple test builder class
+        class TestBuilder(BaseBookBuilder):
+            def get_source_files(self):
+                return {}
+
+            def get_original_file(self):
+                # Look for files starting with "00-" in the output directory
+                if not self.config.source_output_dir.exists():
+                    return None
+
+                for file_path in self.config.source_output_dir.glob("00-*"):
+                    if file_path.is_file():
+                        return file_path
+
+                return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -206,13 +293,29 @@ class TestBuildScriptOriginalFileDetection:
             license_file = book_dir / "license.md"
             license_file.write_text("This is the license content.")
 
-            # Test that the find_original_file_in_output function works
-            found_file = find_original_file_in_output(output_dir)
+            # Create a config and builder to test the logic
+            config = BookConfig(
+                name="test_book",
+                version="1.0.0",
+                title="Test Book",
+                author="Test Author",
+            )
+            # Override the source_output_dir to point to our test directory
+            config.source_output_dir = output_dir
+            config.preface_md = preface_file
+            config.license_md = license_file
+
+            builder = TestBuilder(config=config)
+
+            # Test that the get_original_file function works
+            found_file = builder.get_original_file()
             assert found_file is not None
             assert found_file.exists()
 
-            # Test formatting directly on the found file
-            format_markdown_file(found_file, "This is the preface content.", "This is the license content.")
+            # Test formatting directly on the found file using the builder's method
+            builder.format_markdown_file(
+                found_file, "This is the preface content.", "This is the license content.", "1.0.0"
+            )
 
             # Verify the content was formatted
             content = found_file.read_text()

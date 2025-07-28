@@ -66,6 +66,7 @@ class EnsureBlankLineProcessor(PostProcessor):
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(name="ensure_blank_line", config=config)
+        self.list_pattern = re.compile(r"^\s*([*\-+]|\d+\.)\s+")
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         """
@@ -90,7 +91,7 @@ class EnsureBlankLineProcessor(PostProcessor):
 
                 if line.strip() and next_line.strip():
                     # Check for exceptions
-                    is_list = line.strip().startswith(("* ", "- ")) and next_line.strip().startswith(("* ", "- "))
+                    is_list = self.list_pattern.match(line) and self.list_pattern.match(next_line)
 
                     # Check if we're in a multiline quote block (not Quote/Annotation blocks)
                     in_multiline_quote = self._is_in_multiline_quote(
@@ -136,6 +137,44 @@ class EnsureBlankLineProcessor(PostProcessor):
             break
 
         return False
+
+
+class RemoveBlankLinesInListProcessor(PostProcessor):
+    """
+    Removes blank lines between elements in a Markdown list (either ordered or unordered).
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        super().__init__(name="remove_blank_lines_in_list", config=config)
+        self.list_pattern = re.compile(r"^\s*([*\-+]|\d+\.)\s+")
+
+    def _is_list_related(self, line: str) -> bool:
+        return bool(self.list_pattern.match(line)) or (line.strip() and line.startswith("  "))
+
+    def process(self, original_block: str, llm_block: str, **kwargs) -> str:
+        lines = llm_block.split("\n")
+        processed_lines = []
+        for i, line in enumerate(lines):
+            if not line.strip():  # if blank line
+                # find previous non-blank line
+                prev_line = None
+                for j in range(i - 1, -1, -1):
+                    if lines[j].strip():
+                        prev_line = lines[j]
+                        break
+
+                # find next non-blank line
+                next_line = None
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip():
+                        next_line = lines[j]
+                        break
+
+                if prev_line and next_line and self._is_list_related(prev_line) and self._is_list_related(next_line):
+                    continue  # skip blank line
+
+            processed_lines.append(line)
+        return "\n".join(processed_lines)
 
 
 class RemoveXmlTagsProcessor(PostProcessor):

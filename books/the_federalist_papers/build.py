@@ -8,7 +8,12 @@ while allowing for book-specific customization.
 from pathlib import Path
 from typing import Dict, Optional
 
-from books.base_builder import BaseBookBuilder, BookConfig, auto_detect_book_name, create_build_parser
+from books.base_builder import (
+    BaseBookBuilder,
+    BookConfig,
+    auto_detect_book_name,
+    create_build_parser,
+)
 
 
 class FederalistPapersBuilder(BaseBookBuilder):

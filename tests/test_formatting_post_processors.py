@@ -3,6 +3,7 @@ import pytest
 from src.post_processors import (
     EnsureBlankLineProcessor,
     OrderQuoteAnnotationProcessor,
+    RemoveBlankLinesInListProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
 )
@@ -181,15 +182,7 @@ class TestEnsureBlankLineProcessor:
         assert result == expected_output
 
     def test_list_with_nested_content(self, ensure_blank_line_processor):
-        """Test lists with nested content.
-
-        Note: Nested content (indented text that's not a list item) requires
-        blank line separation because it's not part of the list item exception.
-        The processor only avoids blank lines between consecutive list items
-        (lines starting with '* ' or '- '), not between list items and their
-        nested content. This improves readability by clearly separating the
-        list structure from its nested content.
-        """
+        """Test lists with nested content.\n\n        Note: Nested content (indented text that's not a list item) requires\n        blank line separation because it's not part of the list item exception.\n        The processor only avoids blank lines between consecutive list items\n        (lines starting with '* ' or '- '), not between list items and their\n        nested content. This improves readability by clearly separating the\n        list structure from its nested content.\n"""
         llm_block = "* Item 1\n  Nested content\n* Item 2"
         expected_output = "* Item 1\n\n  Nested content\n\n* Item 2"
         result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
@@ -221,6 +214,83 @@ class TestEnsureBlankLineProcessor:
         llm_block = "Line 1.\n\n\nLine 2."
         expected_output = "Line 1.\n\n\nLine 2."
         result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+
+# ============================================================================
+# RemoveBlankLinesInListProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def remove_blank_lines_in_list_processor():
+    return RemoveBlankLinesInListProcessor()
+
+
+class TestRemoveBlankLinesInListProcessor:
+    """Test suite for RemoveBlankLinesInListProcessor."""
+
+    def test_remove_blank_line_between_list_items(self, remove_blank_lines_in_list_processor):
+        """Test basic blank line removal between list items."""
+        llm_block = "* Item 1\n\n* Item 2"
+        expected_output = "* Item 1\n* Item 2"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_remove_multiple_blank_lines_between_list_items(self, remove_blank_lines_in_list_processor):
+        """Test removal of multiple blank lines between list items."""
+        llm_block = "* Item 1\n\n\n* Item 2"
+        expected_output = "* Item 1\n* Item 2"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_no_blank_lines_to_remove(self, remove_blank_lines_in_list_processor):
+        """Test list with no blank lines."""
+        llm_block = "* Item 1\n* Item 2\n* Item 3"
+        expected_output = "* Item 1\n* Item 2\n* Item 3"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_blank_lines_outside_list_preserved(self, remove_blank_lines_in_list_processor):
+        """Test that blank lines outside the list are preserved."""
+        llm_block = "Some text.\n\n* Item 1\n\n* Item 2\n\nMore text."
+        expected_output = "Some text.\n\n* Item 1\n* Item 2\n\nMore text."
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_mixed_list_types_with_blank_lines(self, remove_blank_lines_in_list_processor):
+        """Test mixed list types with blank lines."""
+        llm_block = "* Item 1\n\n- Item 2\n\n+ Item 3"
+        expected_output = "* Item 1\n- Item 2\n+ Item 3"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_ordered_list_with_blank_lines(self, remove_blank_lines_in_list_processor):
+        """Test ordered list with blank lines."""
+        llm_block = "1. Item 1\n\n2. Item 2\n\n3. Item 3"
+        expected_output = "1. Item 1\n2. Item 2\n3. Item 3"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_list_with_nested_content_and_blank_lines(self, remove_blank_lines_in_list_processor):
+        """Test list with nested content and blank lines."""
+        llm_block = "* Item 1\n\n  Nested content\n\n* Item 2"
+        expected_output = "* Item 1\n  Nested content\n* Item 2"
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_empty_input(self, remove_blank_lines_in_list_processor):
+        """Test with empty input."""
+        llm_block = ""
+        expected_output = ""
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_no_list_input(self, remove_blank_lines_in_list_processor):
+        """Test input with no list."""
+        llm_block = "Some text.\n\nMore text."
+        expected_output = "Some text.\n\nMore text."
+        result = remove_blank_lines_in_list_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
 
@@ -863,3 +933,4 @@ class TestOrderQuoteAnnotationProcessor:
         )
         result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
+

@@ -36,6 +36,7 @@ def test_pipeline_metadata():
 
             # Create a test config with a simple phase
             test_config = RunConfig(
+                book_id="test_book",
                 book_name="Test Book",
                 author_name="Test Author",
                 input_file=input_file,
@@ -140,6 +141,7 @@ def test_cost_analysis_saving():
 
             # Create a test config
             test_config = RunConfig(
+                book_id="test_book",
                 book_name="Test Book",
                 author_name="Test Author",
                 input_file=temp_path / "test_input.md",
