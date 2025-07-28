@@ -9,6 +9,7 @@ from src.post_processors import (
     PostProcessor,
     PostProcessorChain,
     PreserveFStringTagsProcessor,
+    RemoveBlankLinesInListProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
@@ -31,6 +32,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.EDIT: [
             PostProcessorType.NO_NEW_HEADERS,
@@ -38,6 +40,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.FINAL: [
             PostProcessorType.NO_NEW_HEADERS,
@@ -45,6 +48,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.INTRODUCTION: [
             PostProcessorType.NO_NEW_HEADERS,
@@ -52,6 +56,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.SUMMARY: [
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
@@ -60,6 +65,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.ANNOTATE: [
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
@@ -69,6 +75,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_XML_TAGS,
             PostProcessorType.PRESERVE_F_STRING_TAGS,
             PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
     }
 
@@ -210,6 +217,7 @@ class PhaseFactory:
             "order_quote_annotation": OrderQuoteAnnotationProcessor,
             "no_new_headers": NoNewHeadersPostProcessor,
             "revert_removed_block_lines": RevertRemovedBlockLines,
+            "remove_blank_lines_in_list": RemoveBlankLinesInListProcessor,
         }
 
         processor_class = processors.get(processor_name.lower())
@@ -240,6 +248,7 @@ class PhaseFactory:
             PostProcessorType.NO_NEW_HEADERS: NoNewHeadersPostProcessor,
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES: RevertRemovedBlockLines,
             PostProcessorType.PRESERVE_F_STRING_TAGS: PreserveFStringTagsProcessor,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST: RemoveBlankLinesInListProcessor,
         }
 
         processor_class = processor_mapping.get(processor_type)
