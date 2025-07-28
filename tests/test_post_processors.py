@@ -132,17 +132,64 @@ class TestNoNewHeadersPostProcessor:
         assert "Content here." in result
 
     def test_preserve_existing_headers_in_order(self, no_new_headers_processor):
-        """Test that existing headers maintain their order."""
-        original_block = "# Header 1\n\n# Header 2\n\nContent here."
-        llm_block = "# Header 1\n\n# Header 2\n\n# New Header\n\nContent here."
+        """Test that existing headers are preserved in their original order."""
+        original_block = "# Header 1\n\n## Header 2\n\nContent here."
+        llm_block = "# Header 1\n\n## Header 2\n\n# New Header\n\nContent here."
 
         result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
 
         # Check that existing headers are preserved in order
-        header1_pos = result.find("# Header 1")
-        header2_pos = result.find("# Header 2")
-        assert header1_pos < header2_pos
+        lines = result.split("\n")
+        header_lines = [line for line in lines if line.strip().startswith("#")]
+        assert header_lines == ["# Header 1", "## Header 2"]
         assert "# New Header" not in result
+
+    def test_multiple_new_headers_removed(self, no_new_headers_processor):
+        """Test that multiple new headers are properly removed."""
+        original_block = "Content here."
+        llm_block = "# New Header 1\n\n# New Header 2\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# New Header 1" not in result
+        assert "# New Header 2" not in result
+        assert "Content here." in result
+
+    def test_header_with_special_characters_in_content(self, no_new_headers_processor):
+        """Test headers with special characters in content are handled correctly."""
+        original_block = "Content here."
+        llm_block = "# Header with [brackets] and (parentheses)\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# Header with [brackets] and (parentheses)" not in result
+        assert "Content here." in result
+
+    def test_multiple_new_headers_with_content_between(self, no_new_headers_processor):
+        """Test multiple new headers with content between them."""
+        original_block = "# Original Header\n\nContent here."
+        llm_block = "# Original Header\n\n# New Header 1\n\nSome content.\n\n# New Header 2\n\nMore content."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# New Header 1" not in result
+        assert "# New Header 2" not in result
+        assert "# Original Header" in result
+        assert "Some content." in result
+        assert "More content." in result
+
+    def test_headers_with_leading_whitespace_not_removed(self, no_new_headers_processor):
+        """Test that headers with leading whitespace are not removed (current behavior)."""
+        original_block = "Content here."
+        llm_block = "  # Header with leading spaces\n\n\t# Header with leading tab\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Current implementation doesn't match headers with leading whitespace
+        # So these should remain in the output
+        assert "  # Header with leading spaces" in result
+        assert "\t# Header with leading tab" in result
+        assert "Content here." in result
 
 
 # ============================================================================
@@ -778,3 +825,65 @@ class TestPostProcessorChain:
         expected_output = "Regular text.\nSubsection text.\n<br>\n  Trailing spaces"
         result = post_processor_chain.process(original_block=original_block, llm_block=llm_block)
         assert result == expected_output
+
+    def test_unicode_headers_handling(self, no_new_headers_processor):
+        """Test handling of Unicode characters in headers."""
+        original_block = "普通文本内容"
+        llm_block = "# 中文标题\n\n## Русский заголовок\n\n### العنوان العربي\n\n普通文本内容"
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # All Unicode headers should be removed
+        assert "# 中文标题" not in result
+        assert "## Русский заголовок" not in result
+        assert "### العنوان العربي" not in result
+        assert "普通文本内容" in result
+
+    def test_very_long_line_handling(self, revert_removed_block_lines_processor):
+        """Test handling of very long lines in block restoration."""
+        # Create a very long block line (>10K characters)
+        long_content = "x" * 10000
+        original_block = f"> Block line with very long content: {long_content}\nRegular line"
+        llm_block = "Regular line"
+
+        result = revert_removed_block_lines_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert f"> Block line with very long content: {long_content}" in result
+        assert "Regular line" in result
+
+    def test_fstring_tags_with_complex_similarity(self, preserve_fstring_tags_processor):
+        """Test f-string tag preservation with complex similarity matching."""
+        original_block = (
+            "Chapter 1: Introduction\n"
+            "{preface}\n"
+            "This is the main content of chapter 1.\n"
+            "It has multiple paragraphs and sections.\n"
+            "{license}\n"
+            "Final paragraph."
+        )
+
+        # LLM significantly restructures content but keeps some similarities
+        llm_block = (
+            "Chapter One: An Introduction\n"
+            "This represents the primary content of the first chapter.\n"
+            "It contains several paragraphs and different sections.\n"
+            "Concluding paragraph."
+        )
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Should preserve f-string tags even with major content changes
+        assert "{preface}" in result
+        assert "{license}" in result
+        assert "Chapter One: An Introduction" in result
+
+    def test_mixed_line_endings_handling(self, preserve_fstring_tags_processor):
+        """Test handling of mixed line endings (\\n vs \\r\\n)."""
+        # Mix different line ending styles
+        original_block = "Content line 1\r\n{preface}\nContent line 2\r\n{license}\nFinal line"
+        llm_block = "Content line 1\nContent line 2\nFinal line"  # Normalized line endings
+
+        result = preserve_fstring_tags_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "{preface}" in result
+        assert "{license}" in result

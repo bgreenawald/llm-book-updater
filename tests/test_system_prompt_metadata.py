@@ -129,11 +129,203 @@ def test_pipeline_metadata():
 
 
 def test_cost_analysis_saving():
-    """Test that cost analysis is correctly saved as a separate JSON file."""
+    """Test that cost analysis data is correctly saved."""
     try:
         # Create temporary directory for test
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
+
+            # Create test input file
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Section\n\nThis is test content.")
+
+            # Create test original file
+            original_file = temp_path / "test_original.md"
+            original_file.write_text("# Test Section\n\nThis is original content.")
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            # Create a test config with a simple phase
+            test_config = RunConfig(
+                book_id="test_book",
+                book_name="Test Book",
+                author_name="Test Author",
+                input_file=input_file,
+                output_dir=output_dir,
+                original_file=original_file,
+                phases=[
+                    PhaseConfig(
+                        phase_type=PhaseType.MODERNIZE,
+                        enabled=True,
+                        temperature=0.2,
+                    )
+                ],
+                length_reduction=(35, 50),
+            )
+
+            # Create pipeline
+            pipeline = Pipeline(config=test_config)
+
+            # Test cost analysis saving with mock data
+            mock_cost_analysis = {
+                "total_phases": 1,
+                "completed_phases": 1,
+                "total_generations": 5,
+                "total_prompt_tokens": 1000,
+                "total_completion_tokens": 500,
+                "total_tokens": 1500,
+                "total_cost": 0.0025,
+                "currency": "USD",
+                "phase_costs": [
+                    {
+                        "phase_name": "modernize",
+                        "phase_index": 0,
+                        "generation_ids": ["gen_1", "gen_2"],
+                        "total_prompt_tokens": 1000,
+                        "total_completion_tokens": 500,
+                        "total_tokens": 1500,
+                        "total_cost": 0.0025,
+                        "currency": "USD",
+                        "generation_count": 2,
+                    }
+                ],
+            }
+
+            # Save cost analysis
+            pipeline._save_cost_analysis(cost_analysis=mock_cost_analysis)
+
+            # Check that cost analysis file was created
+            cost_files = list(output_dir.glob(pattern="cost_analysis_*.json"))
+            assert len(cost_files) == 1, f"Expected 1 cost analysis file, found {len(cost_files)}"
+
+            # Read and verify cost analysis
+            with open(file=cost_files[0], mode="r", encoding="utf-8") as f:
+                cost_data = json.load(fp=f)
+
+            # Verify cost analysis structure
+            assert "total_phases" in cost_data
+            assert "completed_phases" in cost_data
+            assert "total_generations" in cost_data
+            assert "total_prompt_tokens" in cost_data
+            assert "total_completion_tokens" in cost_data
+            assert "total_tokens" in cost_data
+            assert "total_cost" in cost_data
+            assert "currency" in cost_data
+            assert "phase_costs" in cost_data
+
+            # Verify specific values
+            assert cost_data["total_phases"] == 1
+            assert cost_data["completed_phases"] == 1
+            assert cost_data["total_generations"] == 5
+            assert cost_data["total_prompt_tokens"] == 1000
+            assert cost_data["total_completion_tokens"] == 500
+            assert cost_data["total_tokens"] == 1500
+            assert cost_data["total_cost"] == 0.0025
+            assert cost_data["currency"] == "USD"
+
+            # Verify phase costs
+            assert len(cost_data["phase_costs"]) == 1
+            phase_cost = cost_data["phase_costs"][0]
+            assert phase_cost["phase_name"] == "modernize"
+            assert phase_cost["phase_index"] == 0
+            assert phase_cost["generation_ids"] == ["gen_1", "gen_2"]
+            assert phase_cost["generation_count"] == 2
+
+            print("✓ Cost analysis saving test passed")
+
+    except Exception as e:
+        print(f"✗ Cost analysis saving test failed: {e}")
+        raise
+
+
+def test_metadata_with_disabled_phases():
+    """Test that metadata is correctly collected for disabled phases."""
+    try:
+        # Create temporary directory for test
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create test input file
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Section\n\nThis is test content.")
+
+            # Create test original file
+            original_file = temp_path / "test_original.md"
+            original_file.write_text("# Test Section\n\nThis is original content.")
+
+            # Create output directory
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            # Create a test config with enabled and disabled phases
+            test_config = RunConfig(
+                book_id="test_book",
+                book_name="Test Book",
+                author_name="Test Author",
+                input_file=input_file,
+                output_dir=output_dir,
+                original_file=original_file,
+                phases=[
+                    PhaseConfig(
+                        phase_type=PhaseType.MODERNIZE,
+                        enabled=True,
+                        temperature=0.2,
+                    ),
+                    PhaseConfig(
+                        phase_type=PhaseType.EDIT,
+                        enabled=False,  # Disabled phase
+                        temperature=0.3,
+                    ),
+                    PhaseConfig(
+                        phase_type=PhaseType.ANNOTATE,
+                        enabled=True,
+                        temperature=0.1,
+                    ),
+                ],
+                length_reduction=(35, 50),
+            )
+
+            # Create pipeline
+            pipeline = Pipeline(config=test_config)
+
+            # Collect metadata for disabled phase
+            pipeline._collect_phase_metadata(phase=None, phase_index=1, completed=False)
+
+            # Verify that disabled phase metadata was collected
+            assert len(pipeline._phase_metadata) == 1
+            disabled_phase_metadata = pipeline._phase_metadata[0]
+
+            # Verify disabled phase metadata structure
+            assert disabled_phase_metadata["phase_index"] == 1
+            assert disabled_phase_metadata["phase_type"] == "EDIT"
+            assert disabled_phase_metadata["enabled"] is False
+            assert disabled_phase_metadata["completed"] is False
+            assert disabled_phase_metadata["reason"] == "disabled"
+            assert disabled_phase_metadata["temperature"] == 0.3
+
+            print("✓ Disabled phase metadata test passed")
+
+    except Exception as e:
+        print(f"✗ Disabled phase metadata test failed: {e}")
+        raise
+
+
+def test_metadata_with_failed_phases():
+    """Test that metadata is correctly collected for failed phases."""
+    try:
+        # Create temporary directory for test
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create test input file
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Section\n\nThis is test content.")
+
+            # Create test original file
+            original_file = temp_path / "test_original.md"
+            original_file.write_text("# Test Section\n\nThis is original content.")
 
             # Create output directory
             output_dir = temp_path / "output"
@@ -144,104 +336,50 @@ def test_cost_analysis_saving():
                 book_id="test_book",
                 book_name="Test Book",
                 author_name="Test Author",
-                input_file=temp_path / "test_input.md",
+                input_file=input_file,
                 output_dir=output_dir,
-                original_file=temp_path / "test_original.md",
-                phases=[],
+                original_file=original_file,
+                phases=[
+                    PhaseConfig(
+                        phase_type=PhaseType.MODERNIZE,
+                        enabled=True,
+                        temperature=0.2,
+                    )
+                ],
+                length_reduction=(35, 50),
             )
 
             # Create pipeline
             pipeline = Pipeline(config=test_config)
 
-            # Create sample cost analysis data
-            cost_analysis = {
-                "total_phases": 2,
-                "completed_phases": 2,
-                "total_generations": 5,
-                "total_prompt_tokens": 1000,
-                "total_completion_tokens": 2000,
-                "total_tokens": 3000,
-                "total_cost": 0.015,
-                "currency": "USD",
-                "phase_costs": [
-                    {
-                        "phase_name": "modernize",
-                        "phase_index": 0,
-                        "generation_ids": ["gen1", "gen2"],
-                        "total_prompt_tokens": 500,
-                        "total_completion_tokens": 1000,
-                        "total_tokens": 1500,
-                        "total_cost": 0.0075,
-                        "currency": "USD",
-                        "generation_count": 2,
-                    },
-                    {
-                        "phase_name": "edit",
-                        "phase_index": 1,
-                        "generation_ids": ["gen3", "gen4", "gen5"],
-                        "total_prompt_tokens": 500,
-                        "total_completion_tokens": 1000,
-                        "total_tokens": 1500,
-                        "total_cost": 0.0075,
-                        "currency": "USD",
-                        "generation_count": 3,
-                    },
-                ],
-            }
+            # Initialize phase
+            phase = pipeline._initialize_phase(phase_index=0)
+            assert phase is not None
 
-            # Save cost analysis
-            pipeline._save_cost_analysis(cost_analysis=cost_analysis)
+            # Collect metadata for failed phase
+            pipeline._collect_phase_metadata(phase=phase, phase_index=0, completed=False)
 
-            # Check that cost analysis file was created
-            cost_files = list(output_dir.glob(pattern="cost_analysis_*.json"))
-            assert len(cost_files) == 1, f"Expected 1 cost analysis file, found {len(cost_files)}"
+            # Verify that failed phase metadata was collected
+            assert len(pipeline._phase_metadata) == 1
+            failed_phase_metadata = pipeline._phase_metadata[0]
 
-            # Read and verify cost analysis
-            with open(file=cost_files[0], mode="r", encoding="utf-8") as f:
-                saved_cost_analysis = json.load(fp=f)
+            # Verify failed phase metadata structure
+            assert failed_phase_metadata["phase_index"] == 0
+            assert failed_phase_metadata["phase_type"] == "MODERNIZE"
+            assert failed_phase_metadata["enabled"] is True
+            assert failed_phase_metadata["completed"] is False
+            assert failed_phase_metadata["reason"] == "not_run"
+            assert failed_phase_metadata["temperature"] == 0.2
 
-            # Verify cost analysis structure
-            assert "total_phases" in saved_cost_analysis
-            assert "completed_phases" in saved_cost_analysis
-            assert "total_generations" in saved_cost_analysis
-            assert "total_prompt_tokens" in saved_cost_analysis
-            assert "total_completion_tokens" in saved_cost_analysis
-            assert "total_tokens" in saved_cost_analysis
-            assert "total_cost" in saved_cost_analysis
-            assert "currency" in saved_cost_analysis
-            assert "phase_costs" in saved_cost_analysis
-
-            # Verify specific values
-            assert saved_cost_analysis["total_phases"] == 2
-            assert saved_cost_analysis["completed_phases"] == 2
-            assert saved_cost_analysis["total_generations"] == 5
-            assert saved_cost_analysis["total_prompt_tokens"] == 1000
-            assert saved_cost_analysis["total_completion_tokens"] == 2000
-            assert saved_cost_analysis["total_tokens"] == 3000
-            assert saved_cost_analysis["total_cost"] == 0.015
-            assert saved_cost_analysis["currency"] == "USD"
-
-            # Verify phase costs
-            assert len(saved_cost_analysis["phase_costs"]) == 2
-            phase1 = saved_cost_analysis["phase_costs"][0]
-            assert phase1["phase_name"] == "modernize"
-            assert phase1["phase_index"] == 0
-            assert phase1["generation_count"] == 2
-            assert phase1["total_cost"] == 0.0075
-
-            phase2 = saved_cost_analysis["phase_costs"][1]
-            assert phase2["phase_name"] == "edit"
-            assert phase2["phase_index"] == 1
-            assert phase2["generation_count"] == 3
-            assert phase2["total_cost"] == 0.0075
-
-            print("✓ Cost analysis saving test passed")
+            print("✓ Failed phase metadata test passed")
 
     except Exception as e:
-        print(f"✗ Cost analysis saving test failed: {e}")
+        print(f"✗ Failed phase metadata test failed: {e}")
         raise
 
 
 if __name__ == "__main__":
     test_pipeline_metadata()
     test_cost_analysis_saving()
+    test_metadata_with_disabled_phases()
+    test_metadata_with_failed_phases()
