@@ -210,9 +210,32 @@ class TestEnsureBlankLineProcessor:
         assert result == expected_output
 
     def test_consecutive_blank_lines(self, ensure_blank_line_processor):
-        """Test handling of consecutive blank lines."""
+        """Test that consecutive blank lines are preserved."""
         llm_block = "Line 1.\n\n\nLine 2."
         expected_output = "Line 1.\n\n\nLine 2."
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_quote_block_with_trailing_whitespace(self, ensure_blank_line_processor):
+        """Test Quote blocks with trailing whitespace are handled correctly."""
+        llm_block = "Text.\n> **Quote:** Quote with trailing spaces   . **End quote.**\nMore text."
+        expected_output = "Text.\n\n> **Quote:** Quote with trailing spaces   . **End quote.**\n\nMore text."
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_annotation_block_with_leading_whitespace(self, ensure_blank_line_processor):
+        """Test Annotation blocks with leading whitespace are handled correctly."""
+        llm_block = "Text.\n>   **Annotation:** Annotation with leading spaces. **End annotation.**\nMore text."
+        expected_output = (
+            "Text.\n\n>   **Annotation:** Annotation with leading spaces. **End annotation.**\n\nMore text."
+        )
+        result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
+        assert result == expected_output
+
+    def test_mixed_whitespace_in_quotes(self, ensure_blank_line_processor):
+        """Test that mixed whitespace in regular quotes is handled correctly."""
+        llm_block = "Text.\n>   Quote with mixed whitespace  .\n>   Another line with spaces  .\nMore text."
+        expected_output = "Text.\n\n>   Quote with mixed whitespace  .\n>   Another line with spaces  .\n\nMore text."
         result = ensure_blank_line_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
 
@@ -933,4 +956,3 @@ class TestOrderQuoteAnnotationProcessor:
         )
         result = order_quote_annotation_processor.process(original_block="", llm_block=llm_block)
         assert result == expected_output
-

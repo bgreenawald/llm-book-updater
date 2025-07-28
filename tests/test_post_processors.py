@@ -132,17 +132,64 @@ class TestNoNewHeadersPostProcessor:
         assert "Content here." in result
 
     def test_preserve_existing_headers_in_order(self, no_new_headers_processor):
-        """Test that existing headers maintain their order."""
-        original_block = "# Header 1\n\n# Header 2\n\nContent here."
-        llm_block = "# Header 1\n\n# Header 2\n\n# New Header\n\nContent here."
+        """Test that existing headers are preserved in their original order."""
+        original_block = "# Header 1\n\n## Header 2\n\nContent here."
+        llm_block = "# Header 1\n\n## Header 2\n\n# New Header\n\nContent here."
 
         result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
 
         # Check that existing headers are preserved in order
-        header1_pos = result.find("# Header 1")
-        header2_pos = result.find("# Header 2")
-        assert header1_pos < header2_pos
+        lines = result.split("\n")
+        header_lines = [line for line in lines if line.strip().startswith("#")]
+        assert header_lines == ["# Header 1", "## Header 2"]
         assert "# New Header" not in result
+
+    def test_multiple_new_headers_removed(self, no_new_headers_processor):
+        """Test that multiple new headers are properly removed."""
+        original_block = "Content here."
+        llm_block = "# New Header 1\n\n# New Header 2\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# New Header 1" not in result
+        assert "# New Header 2" not in result
+        assert "Content here." in result
+
+    def test_header_with_special_characters_in_content(self, no_new_headers_processor):
+        """Test headers with special characters in content are handled correctly."""
+        original_block = "Content here."
+        llm_block = "# Header with [brackets] and (parentheses)\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# Header with [brackets] and (parentheses)" not in result
+        assert "Content here." in result
+
+    def test_multiple_new_headers_with_content_between(self, no_new_headers_processor):
+        """Test multiple new headers with content between them."""
+        original_block = "# Original Header\n\nContent here."
+        llm_block = "# Original Header\n\n# New Header 1\n\nSome content.\n\n# New Header 2\n\nMore content."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# New Header 1" not in result
+        assert "# New Header 2" not in result
+        assert "# Original Header" in result
+        assert "Some content." in result
+        assert "More content." in result
+
+    def test_headers_with_leading_whitespace_not_removed(self, no_new_headers_processor):
+        """Test that headers with leading whitespace are not removed (current behavior)."""
+        original_block = "Content here."
+        llm_block = "  # Header with leading spaces\n\n\t# Header with leading tab\n\nContent here."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Current implementation doesn't match headers with leading whitespace
+        # So these should remain in the output
+        assert "  # Header with leading spaces" in result
+        assert "\t# Header with leading tab" in result
+        assert "Content here." in result
 
 
 # ============================================================================
