@@ -373,27 +373,6 @@ class BaseBookBuilder(ABC):
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
 
-    def copy_to_base_directory(self) -> None:
-        """
-        Copy fully rendered files to base directory for easy access.
-        """
-        logger.info("--- Copying fully rendered files to base directory ---")
-
-        shutil.copy(self.config.staged_modernized_md, self.config.base_modernized_md)
-        logger.info(
-            f"Copied modernized markdown to base directory: '{self.safe_relative_path(self.config.base_modernized_md)}'"
-        )
-
-        shutil.copy(self.config.staged_annotated_md, self.config.base_annotated_md)
-        logger.info(
-            f"Copied annotated markdown to base directory: '{self.safe_relative_path(self.config.base_annotated_md)}'"
-        )
-
-        if self.config.staged_original_md.exists():
-            shutil.copy(self.config.staged_original_md, self.config.base_original_md)
-            logger.info(
-                f"Copied original markdown to base directory: '{self.safe_relative_path(self.config.base_original_md)}'"
-            )
 
     def build_epub_and_pdf(self) -> None:
         """
@@ -409,11 +388,6 @@ class BaseBookBuilder(ABC):
                 metadata["book_version"] = self.config.version
             with open(self.config.staged_metadata_json, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=4)
-            # Copy updated metadata to base directory
-            shutil.copy(self.config.staged_metadata_json, self.config.base_metadata_json)
-            logger.info(
-                f"Copied updated metadata to base directory: {self.safe_relative_path(self.config.base_metadata_json)}'"
-            )
 
         pandoc_args = [
             "--toc",
@@ -563,8 +537,6 @@ class BaseBookBuilder(ABC):
         # --- 4. Clean Markdown ---
         self.clean_markdown_files()
 
-        # --- 5. Copy to Base Directory ---
-        self.copy_to_base_directory()
 
         # --- 6. Build EPUB and PDF ---
         self.build_epub_and_pdf()
