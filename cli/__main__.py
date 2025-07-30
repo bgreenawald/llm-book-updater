@@ -12,11 +12,7 @@ import sys
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
-# Import and run the main CLI
 if __name__ == "__main__":
-    import importlib.util
+    import cli as main_cli
 
-    spec = importlib.util.spec_from_file_location("main_cli", os.path.join(parent_dir, "cli.py"))
-    main_cli = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(main_cli)
     main_cli.main()
