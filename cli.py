@@ -17,58 +17,32 @@ Examples:
     python -m cli run on_liberty
 """
 
-import argparse
 import sys
 
-from cli.build import handle_build_command, setup_build_parser
-from cli.run import handle_run_command, setup_run_parser
+import click
+
+from cli.build import build_command
+from cli.run import run_command
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """
-    Create the main argument parser with subcommands.
+@click.group()
+@click.help_option("--help", "-h")
+def cli():
+    """LLM Book Updater - A tool for processing and building books from markdown sources."""
+    pass
 
-    Returns:
-        The configured argument parser
-    """
-    parser = argparse.ArgumentParser(
-        prog="cli",
-        description="LLM Book Updater - A tool for processing and building books from markdown sources.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
 
-    # Create subparsers for different commands
-    subparsers = parser.add_subparsers(
-        dest="command",
-        help="Available commands",
-        metavar="<command>",
-    )
-
-    # Set up individual command parsers
-    build_parser = setup_build_parser(subparsers)
-    build_parser.set_defaults(func=handle_build_command)
-
-    run_parser = setup_run_parser(subparsers)
-    run_parser.set_defaults(func=handle_run_command)
-
-    return parser
+# Add the subcommands
+cli.add_command(build_command)
+cli.add_command(run_command)
 
 
 def main() -> None:
     """
-    Main function to parse arguments and dispatch to appropriate command handler.
+    Main function to handle CLI execution with error handling.
     """
-    parser = create_parser()
-    args = parser.parse_args()
-
-    # If no command is provided, show help
-    if not hasattr(args, "func"):
-        parser.print_help()
-        sys.exit(1)
-
-    # Call the appropriate command handler
     try:
-        args.func(args)
+        cli()
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
         sys.exit(1)

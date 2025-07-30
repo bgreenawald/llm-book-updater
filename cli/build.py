@@ -4,10 +4,10 @@ Build command module.
 This module handles building books from markdown sources to EPUB/PDF formats.
 """
 
-import argparse
 import importlib
 import sys
-from typing import List
+
+import click
 
 from .common import get_books_with_build, validate_book_exists
 
@@ -33,58 +33,39 @@ def build_book(book_name: str, version: str) -> None:
         if hasattr(build_module, "build"):
             build_module.build(version, book_name)
         else:
-            print(f"Error: Book '{book_name}' does not have a build function in its build.py module")
+            click.echo(f"Error: Book '{book_name}' does not have a build function in its build.py module")
             sys.exit(1)
 
     except ImportError as e:
-        print(f"Error: Could not import build module for book '{book_name}': {e}")
+        click.echo(f"Error: Could not import build module for book '{book_name}': {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"Error building book '{book_name}': {e}")
+        click.echo(f"Error building book '{book_name}': {e}")
         sys.exit(1)
 
 
-def setup_build_parser(subparsers) -> argparse.ArgumentParser:
+@click.command("build")
+@click.argument("book_name", required=True)
+@click.argument("version", required=True)
+@click.help_option("--help", "-h")
+def build_command(book_name: str, version: str) -> None:
     """
-    Set up the build command parser.
+    Build books from markdown sources to EPUB/PDF formats.
 
-    Args:
-        subparsers: The subparsers object to add the build command to
+    BOOK_NAME: Name of the book to build (must match a directory in books/)
+    VERSION: Version string for the build (e.g., 'v1.0.0', 'v0.1-alpha')
 
-    Returns:
-        The build command parser
-    """
-    available_books = get_books_with_build()
-    
-    parser = subparsers.add_parser(
-        "build",
-        help="Build books from markdown sources to EPUB/PDF formats",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
-Available books for building:
-{chr(10).join("  " + book for book in available_books) if available_books else "  No buildable books found"}
-
-Examples:
-  python -m cli build the_federalist_papers v1.0.0
-  python -m cli build on_liberty v0.1-alpha
-        """,
-    )
-
-    parser.add_argument("book_name", help="Name of the book to build (must match a directory in books/)")
-    parser.add_argument("version", help="Version string for the build (e.g., 'v1.0.0', 'v0.1-alpha')")
-    
-    return parser
-
-
-def handle_build_command(args) -> None:
-    """
-    Handle the build command.
-
-    Args:
-        args: Parsed command line arguments
+    Examples:
+      python -m cli build the_federalist_papers v1.0.0
+      python -m cli build on_liberty v0.1-alpha
     """
     available_books = get_books_with_build()
-    matched_book_name = validate_book_exists(args.book_name, available_books)
 
-    print(f"Building book '{matched_book_name}' version '{args.version}'...")
-    build_book(matched_book_name, args.version)
+    if not available_books:
+        click.echo("No buildable books found")
+        sys.exit(1)
+
+    matched_book_name = validate_book_exists(book_name, available_books)
+
+    click.echo(f"Building book '{matched_book_name}' version '{version}'...")
+    build_book(matched_book_name, version)
