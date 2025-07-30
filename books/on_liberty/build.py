@@ -30,11 +30,21 @@ class OnLibertyBuilder(BaseBookBuilder):
 
         Returns:
             Dictionary mapping file types to their source paths
+
+        Raises:
+            FileNotFoundError: If required source files are missing
         """
-        return {
+        source_files = {
             "modernized": self.config.source_output_dir / "03-input_small Final_1.md",
             "annotated": self.config.source_output_dir / "06-input_small Annotate_1.md",
         }
+
+        # Validate that required files exist
+        for file_type, file_path in source_files.items():
+            if not file_path.exists():
+                raise FileNotFoundError(f"Required {file_type} source file not found: {file_path}")
+
+        return source_files
 
     def get_original_file(self) -> Optional[Path]:
         """
