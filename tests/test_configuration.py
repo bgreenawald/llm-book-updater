@@ -136,7 +136,7 @@ class TestConfigurationValidation:
             output_dir.mkdir()
 
             # Test invalid phase type
-            with pytest.raises((ValueError, AttributeError)) as exc_info:
+            with pytest.raises((ValueError, AttributeError)):
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",

@@ -23,14 +23,14 @@ def join_paragraphs(lines: list[str]) -> list[str]:
         # blank line: flush pending paragraph, then emit blank
         if not stripped:
             if paragraph_lines:
-                combined = " ".join(l.strip() for l in paragraph_lines) + "\n"
+                combined = " ".join(line.strip() for line in paragraph_lines) + "\n"
                 out.append(combined)
                 paragraph_lines = []
             out.append(line)
         # markdown header: flush paragraph, then emit header
         elif line.startswith("# "):
             if paragraph_lines:
-                combined = " ".join(l.strip() for l in paragraph_lines) + "\n"
+                combined = " ".join(line.strip() for line in paragraph_lines) + "\n"
                 out.append(combined)
                 paragraph_lines = []
             out.append(line)
@@ -39,7 +39,7 @@ def join_paragraphs(lines: list[str]) -> list[str]:
 
     # flush any trailing paragraph
     if paragraph_lines:
-        combined = " ".join(l.strip() for l in paragraph_lines) + "\n"
+        combined = " ".join(line.strip() for line in paragraph_lines) + "\n"
         out.append(combined)
 
     return out
@@ -77,7 +77,7 @@ def transform(lines: list[str]) -> list[str]:
                 pos += 1
             end = pos  # lines[start:end] are subject lines
 
-            subject_parts = [l.strip() for l in lines[start:end] if l.strip()]
+            subject_parts = [line.strip() for line in lines[start:end] if line.strip()]
             subject = " ".join(subject_parts)
 
             # skip the blank that ended the subject (if any)
@@ -96,7 +96,7 @@ def transform(lines: list[str]) -> list[str]:
                 while ext_end < n and lines[ext_end].strip() != "":
                     ext_end += 1
 
-                ext_parts = [l.strip() for l in lines[ext_start:ext_end] if l.strip()]
+                ext_parts = [line.strip() for line in lines[ext_start:ext_end] if line.strip()]
                 if ext_parts:
                     subject_parts.extend(ext_parts)
                     subject = " ".join(subject_parts)

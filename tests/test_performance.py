@@ -186,7 +186,7 @@ class TestPerformancePostProcessors:
         processor = RemoveTrailingWhitespaceProcessor()
 
         start_time = time.time()
-        result = processor.process(original_block="", llm_block=long_line_block)
+        processor.process(original_block="", llm_block=long_line_block)
         end_time = time.time()
 
         processing_time = end_time - start_time

@@ -57,9 +57,7 @@ def example_custom_retry():
     print(f"  - Total attempts: {model.max_retries + 1}")
 
     # Calculate delay sequence
-    delays = [
-        model.retry_delay * (model.backoff_factor**i) for i in range(model.max_retries)
-    ]
+    delays = [model.retry_delay * (model.backoff_factor**i) for i in range(model.max_retries)]
     print(f"  - Delay sequence: {delays}")
     print()
 
