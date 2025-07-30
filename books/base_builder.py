@@ -408,9 +408,9 @@ class BaseBookBuilder(ABC):
 
         pandoc_args = [
             "--toc",
-            "--toc-depth=1",
-            "--split-level=1",
+            "--toc-depth=3",
             f"--css={self.safe_relative_path(self.config.epub_css)}",
+            "--lua-filter=books/exclude_h1.lua",
         ]
 
         # Build Modernized Version
