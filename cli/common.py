@@ -10,6 +10,23 @@ from pathlib import Path
 from typing import List
 
 
+def _get_valid_book_dirs() -> List[Path]:
+    """
+    Return a list of Path objects for valid book directories in the books directory.
+
+    Returns:
+        List of Path objects for valid book directories.
+    """
+    books_dir = Path("books")
+    if not books_dir.exists():
+        return []
+    return [
+        item
+        for item in books_dir.iterdir()
+        if item.is_dir() and not item.name.startswith(".") and item.name != "__pycache__"
+    ]
+
+
 def get_available_books() -> List[str]:
     """
     Dynamically discover available books by scanning the books directory.
@@ -17,16 +34,7 @@ def get_available_books() -> List[str]:
     Returns:
         List of available book names (directory names that are valid book projects)
     """
-    books_dir = Path("books")
-    if not books_dir.exists():
-        return []
-
-    available_books = []
-    for item in books_dir.iterdir():
-        if item.is_dir() and not item.name.startswith(".") and item.name != "__pycache__":
-            available_books.append(item.name)
-
-    return sorted(available_books)
+    return sorted([item.name for item in _get_valid_book_dirs()])
 
 
 def get_books_with_build() -> List[str]:
@@ -36,18 +44,7 @@ def get_books_with_build() -> List[str]:
     Returns:
         List of book names that can be built
     """
-    books_dir = Path("books")
-    if not books_dir.exists():
-        return []
-
-    available_books = []
-    for item in books_dir.iterdir():
-        if item.is_dir() and not item.name.startswith(".") and item.name != "__pycache__":
-            build_file = item / "build.py"
-            if build_file.exists():
-                available_books.append(item.name)
-
-    return sorted(available_books)
+    return sorted([item.name for item in _get_valid_book_dirs() if (item / "build.py").exists()])
 
 
 def get_books_with_run() -> List[str]:
@@ -57,18 +54,7 @@ def get_books_with_run() -> List[str]:
     Returns:
         List of book names that can be run
     """
-    books_dir = Path("books")
-    if not books_dir.exists():
-        return []
-
-    available_books = []
-    for item in books_dir.iterdir():
-        if item.is_dir() and not item.name.startswith(".") and item.name != "__pycache__":
-            run_file = item / "run.py"
-            if run_file.exists():
-                available_books.append(item.name)
-
-    return sorted(available_books)
+    return sorted([item.name for item in _get_valid_book_dirs() if (item / "run.py").exists()])
 
 
 def find_matching_book(partial_name: str, available_books: List[str]) -> str:
@@ -89,10 +75,10 @@ def find_matching_book(partial_name: str, available_books: List[str]) -> str:
     # First, check for exact match
     if partial_name in available_books:
         return partial_name
-    
+
     # Find all books that start with the partial name (highest priority)
     prefix_matches = [book for book in available_books if book.startswith(partial_name)]
-    
+
     if len(prefix_matches) == 1:
         return prefix_matches[0]
     elif len(prefix_matches) > 1:
@@ -101,10 +87,10 @@ def find_matching_book(partial_name: str, available_books: List[str]) -> str:
             print(f"  {match}")
         print("Please be more specific.")
         sys.exit(1)
-    
+
     # If no prefix matches, find all books that contain the partial name as a substring
     substring_matches = [book for book in available_books if partial_name in book]
-    
+
     if len(substring_matches) == 0:
         print(f"Error: No book found matching '{partial_name}'.")
         print(f"Available books: {', '.join(available_books)}")
