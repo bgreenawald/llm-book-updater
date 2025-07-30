@@ -3,8 +3,15 @@
 
 def transform_text():
     # Read the input file
-    with open("input_raw.md", "r", encoding="utf-8") as f:
-        lines = f.readlines()
+    try:
+        with open("input_raw.md", "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print("Error: input_raw.md not found")
+        sys.exit(1)
+    except IOError as e:
+        print(f"Error reading input file: {e}")
+        sys.exit(1)
 
     # Step 1: Remove whitespace at start and end of each line
     lines = [line.strip() for line in lines]
