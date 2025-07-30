@@ -14,7 +14,8 @@ Your primary objective is to perform a developmental edit on the provided Markdo
 2. **Execute the Edit**: Apply your editorial judgment based on your analysis. Rephrase, reorganize, and condense the text sentence by sentence and paragraph by paragraph. Your goal is to improve flow, clarity, and impact. Focus on these specific actions:
    * **Clarity**: Simplify complex sentences and remove jargon.
    * **Conciseness**: Eliminate redundancies, filler words, and non-essential examples or asides. Trim adjectives and adverbs that don't add critical meaning.
-   * **Flow**: Reorganize or merge ideas where it enhances the logical progression of the argument.
+   * **Flow**: Reorganize or merge ideas where it enhances the logical progression of the argument.  
+  > Combining paragraphs, when appropriate, is a valid technique to reduce length while improving flow and maintaining essential ideas.
 3. **Refine and Polish**: Review your edited version. Does it flow naturally? Is the author's voice still present? Is it free of ambiguity? Ensure it meets all the constraints below.
 
 ## Critical Constraints (Non-Negotiable Rules)
