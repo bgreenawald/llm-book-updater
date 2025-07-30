@@ -105,6 +105,41 @@ The system includes an optional cost tracking feature for OpenRouter API usage. 
    python examples/cost_tracking_example.py
    ```
 
+## Building Books
+
+The project includes a simplified build system for converting processed markdown files to EPUB and PDF formats.
+
+### Build Command
+
+Use the unified build command from the project root:
+
+```bash
+python -m build <book_name> <version>
+```
+
+**Examples:**
+```bash
+python -m build the_federalist_papers v1.0.0
+python -m build on_liberty v0.1-alpha
+```
+
+### Available Books
+
+To see all available books that can be built:
+
+```bash
+python -m build --help
+```
+
+This will show a dynamically generated list of all books in the `books/` directory that have a `build.py` file.
+
+### Legacy Build Commands
+
+The old build commands still work for backward compatibility:
+```bash
+python -m books.the_federalist_papers.build build v0.0-alpha
+```
+
 ## Examples
 
 See the `examples/` directory for complete working examples:
