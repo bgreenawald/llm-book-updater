@@ -105,38 +105,62 @@ The system includes an optional cost tracking feature for OpenRouter API usage. 
    python examples/cost_tracking_example.py
    ```
 
-## Building Books
+## Command Line Interface
 
-The project includes a simplified build system for converting processed markdown files to EPUB and PDF formats.
+The project provides a unified command-line interface for building books and running pipeline processing.
 
-### Build Command
+### Available Commands
 
-Use the unified build command from the project root:
+- **build**: Build books from markdown sources to EPUB/PDF formats
+- **run**: Run pipeline processing for books from markdown sources
+
+### Building Books
+
+Use the build command to convert processed markdown files to EPUB and PDF formats:
 
 ```bash
-python -m build <book_name> <version>
+python -m cli build <book_name> <version>
 ```
 
 **Examples:**
 ```bash
-python -m build the_federalist_papers v1.0.0
-python -m build on_liberty v0.1-alpha
+python -m cli build the_federalist_papers v1.0.0
+python -m cli build on_liberty v0.1-alpha
 ```
 
-### Available Books
+### Running Pipeline Processing
 
-To see all available books that can be built:
+Use the run command to process books through the pipeline:
 
 ```bash
-python -m build --help
+python -m cli run <book_name>
 ```
 
-This will show a dynamically generated list of all books in the `books/` directory that have a `build.py` file.
+**Example:**
+```bash
+python -m cli run on_liberty
+```
+
+### Getting Help
+
+To see all available commands and options:
+
+```bash
+python -m cli --help
+```
+
+To see help for a specific command:
+
+```bash
+python -m cli build --help
+python -m cli run --help
+```
 
 ### Legacy Build Commands
 
 The old build commands still work for backward compatibility:
 ```bash
+python -m build <book_name> <version>
 python -m books.the_federalist_papers.build build v0.0-alpha
 ```
 
