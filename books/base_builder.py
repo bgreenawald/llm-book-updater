@@ -54,18 +54,18 @@ class BookConfig:
         self.author = author
         self.clean_title = clean_title or self._generate_clean_title(title)
 
-        # --- Source Paths ---
+        # Source Paths
         self.base_dir = Path(f"books/{self.name}")
         self.source_output_dir = self.base_dir / "output"
 
-        # --- Intermediate (Staging) Paths ---
+        # Intermediate (Staging) Paths
         self.staging_dir = self.base_dir / "staging"
         self.staged_modernized_md = self.staging_dir / "modernized.md"
         self.staged_annotated_md = self.staging_dir / "annotated.md"
         self.staged_metadata_json = self.staging_dir / "metadata.json"
         self.staged_original_md = self.staging_dir / "original.md"
 
-        # --- Build Output Paths ---
+        # Build Output Paths
         self.build_dir = Path("build") / self.name / self.version
         self.build_modernized_md = self.build_dir / f"{self.clean_title}-modernized.md"
         self.build_annotated_md = self.build_dir / f"{self.clean_title}-annotated.md"
@@ -76,13 +76,13 @@ class BookConfig:
         self.build_annotated_epub = self.build_dir / f"{self.clean_title}-annotated.epub"
         self.build_annotated_pdf = self.build_dir / f"{self.clean_title}-annotated.pdf"
 
-        # --- Asset Paths ---
+        # Asset Paths
         self.cover_image = self.base_dir / "cover.png"
-        self.epub_css = self.base_dir / "epub.css"
-        self.preface_md = self.base_dir / "preface.md"
-        self.license_md = self.base_dir / "license.md"
+        self.epub_css = self._get_asset_path("epub.css")
+        self.preface_md = self._get_asset_path("preface.md")
+        self.license_md = self._get_asset_path("license.md")
 
-        # --- Base Directory Output Paths ---
+        # Base Directory Output Paths
         self.base_modernized_md = self.base_dir / "output-modernized.md"
         self.base_annotated_md = self.base_dir / "output-annotated.md"
         self.base_original_md = self.base_dir / "output-original.md"
@@ -102,6 +102,24 @@ class BookConfig:
         clean = re.sub(r"[^\w\s-]", "", title)
         clean = re.sub(r"[-\s]+", "-", clean)
         return clean.strip("-")
+
+    def _get_asset_path(self, filename: str) -> Path:
+        """
+        Get the path for an asset file, checking book-specific directory first,
+        then falling back to default render assets.
+
+        Args:
+            filename: The name of the asset file
+
+        Returns:
+            Path to the asset file (book-specific or default)
+        """
+        book_specific_path = self.base_dir / filename
+        if book_specific_path.exists():
+            return book_specific_path
+
+        default_path = Path("books/default_render_assets") / filename
+        return default_path
 
     def get_source_files(self) -> Dict[str, Path]:
         """
@@ -295,7 +313,7 @@ class BaseBookBuilder(ABC):
         """
         Copy source files to staging area and prepare them for building.
         """
-        logger.info("--- Preparing Source Files ---")
+        logger.info("Preparing Source Files")
 
         # Copy main source files
         source_files = self.get_source_files()
@@ -332,9 +350,9 @@ class BaseBookBuilder(ABC):
         """
         Format all markdown files with preface, license, and version information.
         """
-        logger.info("--- Formatting Markdown ---")
+        logger.info("Formatting Markdown")
 
-        # Check required files exist
+        # Check required files exist (either book-specific or default)
         if not self.config.preface_md.exists():
             raise FileNotFoundError(f"Preface file not found: {self.safe_relative_path(self.config.preface_md)}")
         if not self.config.license_md.exists():
@@ -361,24 +379,23 @@ class BaseBookBuilder(ABC):
         """
         Clean markdown files by replacing <br> tags and cleaning annotation patterns.
         """
-        logger.info("--- Replacing <br> tags with spaces ---")
+        logger.info("Replacing <br> tags with spaces")
         self.replace_br_tags(self.config.staged_modernized_md)
         self.replace_br_tags(self.config.staged_annotated_md)
         if self.config.staged_original_md.exists():
             self.replace_br_tags(self.config.staged_original_md)
 
-        logger.info("--- Cleaning annotation patterns ---")
+        logger.info("Cleaning annotation patterns")
         self.clean_annotation_patterns(self.config.staged_modernized_md)
         self.clean_annotation_patterns(self.config.staged_annotated_md)
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
 
-
     def build_epub_and_pdf(self) -> None:
         """
         Build EPUB and PDF files using Pandoc and Calibre.
         """
-        logger.info("--- Running Pandoc Build ---")
+        logger.info("Running Pandoc Build")
 
         # Update metadata with version
         metadata = {}
@@ -494,7 +511,7 @@ class BaseBookBuilder(ABC):
         """
         Copy final artifacts to build directory and clean up staging.
         """
-        logger.info("--- Copying Final Artifacts to Build Directory ---")
+        logger.info("Copying Final Artifacts to Build Directory")
 
         # Copy markdown files
         shutil.copy(self.config.staged_modernized_md, self.config.build_modernized_md)
@@ -524,24 +541,23 @@ class BaseBookBuilder(ABC):
         """
         logger.info(f"Starting build for '{self.config.name}' version '{self.config.version}'")
 
-        # --- 1. Setup Directories ---
+        # Setup Directories
         self.ensure_directories_exist()
         logger.info(f"Build output directory: '{self.safe_relative_path(self.config.build_dir)}'")
 
-        # --- 2. Copy and Prepare Files ---
+        # Copy and Prepare Files
         self.copy_and_prepare_files()
 
-        # --- 3. Format Markdown ---
+        # Format Markdown
         self.format_markdown_files()
 
-        # --- 4. Clean Markdown ---
+        # Clean Markdown
         self.clean_markdown_files()
 
-
-        # --- 6. Build EPUB and PDF ---
+        # Build EPUB and PDF
         self.build_epub_and_pdf()
 
-        # --- 7. Copy Final Artifacts ---
+        # Copy Final Artifacts
         self.copy_final_artifacts()
 
         logger.success(f"\nBuild complete for {self.config.name} v{self.config.version}!")
