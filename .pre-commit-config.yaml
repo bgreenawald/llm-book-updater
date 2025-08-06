@@ -29,3 +29,12 @@ repos:
     hooks:
       - id: bandit
         args: [-ll, -x, tests/]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        types: [python]
+        pass_filenames: false
