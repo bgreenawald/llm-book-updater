@@ -11,32 +11,32 @@ run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
         model_type=GEMINI_FLASH,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
         model_type=GEMINI_PRO,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
         model_type=DEEPSEEK,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
         model_type=GEMINI_FLASH,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
         model_type=GEMINI_FLASH,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
         model_type=GEMINI_FLASH,
-        reasoning={"reasoning": {"effort": "high"}},
+        reasoning={"effort": "high"},
     ),
 ]
 

@@ -36,7 +36,7 @@ class LlmPhase(ABC):
         model: Any,
         temperature: float = 0.2,
         max_workers: Optional[int] = None,
-        reasoning: Optional[Dict[str, Dict[str, str]]] = None,
+        reasoning: Optional[Dict[str, str]] = None,
         post_processor_chain: Optional[Any] = None,
         length_reduction: Optional[Any] = None,
     ) -> None:
