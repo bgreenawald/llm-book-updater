@@ -53,7 +53,7 @@ def transform(lines: list[str]) -> list[str]:
       3. If the subject == "The Same Subject Continued",
          skip blank(s) again and collect until the next blank as an
          extension. Append that to the subject.
-      4. Emit "# No.… - <subject>" and skip all consumed lines.
+      4. Emit "## No.… - <subject>" and skip all consumed lines.
     """
     out: list[str] = []
     n = len(lines)
@@ -106,7 +106,7 @@ def transform(lines: list[str]) -> list[str]:
                     skip_to += 1
 
             # 4) emit header and advance
-            new_line = f"# {line.strip()} - {subject}\n\n"
+            new_line = f"## {line.strip()} - {subject}\n\n"
             out.append(new_line)
             i = skip_to
 

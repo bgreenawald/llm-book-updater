@@ -35,7 +35,7 @@ class CostTrackingWrapper:
             api_key = os.getenv("OPENROUTER_API_KEY")
 
         if api_key:
-            self.cost_tracker = CostTracker(api_key=api_key)
+            self.cost_tracker: CostTracker | None = CostTracker(api_key=api_key)
             self.enabled = True
             module_logger.info("Cost tracking enabled")
         else:

@@ -47,7 +47,7 @@ class PhaseConfig:
     enabled: bool = True
     model_type: str = GEMINI_FLASH
     temperature: float = 0.2
-    reasoning: Optional[Dict[str, str]] = None
+    reasoning: Optional[Dict[str, Dict[str, str]]] = None
     system_prompt_path: Optional[Path] = None
     user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None

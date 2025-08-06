@@ -102,6 +102,20 @@ class PhaseFactory:
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
+        # Validate required fields
+        if config.name is None:
+            raise ValueError("name is required for StandardLlmPhase")
+        if config.input_file_path is None:
+            raise ValueError("input_file_path is required for StandardLlmPhase")
+        if config.output_file_path is None:
+            raise ValueError("output_file_path is required for StandardLlmPhase")
+        if config.original_file_path is None:
+            raise ValueError("original_file_path is required for StandardLlmPhase")
+        if config.book_name is None:
+            raise ValueError("book_name is required for StandardLlmPhase")
+        if config.author_name is None:
+            raise ValueError("author_name is required for StandardLlmPhase")
+
         return StandardLlmPhase(
             name=config.name,
             input_file_path=config.input_file_path,
@@ -141,6 +155,20 @@ class PhaseFactory:
         post_processor_chain = PhaseFactory._create_post_processor_chain(
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
+
+        # Validate required fields
+        if config.name is None:
+            raise ValueError("name is required for IntroductionAnnotationPhase")
+        if config.input_file_path is None:
+            raise ValueError("input_file_path is required for IntroductionAnnotationPhase")
+        if config.output_file_path is None:
+            raise ValueError("output_file_path is required for IntroductionAnnotationPhase")
+        if config.original_file_path is None:
+            raise ValueError("original_file_path is required for IntroductionAnnotationPhase")
+        if config.book_name is None:
+            raise ValueError("book_name is required for IntroductionAnnotationPhase")
+        if config.author_name is None:
+            raise ValueError("author_name is required for IntroductionAnnotationPhase")
 
         return IntroductionAnnotationPhase(
             name=config.name,
@@ -182,6 +210,20 @@ class PhaseFactory:
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
+        # Validate required fields
+        if config.name is None:
+            raise ValueError("name is required for SummaryAnnotationPhase")
+        if config.input_file_path is None:
+            raise ValueError("input_file_path is required for SummaryAnnotationPhase")
+        if config.output_file_path is None:
+            raise ValueError("output_file_path is required for SummaryAnnotationPhase")
+        if config.original_file_path is None:
+            raise ValueError("original_file_path is required for SummaryAnnotationPhase")
+        if config.book_name is None:
+            raise ValueError("book_name is required for SummaryAnnotationPhase")
+        if config.author_name is None:
+            raise ValueError("author_name is required for SummaryAnnotationPhase")
+
         return SummaryAnnotationPhase(
             name=config.name,
             input_file_path=config.input_file_path,
@@ -210,7 +252,9 @@ class PhaseFactory:
         Returns:
             Optional[PostProcessor]: The created processor or None if not found
         """
-        processors = {
+        from typing import Type
+
+        processors: dict[str, Type[PostProcessor]] = {
             "ensure_blank_line": EnsureBlankLineProcessor,
             "remove_xml_tags": RemoveXmlTagsProcessor,
             "remove_trailing_whitespace": RemoveTrailingWhitespaceProcessor,
@@ -221,8 +265,8 @@ class PhaseFactory:
         }
 
         processor_class = processors.get(processor_name.lower())
-        if processor_class:
-            return processor_class()
+        if processor_class is not None:
+            return processor_class()  # type: ignore[abstract, call-arg]
 
         return None
 
@@ -240,7 +284,9 @@ class PhaseFactory:
         Returns:
             Optional[PostProcessor]: The created processor or None if not found
         """
-        processor_mapping = {
+        from typing import Type
+
+        processor_mapping: dict[PostProcessorType, Type[PostProcessor]] = {
             PostProcessorType.ENSURE_BLANK_LINE: EnsureBlankLineProcessor,
             PostProcessorType.REMOVE_XML_TAGS: RemoveXmlTagsProcessor,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE: RemoveTrailingWhitespaceProcessor,
@@ -252,11 +298,11 @@ class PhaseFactory:
         }
 
         processor_class = processor_mapping.get(processor_type)
-        if processor_class:
+        if processor_class is not None:
             if processor_type == PostProcessorType.PRESERVE_F_STRING_TAGS and tags_to_preserve:
-                return processor_class(config={"tags_to_preserve": tags_to_preserve})
+                return processor_class(config={"tags_to_preserve": tags_to_preserve})  # type: ignore[abstract, call-arg]
             else:
-                return processor_class()
+                return processor_class()  # type: ignore[abstract, call-arg]
 
         return None
 
@@ -307,7 +353,8 @@ class PhaseFactory:
         """
         # Use default post-processors if none provided and phase_type is specified
         if not post_processors and phase_type:
-            post_processors = PhaseFactory.DEFAULT_POST_PROCESSORS.get(phase_type, [])
+            default_processors = PhaseFactory.DEFAULT_POST_PROCESSORS.get(phase_type, [])
+            post_processors = list(default_processors)
 
         if not post_processors:
             return None
@@ -325,19 +372,19 @@ class PhaseFactory:
                         chain.add_processor(processor=processor)
                 else:
                     # Handle built-in processor by name
-                    processor = PhaseFactory._create_built_in_processor(processor_name=processor_item)
-                    if processor:
-                        chain.add_processor(processor=processor)
+                    built_in_processor = PhaseFactory._create_built_in_processor(processor_name=processor_item)
+                    if built_in_processor is not None:
+                        chain.add_processor(processor=built_in_processor)
             elif isinstance(processor_item, PostProcessor):
                 # Handle custom PostProcessor instances
                 chain.add_processor(processor=processor_item)
             elif isinstance(processor_item, PostProcessorType):
                 # Handle PostProcessorType enum values
-                processor = PhaseFactory._create_processor_from_enum(
+                enum_processor = PhaseFactory._create_processor_from_enum(
                     processor_type=processor_item, tags_to_preserve=tags_to_preserve
                 )
-                if processor:
-                    chain.add_processor(processor=processor)
+                if enum_processor is not None:
+                    chain.add_processor(processor=enum_processor)
             else:
                 # Skip invalid items
                 continue

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+
 
 def transform_text():
     # Read the input file
@@ -34,7 +36,7 @@ def transform_text():
 
         # Handle INTRODUCTION AND PLAN OF THE WORK special case
         if line.endswith("INTRODUCTION AND PLAN OF THE WORK."):
-            result_lines.append("# INTRODUCTION AND PLAN OF THE WORK.")
+            result_lines.append("## INTRODUCTION AND PLAN OF THE WORK.")
             i += 1
             continue
 
@@ -47,7 +49,7 @@ def transform_text():
                 book_parts.append(lines[i])
                 i += 1
             # Create markdown h1 header
-            book_header = "# " + " ".join(book_parts)
+            book_header = "## " + " ".join(book_parts)
             result_lines.append(book_header)
             continue
 
@@ -60,7 +62,7 @@ def transform_text():
                 chapter_parts.append(lines[i])
                 i += 1
             # Create markdown h2 header
-            chapter_header = "## " + " ".join(chapter_parts)
+            chapter_header = "### " + " ".join(chapter_parts)
             result_lines.append(chapter_header)
             continue
 
@@ -100,7 +102,7 @@ def transform_text():
                 final_lines.append(" ".join(non_blank_lines))
 
     # Join with newlines to create final text
-    final_text = "\n".join(final_lines)
+    final_text = "# The Wealth of Nations\n\n" + "\n".join(final_lines)
 
     # Write the result to output file
     with open("input_transformed.md", "w", encoding="utf-8") as f:

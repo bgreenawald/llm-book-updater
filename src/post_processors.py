@@ -149,7 +149,7 @@ class RemoveBlankLinesInListProcessor(PostProcessor):
         self.list_pattern = re.compile(r"^\s*([*\-+]|\d+\.)\s+")
 
     def _is_list_related(self, line: str) -> bool:
-        return bool(self.list_pattern.match(line)) or (line.strip() and line.startswith("  "))
+        return bool(self.list_pattern.match(line)) or bool(line.strip() and line.startswith("  "))
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         lines = llm_block.split("\n")
@@ -398,7 +398,7 @@ class OrderQuoteAnnotationProcessor(PostProcessor):
         """
         lines = llm_block.split("\n")
         processed_lines = []
-        current_block = []
+        current_block: list[str] = []
         i = 0
         n = len(lines)
 
@@ -500,8 +500,8 @@ class PreserveFStringTagsProcessor(PostProcessor):
             # If there's similarity and no multiple occurrences, try to restore tags and adjacent
             # blank lines at their original positions
             processed_lines = list(llm_lines)
-            for tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
-                if tag == "delete":
+            for op_tag, i1, i2, j1, j2 in reversed(matcher.get_opcodes()):
+                if op_tag == "delete":
                     # Collect lines to restore (tags and adjacent blank lines)
                     i = i2 - 1
                     while i >= i1:

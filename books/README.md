@@ -188,4 +188,4 @@ See `the_federalist_papers/build.py` for a complete example implementation that 
 2. **Maintainability** - Shared logic is centralized and easy to update
 3. **Flexibility** - Each book can customize source file locations and processing
 4. **Reusability** - New books can be added quickly using the template
-5. **Reliability** - Proven build logic is shared across all books 
+5. **Reliability** - Proven build logic is shared across all books
