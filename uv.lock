@@ -753,11 +753,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "ruff" },
-]
-
-[package.dev-dependencies]
-dev = [
     { name = "bandit" },
     { name = "mypy" },
     { name = "pre-commit" },
@@ -768,28 +763,23 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "click", specifier = ">=8.2.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "marker-pdf", extras = ["full"], specifier = ">=1.7.3" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
     { name = "openai", specifier = ">=1.82.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "pypandoc", specifier = ">=1.15" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.1" },
     { name = "streamlit", specifier = ">=1.45.1" },
     { name = "streamlit-ace", specifier = ">=0.1.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "bandit", specifier = ">=1.8.0" },
-    { name = "mypy", specifier = ">=1.13.0" },
-    { name = "pre-commit", specifier = ">=4.0.1" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "ruff", specifier = ">=0.12.1" },
-]
 
 [[package]]
 name = "loguru"
