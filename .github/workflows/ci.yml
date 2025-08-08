@@ -34,14 +34,4 @@ jobs:
 
     - name: Run tests
       run: |
-        uv run pytest tests/ -v --tb=short
-
-    - name: Check code coverage
-      run: |
-        uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
+        uv run python -m pytest -v --tb=short
