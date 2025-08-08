@@ -85,5 +85,6 @@ line-ending = "auto"
 
 [dependency-groups]
 dev = [
+    "bandit>=1.8.6",
     "pytest>=8.4.1",
 ]
