@@ -301,8 +301,16 @@ class CostTracker:
         if model in self.OPENAI_PRICING:
             pricing = self.OPENAI_PRICING[model]
         else:
-            if "4o-mini" in model or "mini" in model.lower():
+            # Check for more specific models first before generic patterns
+            if "gpt-4o-mini" in model.lower() or "4o-mini" in model.lower():
+                pricing = self.OPENAI_PRICING["gpt-4o-mini"]
+                estimation_method = "similar_model_pricing_fallback"
+            elif "o4-mini" in model.lower():
                 pricing = self.OPENAI_PRICING["o4-mini"]
+                estimation_method = "similar_model_pricing_fallback"
+            elif "mini" in model.lower():
+                # Default mini models to gpt-4o-mini (most common)
+                pricing = self.OPENAI_PRICING["gpt-4o-mini"]
                 estimation_method = "similar_model_pricing_fallback"
             elif "4o" in model or "gpt-4" in model:
                 pricing = self.OPENAI_PRICING["gpt-4o"]
@@ -366,6 +374,7 @@ class CostTracker:
         model: Optional[str] = None,
         prompt_tokens: Optional[int] = None,
         completion_tokens: Optional[int] = None,
+        provider: Optional[Provider] = None,
     ) -> Optional[GenerationStats]:
         """
         Query or estimate generation statistics from any supported provider.
@@ -375,6 +384,7 @@ class CostTracker:
             model: Model name (required for cost estimation with non-OpenRouter providers)
             prompt_tokens: Number of prompt tokens (for cost estimation)
             completion_tokens: Number of completion tokens (for cost estimation)
+            provider: Provider to use for queries (if None, will detect from generation ID)
 
         Returns:
             GenerationStats object if successful, None otherwise
@@ -383,8 +393,9 @@ class CostTracker:
         if generation_id in self.generation_stats_cache:
             return self.generation_stats_cache[generation_id]
 
-        # Detect provider from generation ID
-        provider = self._detect_provider_from_generation_id(generation_id)
+        # Use provided provider or detect from generation ID
+        if provider is None:
+            provider = self._detect_provider_from_generation_id(generation_id)
 
         if provider == Provider.OPENROUTER:
             # Use OpenRouter API to get actual costs
@@ -539,7 +550,9 @@ class CostTracker:
             phase_name: Name of the phase
             phase_index: Index of the phase in the pipeline
             generation_ids: List of generation IDs for this phase
-            model_info: Optional dict mapping generation_id to model/token info
+            model_info: Optional dictionary where each generation ID maps to a dictionary
+                       containing keys "model" (str), "prompt_tokens" (int),
+                       "completion_tokens" (int), and "provider" (Provider)
 
         Returns:
             PhaseCosts object with aggregated statistics
@@ -561,6 +574,7 @@ class CostTracker:
                 model=gen_model_info.get("model"),
                 prompt_tokens=gen_model_info.get("prompt_tokens"),
                 completion_tokens=gen_model_info.get("completion_tokens"),
+                provider=gen_model_info.get("provider"),
             )
 
             if stats:

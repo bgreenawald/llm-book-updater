@@ -163,7 +163,7 @@ from src.llm_model import GEMINI_FLASH
 
 phase_config = PhaseConfig(
     phase_type=PhaseType.MODERNIZE,
-    model_type=GEMINI_FLASH,  # Direct Gemini SDK
+    model=GEMINI_FLASH,  # Direct Gemini SDK
     temperature=0.2
 )
 ```
@@ -188,23 +188,31 @@ The system includes an optional cost tracking feature for LLM API usage across a
    export GEMINI_API_KEY="your-api-key-here"        # For Gemini
    ```
 
-2. Use the cost tracking wrapper in your code:
+2. Use the CostTrackingWrapper class in your code:
    ```python
-   from src.cost_tracking_wrapper import add_generation_id, calculate_and_log_costs
+   from src.cost_tracking_wrapper import CostTrackingWrapper
+
+   # Initialize the wrapper with your API key
+   cost_wrapper = CostTrackingWrapper(api_key="your-openrouter-api-key")
+   # Or let it auto-detect from environment variables
+   cost_wrapper = CostTrackingWrapper()
 
    # After each API call, add the generation ID
    processed_body, generation_id = self.model.chat_completion(...)
-   add_generation_id(phase_name=self.name, generation_id=generation_id)
+   cost_wrapper.add_generation_id(
+       phase_name="phase_name",
+       generation_id=generation_id,
+       model="gpt-4o-mini",  # Optional for better accuracy
+       prompt_tokens=100,    # Optional for cost estimation
+       completion_tokens=50  # Optional for cost estimation
+   )
 
    # At the end of your pipeline, calculate and log costs
    phase_names = ["modernize", "edit", "final"]
-   run_costs = calculate_and_log_costs(phase_names)
+   run_costs = cost_wrapper.calculate_and_log_costs(phase_names)
    ```
 
-3. Run the example:
-   ```bash
-   python examples/cost_tracking_example.py
-   ```
+3. Optional: Create your own cost tracking example by adding a file like `examples/cost_tracking_example.py` with the above code patterns.
 
 ## Command Line Interface
 

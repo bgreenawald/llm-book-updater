@@ -268,7 +268,10 @@ class OpenAIClient(ProviderClient):
             content = output_message.content[0].text
 
             # Check if response was truncated (status might indicate this)
-            if output_message.status == "incomplete" or response.status == "incomplete":
+            if (
+                getattr(output_message, "status", None) == "incomplete"
+                or getattr(response, "status", None) == "incomplete"
+            ):
                 module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
 
             # Register token usage for cost tracking if available

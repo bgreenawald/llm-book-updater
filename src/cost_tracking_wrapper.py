@@ -6,6 +6,7 @@ to existing LLM calls without modifying the core classes.
 """
 
 import os
+import threading
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -52,6 +53,8 @@ class CostTrackingWrapper:
         self.phase_generations: Dict[str, List[str]] = {}
         # Store model information for cost estimation
         self.model_info: Dict[str, Dict[str, Any]] = {}
+        # Thread lock for synchronizing access to shared data structures
+        self._lock = threading.Lock()
 
     def add_generation_id(
         self,
@@ -74,18 +77,19 @@ class CostTrackingWrapper:
         if not self.enabled:
             return
 
-        if phase_name not in self.phase_generations:
-            self.phase_generations[phase_name] = []
+        with self._lock:
+            if phase_name not in self.phase_generations:
+                self.phase_generations[phase_name] = []
 
-        self.phase_generations[phase_name].append(generation_id)
+            self.phase_generations[phase_name].append(generation_id)
 
-        # Store model information if provided
-        if model or prompt_tokens is not None or completion_tokens is not None:
-            self.model_info[generation_id] = {
-                "model": model,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-            }
+            # Store model information if provided
+            if model or prompt_tokens is not None or completion_tokens is not None:
+                self.model_info[generation_id] = {
+                    "model": model,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                }
 
         module_logger.debug(f"Added generation ID {generation_id} for phase {phase_name}")
 
@@ -105,11 +109,12 @@ class CostTrackingWrapper:
         if not self.enabled:
             return
 
-        self.model_info[generation_id] = {
-            "model": model,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-        }
+        with self._lock:
+            self.model_info[generation_id] = {
+                "model": model,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+            }
         module_logger.debug(
             f"Registered model info for generation {generation_id}: model={model}, "
             f"prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens}"
@@ -132,16 +137,21 @@ class CostTrackingWrapper:
         try:
             module_logger.info("Calculating run costs...")
 
+            # Create snapshots of shared data structures to avoid holding lock during calculations
+            with self._lock:
+                phase_generations_snapshot = {phase: ids.copy() for phase, ids in self.phase_generations.items()}
+                model_info_snapshot = self.model_info.copy()
+
             # Calculate costs for each phase
             phase_costs = []
             for i, phase_name in enumerate(phase_names):
-                generation_ids = self.phase_generations.get(phase_name, [])
+                generation_ids = phase_generations_snapshot.get(phase_name, [])
                 if generation_ids:
                     phase_cost = self.cost_tracker.calculate_phase_costs(
                         phase_name=phase_name,
                         phase_index=i,
                         generation_ids=generation_ids,
-                        model_info=self.model_info,
+                        model_info=model_info_snapshot,
                     )
                     phase_costs.append(phase_cost)
 
@@ -168,7 +178,8 @@ class CostTrackingWrapper:
         Returns:
             Number of generations for the phase
         """
-        return len(self.phase_generations.get(phase_name, []))
+        with self._lock:
+            return len(self.phase_generations.get(phase_name, []))
 
     def get_total_generation_count(self) -> int:
         """
@@ -177,12 +188,14 @@ class CostTrackingWrapper:
         Returns:
             Total number of generations
         """
-        return sum(len(generations) for generations in self.phase_generations.values())
+        with self._lock:
+            return sum(len(generations) for generations in self.phase_generations.values())
 
     def clear_generations(self) -> None:
         """Clear all stored generation IDs and model information."""
-        self.phase_generations.clear()
-        self.model_info.clear()
+        with self._lock:
+            self.phase_generations.clear()
+            self.model_info.clear()
         module_logger.debug("Cleared all generation IDs and model information")
 
 
