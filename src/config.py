@@ -3,7 +3,8 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from src.llm_model import GEMINI_FLASH
+from src.common.provider import Provider
+from src.llm_model import ModelConfig
 
 if TYPE_CHECKING:
     from src.llm_model import LlmModel
@@ -45,7 +46,9 @@ class PhaseConfig:
 
     phase_type: PhaseType
     enabled: bool = True
-    model_type: str = GEMINI_FLASH
+    model: ModelConfig = field(
+        default_factory=lambda: ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+    )
     temperature: float = 0.2
     reasoning: Optional[dict[str, str]] = None
     system_prompt_path: Optional[Path] = None
@@ -56,7 +59,7 @@ class PhaseConfig:
     input_file_path: Optional[Path] = None
     output_file_path: Optional[Path] = None
     original_file_path: Optional[Path] = None
-    model: Optional["LlmModel"] = None  # LlmModel instance
+    llm_model_instance: Optional["LlmModel"] = None  # LlmModel instance
     # Unified post-processors list that can contain strings (built-in) or
     # PostProcessor instances (custom)
     post_processors: Optional[List[Union[str, "PostProcessor", PostProcessorType]]] = None

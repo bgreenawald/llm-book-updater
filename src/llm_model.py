@@ -1,24 +1,62 @@
 import json
 import os
 import time
-from typing import Tuple
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple
 
 import requests
+from dotenv import load_dotenv
 
+from src.common.provider import Provider
+from src.cost_tracking_wrapper import register_generation_model_info
 from src.logging_config import setup_logging
+
+# Load environment variables from .env to ensure API keys are available
+load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="llm_model")
 
-# Model constants
-GROK_3_MINI = "x-ai/grok-3-mini"
-GEMINI_FLASH = "google/gemini-2.5-flash"
-GEMINI_PRO = "google/gemini-2.5-pro"
-DEEPSEEK = "deepseek/deepseek-r1-0528"
-OPENAI_04_MINI = "openai/o4-mini-high"
-CLAUDE_4_SONNET = "anthropic/claude-sonnet-4"
-GEMINI_FLASH_LITE = "google/gemini-2.5-flash-lite-preview-06-17"
-KIMI_K2 = "moonshotai/kimi-k2:free"
+
+@dataclass
+class ModelConfig:
+    """Configuration for a model, including provider and model identifier."""
+
+    provider: Provider
+    model_id: str
+    # Provider-specific model name (for direct SDK calls)
+    provider_model_name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Set provider_model_name if not specified."""
+        if self.provider_model_name is None:
+            if self.provider == Provider.OPENAI:
+                # Extract OpenAI model name from OpenRouter format
+                if "/" in self.model_id:
+                    self.provider_model_name = self.model_id.split("/", 1)[1]
+                else:
+                    self.provider_model_name = self.model_id
+            elif self.provider == Provider.GEMINI:
+                # Extract Gemini model name from OpenRouter format
+                if "/" in self.model_id:
+                    self.provider_model_name = self.model_id.split("/", 1)[1]
+                else:
+                    self.provider_model_name = self.model_id
+            else:
+                # For OpenRouter, use the full model_id
+                self.provider_model_name = self.model_id
+
+
+# Model constants with provider information
+GROK_3_MINI = ModelConfig(Provider.OPENROUTER, "x-ai/grok-3-mini")
+GEMINI_FLASH = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+GEMINI_PRO = ModelConfig(Provider.GEMINI, "google/gemini-2.5-pro", "gemini-2.5-pro")
+DEEPSEEK = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1-0528")
+OPENAI_04_MINI = ModelConfig(Provider.OPENAI, "openai/o4-mini-high", "o4-mini")
+CLAUDE_4_SONNET = ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4")
+GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash-lite")
+KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2:free")
 
 
 class LlmModelError(Exception):
@@ -27,120 +65,55 @@ class LlmModelError(Exception):
     pass
 
 
-class LlmModel:
-    """
-    LLM client backed by OpenRouter. Makes direct API calls to OpenRouter
-    with logging and validation.
-    """
+class ProviderClient(ABC):
+    """Abstract base class for provider-specific LLM clients."""
 
-    DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
-    DEFAULT_API_ENV = "OPENROUTER_API_KEY"
-    DEFAULT_MAX_RETRIES = 3
-    DEFAULT_RETRY_DELAY = 1.0  # seconds
-    DEFAULT_BACKOFF_FACTOR = 2.0
+    @abstractmethod
+    def chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """
+        Make a chat completion call.
+
+        Returns:
+            Tuple of (response_content, generation_id)
+        """
+        pass
+
+
+class OpenRouterClient(ProviderClient):
+    """Client for OpenRouter API calls."""
 
     def __init__(
         self,
-        model: str,
-        temperature: float = 0.2,
-        api_key_env: str = DEFAULT_API_ENV,
-        base_url: str = DEFAULT_BASE_URL,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        retry_delay: float = DEFAULT_RETRY_DELAY,
-        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-    ) -> None:
-        """
-        Args:
-            model:         Which model to call (string model identifier).
-            temperature:   Temperature for sampling.
-            api_key_env:   Name of the ENV var holding your OpenRouter API key.
-            base_url:      OpenRouter base endpoint.
-            max_retries:   Maximum number of retry attempts for failed API calls.
-            retry_delay:   Initial delay between retries in seconds.
-            backoff_factor: Multiplier for exponential backoff.
-        """
-        module_logger.info(f"Initializing LLM client: model={model}, base_url={base_url}")
-        api_key = os.getenv(api_key_env)
-        if not api_key:
-            msg = f"Missing environment variable: {api_key_env}"
-            module_logger.error(msg)
-            raise ValueError(msg)
-
-        self.model_id = model
-        self.temperature = temperature
-        self.base_url = base_url
+        api_key: str,
+        base_url: str = "https://openrouter.ai/api/v1",
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        backoff_factor: float = 2.0,
+    ):
         self.api_key = api_key
+        self.base_url = base_url
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.backoff_factor = backoff_factor
-        module_logger.success(f"LLM client ready: {self.model_id}")
-
-    @classmethod
-    def create(
-        cls,
-        model: str,
-        temperature: float = 0.2,
-        api_key_env: str = DEFAULT_API_ENV,
-        base_url: str = DEFAULT_BASE_URL,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        retry_delay: float = DEFAULT_RETRY_DELAY,
-        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-    ) -> "LlmModel":
-        """Create a new LlmModel instance with the specified configuration."""
-        return cls(
-            model=model,
-            temperature=temperature,
-            api_key_env=api_key_env,
-            base_url=base_url,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-            backoff_factor=backoff_factor,
-        )
-
-    def __str__(self) -> str:
-        return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
-
-    def __repr__(self) -> str:
-        return f"LlmModel(model_id={self.model_id}, temperature={self.temperature})"
-
-    def _log_prompt(self, role: str, content: str) -> None:
-        """
-        Logs a preview of the prompt content.
-
-        Args:
-            role (str): The role of the prompt (e.g., "System", "User").
-            content (str): The full content of the prompt.
-        """
-        preview = content if len(content) <= 200 else content[:200] + "..."
-        module_logger.trace(f"{role} prompt: {preview}")
 
     def _should_retry(self, error: Exception) -> bool:
         """Determine if an error should trigger a retry."""
         if isinstance(error, requests.exceptions.RequestException):
-            # Retry on network errors, timeouts, and 5xx server errors
             if hasattr(error, "response") and error.response is not None:
                 status_code = error.response.status_code
                 return status_code >= 500 or status_code == 429
-            # Retry on connection errors, timeouts, etc.
             return True
-        # Don't retry on JSON decode errors or other non-network issues
         return False
 
     def _make_api_call(self, headers: dict, data: dict) -> dict:
-        """
-        Makes a single API call to OpenRouter with retry logic.
-
-        Args:
-            headers (dict): HTTP headers for the request.
-            data (dict): JSON payload for the request.
-
-        Returns:
-            dict: The JSON response from the API.
-
-        Raises:
-            LlmModelError: If the API call fails after all retries.
-            json.JSONDecodeError: If the response cannot be decoded as JSON.
-        """
+        """Makes a single API call to OpenRouter with retry logic."""
         last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
@@ -149,7 +122,7 @@ class LlmModel:
                     url=f"{self.base_url}/chat/completions",
                     headers=headers,
                     data=json.dumps(obj=data),
-                    timeout=30,  # Add timeout to prevent hanging requests
+                    timeout=30,
                 )
                 response.raise_for_status()
                 return response.json()
@@ -175,7 +148,6 @@ class LlmModel:
                 module_logger.error(f"Unexpected error during API call: {e}")
                 break
 
-        # If we get here, all retries have been exhausted
         error_msg = f"API call failed after {self.max_retries + 1} attempts"
         if last_error:
             error_msg += f": {last_error}"
@@ -187,45 +159,34 @@ class LlmModel:
         self,
         system_prompt: str,
         user_prompt: str,
+        model_name: str,
+        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
-        """
-        Make a chat completion call using OpenRouter API with retry logic.
-
-        Returns:
-            assistant reply content and generation ID.
-
-        Raises:
-            LlmModelError: When API calls fail after max retries.
-            ValueError: On empty/malformed response.
-        """
-        self._log_prompt(role="System", content=system_prompt)
-        self._log_prompt(role="User", content=user_prompt)
-
-        # Prepare headers
+        """Make a chat completion call using OpenRouter API."""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
-        # Prepare request data
-        data = {
-            "model": self.model_id,
+        # GPT-5 models (and variants) currently do not accept custom temperature
+        # values. Detect and omit temperature to avoid 400 errors from upstream.
+        provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
+        is_gpt5_series_model = provider_model.lower().startswith("gpt-5")
+
+        data: dict[str, Any] = {
+            "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             **kwargs,
         }
+        if not is_gpt5_series_model:
+            data["temperature"] = temperature
 
-        # Make the API call with retry logic
-        try:
-            resp_data = self._make_api_call(headers=headers, data=data)
-        except LlmModelError:
-            # Re-raise LlmModelError to stop the pipeline
-            raise
+        resp_data = self._make_api_call(headers=headers, data=data)
 
-        # Extract response content
         choices = resp_data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):
             raise ValueError(f"Empty or malformed response: {resp_data}")
@@ -237,5 +198,402 @@ class LlmModel:
             module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
 
         generation_id = resp_data.get("id", "unknown")
-
         return content, generation_id
+
+
+class OpenAIClient(ProviderClient):
+    """Client for OpenAI SDK calls."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self._client = None
+
+    def _get_client(self):
+        """Lazy initialization of OpenAI client."""
+        if self._client is None:
+            try:
+                import openai
+
+                self._client = openai.OpenAI(api_key=self.api_key)
+            except ImportError as e:
+                raise LlmModelError(f"OpenAI SDK not available: {e}")
+        return self._client
+
+    def chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """Make a chat completion call using OpenAI SDK."""
+        client = self._get_client()
+
+        try:
+            # GPT-5 models (and variants) currently do not support custom
+            # temperature values; only the default is allowed. Omit the
+            # temperature parameter for these models to avoid 400 errors.
+            is_gpt5_series_model = model_name.lower().startswith("gpt-5")
+
+            request_kwargs: dict[str, Any] = {
+                "model": model_name,
+                "instructions": system_prompt,
+                "input": user_prompt,
+            }
+
+            if not is_gpt5_series_model:
+                request_kwargs["temperature"] = temperature
+
+            response = client.responses.create(**request_kwargs, **kwargs)
+
+            # Extract content from the new responses API format
+            # Response format: response.output[0] should be a message with content[0].text
+            if not response.output:
+                raise ValueError("Empty response output from OpenAI")
+
+            # Find the first message object in output (skip reasoning items)
+            output_message = None
+            for output_item in response.output:
+                if hasattr(output_item, "type") and output_item.type == "message":
+                    output_message = output_item
+                    break
+
+            if output_message is None:
+                raise ValueError("No message output found in OpenAI response")
+
+            if not output_message.content or not output_message.content[0].text:
+                raise ValueError("Empty response content from OpenAI")
+
+            content = output_message.content[0].text
+
+            # Check if response was truncated (status might indicate this)
+            if (
+                getattr(output_message, "status", None) == "incomplete"
+                or getattr(response, "status", None) == "incomplete"
+            ):
+                module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
+
+            # Register token usage for cost tracking if available
+            try:
+                usage = getattr(response, "usage", None)
+                prompt_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
+                completion_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
+
+                if prompt_tokens is not None or completion_tokens is not None:
+                    register_generation_model_info(
+                        generation_id=response.id,
+                        model=model_name,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                    )
+            except Exception:
+                # Swallow any optional usage extraction issues without failing the call
+                pass
+
+            return content, response.id
+
+        except Exception as e:
+            module_logger.error(f"OpenAI API call failed: {e}")
+            raise LlmModelError(f"OpenAI API call failed: {e}")
+
+
+class GeminiClient(ProviderClient):
+    """Client for Google Gemini SDK calls."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self._client = None
+
+    def _get_client(self):
+        """Lazy initialization of Gemini client."""
+        if self._client is None:
+            try:
+                from google import genai
+
+                self._client = genai.Client(api_key=self.api_key)
+            except ImportError as e:
+                raise LlmModelError(f"Google GenAI SDK not available: {e}")
+        return self._client
+
+    def chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """Make a chat completion call using Gemini SDK."""
+        client = self._get_client()
+
+        try:
+            from google.genai import types
+
+            # Configure generation settings
+            # Remove unsupported parameters (e.g., reasoning)
+            kwargs.pop("reasoning", None)
+
+            # Build the generation config
+            config = types.GenerateContentConfig(temperature=temperature, **kwargs)
+
+            # Combine system prompt and user prompt into contents
+            contents = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+
+            response = client.models.generate_content(model=model_name, contents=contents, config=config)
+
+            if not response.text:
+                raise ValueError("Empty response from Gemini")
+
+            # Gemini doesn't provide a completion ID in the same way, so we'll generate one
+            generation_id = f"gemini_{int(time.time())}"
+
+            # Extract and register token usage for cost tracking if available
+            try:
+                usage_metadata = getattr(response, "usage_metadata", None)
+                if usage_metadata:
+                    prompt_tokens = getattr(usage_metadata, "prompt_token_count", None)
+                    completion_tokens = getattr(usage_metadata, "candidates_token_count", None)
+
+                    if prompt_tokens is not None or completion_tokens is not None:
+                        register_generation_model_info(
+                            generation_id=generation_id,
+                            model=model_name,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                        )
+            except Exception as e:
+                # Log but don't fail if we can't extract usage metadata
+                module_logger.debug(f"Could not extract Gemini usage metadata: {e}")
+
+            return response.text, generation_id
+
+        except Exception as e:
+            module_logger.error(f"Gemini API call failed: {e}")
+            raise LlmModelError(f"Gemini API call failed: {e}")
+
+
+class LlmModel:
+    """
+    Unified LLM client that supports multiple providers (OpenRouter, OpenAI, Gemini).
+    Routes requests to the appropriate provider based on model configuration.
+    """
+
+    DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    DEFAULT_OPENROUTER_API_ENV = "OPENROUTER_API_KEY"
+    DEFAULT_OPENAI_API_ENV = "OPENAI_API_KEY"
+    DEFAULT_GEMINI_API_ENV = "GEMINI_API_KEY"
+    DEFAULT_MAX_RETRIES = 3
+    DEFAULT_RETRY_DELAY = 1.0  # seconds
+    DEFAULT_BACKOFF_FACTOR = 2.0
+
+    def __init__(
+        self,
+        model: ModelConfig,
+        temperature: float = 0.2,
+        # OpenRouter settings
+        openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
+        openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
+        openrouter_max_retries: int = DEFAULT_MAX_RETRIES,
+        openrouter_retry_delay: float = DEFAULT_RETRY_DELAY,
+        openrouter_backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        # Provider-specific API key environments
+        openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
+        gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        # Prompt logging control
+        enable_prompt_logging: Optional[bool] = None,
+    ) -> None:
+        """
+        Initialize LLM client with provider routing capabilities.
+
+        Args:
+            model: Model configuration (ModelConfig) specifying provider and model.
+            temperature: Temperature for sampling.
+            openrouter_api_key_env: Environment variable for OpenRouter API key.
+            openrouter_base_url: OpenRouter base URL.
+            openrouter_max_retries: Maximum retry attempts for OpenRouter.
+            openrouter_retry_delay: Initial retry delay for OpenRouter.
+            openrouter_backoff_factor: Backoff multiplier for OpenRouter.
+            openai_api_key_env: Environment variable for OpenAI API key.
+            gemini_api_key_env: Environment variable for Gemini API key.
+            enable_prompt_logging: Whether to enable prompt content logging (defaults to False).
+                If None, checks LLM_ENABLE_PROMPT_LOGGING environment variable.
+        """
+        self.model_config = model
+        self.temperature = temperature
+
+        # Determine prompt logging setting
+        if enable_prompt_logging is None:
+            # Check environment variable, default to False for security
+            env_value = os.getenv("LLM_ENABLE_PROMPT_LOGGING", "false").lower()
+            self.enable_prompt_logging = env_value in ("true", "1", "yes", "on")
+        else:
+            self.enable_prompt_logging = enable_prompt_logging
+
+        # Initialize provider clients
+        self._clients: dict[Provider, ProviderClient] = {}
+
+        # Store configuration for lazy initialization
+        # Explicit typing avoids mypy treating this as 'object'
+        self._config: dict[str, dict[str, Any]] = {
+            "openrouter": {
+                "api_key_env": openrouter_api_key_env,
+                "base_url": openrouter_base_url,
+                "max_retries": openrouter_max_retries,
+                "retry_delay": openrouter_retry_delay,
+                "backoff_factor": openrouter_backoff_factor,
+            },
+            "openai": {"api_key_env": openai_api_key_env},
+            "gemini": {"api_key_env": gemini_api_key_env},
+        }
+
+        module_logger.info(
+            f"Initializing LLM client: provider={self.model_config.provider.value}, model={self.model_config.model_id}"
+        )
+
+        # Validate that we have the required API key for the provider
+        self._validate_api_key()
+
+        module_logger.success(f"LLM client ready: {self.model_config.model_id}")
+
+    def _validate_api_key(self) -> None:
+        """Validate that the required API key is available for the provider."""
+        provider = self.model_config.provider
+
+        if provider == Provider.OPENROUTER:
+            api_key_env = self._config["openrouter"]["api_key_env"]
+        elif provider == Provider.OPENAI:
+            api_key_env = self._config["openai"]["api_key_env"]
+        elif provider == Provider.GEMINI:
+            api_key_env = self._config["gemini"]["api_key_env"]
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+
+        if not os.getenv(api_key_env):
+            msg = f"Missing environment variable: {api_key_env}"
+            module_logger.error(msg)
+            raise ValueError(msg)
+
+    def _get_client(self) -> ProviderClient:
+        """Get or create the appropriate provider client."""
+        provider = self.model_config.provider
+
+        if provider not in self._clients:
+            if provider == Provider.OPENROUTER:
+                config = self._config["openrouter"]
+                api_key = os.getenv(config["api_key_env"])
+                if api_key is None:
+                    raise ValueError(f"Missing environment variable: {config['api_key_env']}")
+                self._clients[provider] = OpenRouterClient(
+                    api_key=api_key,
+                    base_url=config["base_url"],
+                    max_retries=config["max_retries"],
+                    retry_delay=config["retry_delay"],
+                    backoff_factor=config["backoff_factor"],
+                )
+            elif provider == Provider.OPENAI:
+                api_key = os.getenv(self._config["openai"]["api_key_env"])
+                if api_key is None:
+                    raise ValueError(f"Missing environment variable: {self._config['openai']['api_key_env']}")
+                self._clients[provider] = OpenAIClient(api_key=api_key)
+            elif provider == Provider.GEMINI:
+                api_key = os.getenv(self._config["gemini"]["api_key_env"])
+                if api_key is None:
+                    raise ValueError(f"Missing environment variable: {self._config['gemini']['api_key_env']}")
+                self._clients[provider] = GeminiClient(api_key=api_key)
+            else:
+                raise ValueError(f"Unsupported provider: {provider}")
+
+        return self._clients[provider]
+
+    @classmethod
+    def create(
+        cls,
+        model: ModelConfig,
+        temperature: float = 0.2,
+        openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
+        openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
+        openrouter_max_retries: int = DEFAULT_MAX_RETRIES,
+        openrouter_retry_delay: float = DEFAULT_RETRY_DELAY,
+        openrouter_backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
+        gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        enable_prompt_logging: Optional[bool] = None,
+    ) -> "LlmModel":
+        """Create a new LlmModel instance with the specified configuration."""
+        return cls(
+            model=model,
+            temperature=temperature,
+            openrouter_api_key_env=openrouter_api_key_env,
+            openrouter_base_url=openrouter_base_url,
+            openrouter_max_retries=openrouter_max_retries,
+            openrouter_retry_delay=openrouter_retry_delay,
+            openrouter_backoff_factor=openrouter_backoff_factor,
+            openai_api_key_env=openai_api_key_env,
+            gemini_api_key_env=gemini_api_key_env,
+            enable_prompt_logging=enable_prompt_logging,
+        )
+
+    @property
+    def model_id(self) -> str:
+        """Get the model ID for backward compatibility."""
+        return self.model_config.model_id
+
+    def __str__(self) -> str:
+        return (
+            f"LlmModel(provider={self.model_config.provider.value}, "
+            f"model_id={self.model_config.model_id}, temperature={self.temperature})"
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"LlmModel(provider={self.model_config.provider.value}, "
+            f"model_id={self.model_config.model_id}, temperature={self.temperature})"
+        )
+
+    def _log_prompt(self, role: str, content: str) -> None:
+        """
+        Logs a preview of the prompt content if prompt logging is enabled.
+
+        Args:
+            role (str): The role of the prompt (e.g., "System", "User").
+            content (str): The full content of the prompt.
+        """
+        if self.enable_prompt_logging:
+            preview = content if len(content) <= 200 else content[:200] + "..."
+            module_logger.trace(f"{role} prompt: {preview}")
+
+    def chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """
+        Make a chat completion call using the appropriate provider.
+
+        Returns:
+            Tuple of (assistant reply content, generation ID).
+
+        Raises:
+            LlmModelError: When API calls fail after max retries.
+            ValueError: On empty/malformed response.
+        """
+        self._log_prompt(role="System", content=system_prompt)
+        self._log_prompt(role="User", content=user_prompt)
+
+        client = self._get_client()
+
+        # Ensure model_name is a concrete string
+        model_name: str = self.model_config.provider_model_name or self.model_config.model_id
+
+        # Allow per-call temperature override without duplicating keyword
+        call_temperature: float = kwargs.pop("temperature", self.temperature)
+
+        return client.chat_completion(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_name=model_name,
+            temperature=call_temperature,
+            **kwargs,
+        )
