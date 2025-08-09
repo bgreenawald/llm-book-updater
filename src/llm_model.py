@@ -176,17 +176,16 @@ class OpenRouterClient(ProviderClient):
             "Content-Type": "application/json",
         }
 
-        # Some OpenAI o* models (e.g., openai/o4-*, openai/o3-*) routed via
-        # OpenRouter also do not accept custom temperature values. Detect and
-        # omit temperature in that case to avoid 400 errors from upstream.
+        # GPT-5 models (and variants) currently do not accept custom temperature
+        # values. Detect and omit temperature to avoid 400 errors from upstream.
         provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
-        is_o_series_model = provider_model.lower().startswith("o")
+        is_gpt5_series_model = provider_model.lower().startswith("gpt-5")
 
         # Remove unsupported parameters for OpenRouter chat completions
         # (e.g., a "reasoning" dict intended for other APIs)
         kwargs.pop("reasoning", None)
 
-        data = {
+        data: dict[str, Any] = {
             "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -194,7 +193,7 @@ class OpenRouterClient(ProviderClient):
             ],
             **kwargs,
         }
-        if not is_o_series_model:
+        if not is_gpt5_series_model:
             data["temperature"] = temperature
 
         resp_data = self._make_api_call(headers=headers, data=data)
@@ -243,15 +242,27 @@ class OpenAIClient(ProviderClient):
         client = self._get_client()
 
         try:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[
+            # GPT-5 models (and variants) currently do not support custom
+            # temperature values; only the default is allowed. Omit the
+            # temperature parameter for these models to avoid 400 errors.
+            is_gpt5_series_model = model_name.lower().startswith("gpt-5")
+
+            # Remove unsupported/unknown parameters for chat.completions
+            # (e.g., a "reasoning" dict intended for Responses API)
+            kwargs.pop("reasoning", None)
+
+            request_kwargs: dict[str, Any] = {
+                "model": model_name,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=temperature,
-                **kwargs,
-            )
+            }
+
+            if not is_gpt5_series_model:
+                request_kwargs["temperature"] = temperature
+
+            response = client.chat.completions.create(**request_kwargs, **kwargs)
 
             content = response.choices[0].message.content
             if not content:
