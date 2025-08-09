@@ -6,7 +6,7 @@ to existing LLM calls without modifying the core classes.
 """
 
 import os
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.cost_tracker import CostTracker, RunCosts
 from src.logging_config import setup_logging
@@ -44,15 +44,27 @@ class CostTrackingWrapper:
             module_logger.warning("No API key found, cost tracking disabled")
 
         # Store generation IDs by phase
-        self.phase_generations: dict = {}
+        self.phase_generations: Dict[str, List[str]] = {}
+        # Store model information for cost estimation
+        self.model_info: Dict[str, Dict[str, Any]] = {}
 
-    def add_generation_id(self, phase_name: str, generation_id: str) -> None:
+    def add_generation_id(
+        self,
+        phase_name: str,
+        generation_id: str,
+        model: Optional[str] = None,
+        prompt_tokens: Optional[int] = None,
+        completion_tokens: Optional[int] = None,
+    ) -> None:
         """
-        Add a generation ID for a specific phase.
+        Add a generation ID for a specific phase with optional model information for cost estimation.
 
         Args:
             phase_name: Name of the phase
             generation_id: Generation ID from the API call
+            model: Model name (required for non-OpenRouter providers)
+            prompt_tokens: Number of prompt tokens (for cost estimation)
+            completion_tokens: Number of completion tokens (for cost estimation)
         """
         if not self.enabled:
             return
@@ -61,6 +73,15 @@ class CostTrackingWrapper:
             self.phase_generations[phase_name] = []
 
         self.phase_generations[phase_name].append(generation_id)
+
+        # Store model information if provided
+        if model or prompt_tokens is not None or completion_tokens is not None:
+            self.model_info[generation_id] = {
+                "model": model,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+            }
+
         module_logger.debug(f"Added generation ID {generation_id} for phase {phase_name}")
 
     def calculate_and_log_costs(self, phase_names: List[str]) -> Optional[RunCosts]:
@@ -89,6 +110,7 @@ class CostTrackingWrapper:
                         phase_name=phase_name,
                         phase_index=i,
                         generation_ids=generation_ids,
+                        model_info=self.model_info,
                     )
                     phase_costs.append(phase_cost)
 
@@ -127,9 +149,10 @@ class CostTrackingWrapper:
         return sum(len(generations) for generations in self.phase_generations.values())
 
     def clear_generations(self) -> None:
-        """Clear all stored generation IDs."""
+        """Clear all stored generation IDs and model information."""
         self.phase_generations.clear()
-        module_logger.debug("Cleared all generation IDs")
+        self.model_info.clear()
+        module_logger.debug("Cleared all generation IDs and model information")
 
 
 # Global instance for easy access
@@ -149,17 +172,26 @@ def get_cost_tracking_wrapper() -> Optional[CostTrackingWrapper]:
     return _cost_tracking_wrapper
 
 
-def add_generation_id(phase_name: str, generation_id: str) -> None:
+def add_generation_id(
+    phase_name: str,
+    generation_id: str,
+    model: Optional[str] = None,
+    prompt_tokens: Optional[int] = None,
+    completion_tokens: Optional[int] = None,
+) -> None:
     """
-    Add a generation ID for a specific phase.
+    Add a generation ID for a specific phase with optional model information.
 
     Args:
         phase_name: Name of the phase
         generation_id: Generation ID from the API call
+        model: Model name (required for non-OpenRouter providers)
+        prompt_tokens: Number of prompt tokens (for cost estimation)
+        completion_tokens: Number of completion tokens (for cost estimation)
     """
     wrapper = get_cost_tracking_wrapper()
     if wrapper:
-        wrapper.add_generation_id(phase_name, generation_id)
+        wrapper.add_generation_id(phase_name, generation_id, model, prompt_tokens, completion_tokens)
 
 
 def calculate_and_log_costs(phase_names: List[str]) -> Optional[RunCosts]:
@@ -176,3 +208,32 @@ def calculate_and_log_costs(phase_names: List[str]) -> Optional[RunCosts]:
     if wrapper:
         return wrapper.calculate_and_log_costs(phase_names)
     return None
+
+
+def add_llm_generation(
+    phase_name: str,
+    generation_id: str,
+    model_config,
+    prompt_tokens: Optional[int] = None,
+    completion_tokens: Optional[int] = None,
+) -> None:
+    """
+    Add a generation ID from an LlmModel call with automatic model name extraction.
+
+    Args:
+        phase_name: Name of the phase
+        generation_id: Generation ID from the LlmModel call
+        model_config: ModelConfig object from LlmModel
+        prompt_tokens: Number of prompt tokens (for cost estimation)
+        completion_tokens: Number of completion tokens (for cost estimation)
+    """
+    # Extract model name from ModelConfig
+    model_name = getattr(model_config, "provider_model_name", None) or getattr(model_config, "model_id", None)
+
+    add_generation_id(
+        phase_name=phase_name,
+        generation_id=generation_id,
+        model=model_name,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )

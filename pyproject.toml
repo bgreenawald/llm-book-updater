@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
+    "google-genai>=1.27.0",
     "loguru>=0.7.3",
     "marker-pdf[full]>=1.7.3",
     "openai>=1.82.0",

@@ -27,7 +27,7 @@ A tool for processing and updating book content using Large Language Models (LLM
     ```
     *(This command uses the dependencies specified in `pyproject.toml`)*
 
-3.  **Configure your LLM API credentials** (e.g., set `OPENROUTER_API_KEY` as an environment variable).
+3.  **Configure your LLM API credentials** (see [LLM Provider Configuration](#llm-provider-configuration) below).
 
 ## System Requirements
 
@@ -76,15 +76,115 @@ pipeline = Pipeline(
 pipeline.run()
 ```
 
+## LLM Provider Configuration
+
+The system supports multiple LLM providers with direct SDK integration for better performance and cost efficiency:
+
+- **OpenRouter**: API proxy for various models (default)
+- **OpenAI**: Direct SDK integration using `openai` package
+- **Gemini**: Direct SDK integration using `google-genai` package
+
+### Environment Variables
+
+Set the appropriate API keys for the providers you want to use:
+
+```bash
+# For OpenRouter models
+export OPENROUTER_API_KEY="your_openrouter_key_here"
+
+# For OpenAI models (direct SDK)
+export OPENAI_API_KEY="your_openai_key_here"
+
+# For Gemini models (direct SDK)
+export GEMINI_API_KEY="your_gemini_key_here"
+```
+
+### Using Predefined Models
+
+```python
+from src.llm_model import GEMINI_FLASH, OPENAI_04_MINI, GROK_3_MINI, LlmModel
+
+# Use Gemini directly via Google's SDK (faster, cheaper)
+model = LlmModel.create(model=GEMINI_FLASH, temperature=0.2)
+
+# Use OpenAI directly via OpenAI's SDK
+model = LlmModel.create(model=OPENAI_04_MINI, temperature=0.2)
+
+# Use OpenRouter (for models not available via direct SDKs)
+model = LlmModel.create(model=GROK_3_MINI, temperature=0.2)
+```
+
+### Available Model Constants
+
+**Gemini Models (Direct SDK)**
+- `GEMINI_FLASH` → `gemini-2.5-flash`
+- `GEMINI_PRO` → `gemini-2.5-pro`
+- `GEMINI_FLASH_LITE` → `gemini-2.5-flash-lite`
+
+**OpenAI Models (Direct SDK)**
+- `OPENAI_04_MINI` → `o4-mini`
+
+**OpenRouter Models**
+- `GROK_3_MINI` → `x-ai/grok-3-mini`
+- `DEEPSEEK` → `deepseek/deepseek-r1-0528`
+- `CLAUDE_4_SONNET` → `anthropic/claude-sonnet-4`
+- `KIMI_K2` → `moonshotai/kimi-k2:free`
+
+### Custom Model Configurations
+
+```python
+from src.llm_model import ModelConfig, Provider, LlmModel
+
+# Custom OpenAI model
+custom_openai = ModelConfig(
+    provider=Provider.OPENAI,
+    model_id="gpt-4o",
+    provider_model_name="gpt-4o"
+)
+model = LlmModel.create(model=custom_openai)
+
+# Custom Gemini model
+custom_gemini = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="gemini-pro",
+    provider_model_name="gemini-pro"
+)
+model = LlmModel.create(model=custom_gemini)
+```
+
+### Configuration in Pipeline
+
+In your pipeline configuration, use ModelConfig objects:
+
+```python
+from src.config import PhaseConfig, PhaseType
+from src.llm_model import GEMINI_FLASH
+
+phase_config = PhaseConfig(
+    phase_type=PhaseType.MODERNIZE,
+    model_type=GEMINI_FLASH,  # Direct Gemini SDK
+    temperature=0.2
+)
+```
+
+### Benefits of Direct SDK Integration
+
+- **Performance**: Direct SDK calls are faster than OpenRouter proxy
+- **Cost**: No OpenRouter markup fees for direct provider calls
+- **Reliability**: Provider-specific retry logic and error handling
+- **Features**: Access to provider-specific optimizations
+
 ## Cost Tracking
 
-The system includes an optional cost tracking feature for OpenRouter API usage. This allows you to monitor and log costs for each phase and the total run without modifying existing code.
+The system includes an optional cost tracking feature for LLM API usage across all providers. This allows you to monitor and log costs for each phase and the total run without modifying existing code.
 
 ### Quick Start with Cost Tracking
 
-1. Set your OpenRouter API key:
+1. Set your API key for the provider you're using:
    ```bash
-   export OPENROUTER_API_KEY="your-api-key-here"
+   export OPENROUTER_API_KEY="your-api-key-here"    # For OpenRouter
+   export OPENAI_API_KEY="your-api-key-here"        # For OpenAI
+   export GEMINI_API_KEY="your-api-key-here"        # For Gemini
    ```
 
 2. Use the cost tracking wrapper in your code:

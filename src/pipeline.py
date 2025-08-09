@@ -2,7 +2,10 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.llm_model import ModelConfig
 
 import requests
 from loguru import logger
@@ -407,26 +410,47 @@ class Pipeline:
             logger.warning(f"Failed to fetch model info for {model_id}: {str(e)}")
             return None
 
-    def _get_model_metadata(self, model_type: str) -> Dict[str, Any]:
+    def _get_model_metadata(self, model_type: "ModelConfig") -> Dict[str, Any]:
         """
-        Get model metadata including both the original model_type and clean model info.
+        Get model metadata from ModelConfig object.
 
         Args:
-            model_type (str): The original model type string
+            model_type: The model configuration (ModelConfig)
 
         Returns:
-            Dict[str, Any]: Model metadata with both original and clean information
+            Dict[str, Any]: Model metadata with provider and model information
         """
-        model_info = self._fetch_model_info(model_id=model_type)
+        model_id = model_type.model_id
+        provider = model_type.provider.value
+        provider_model_name = model_type.provider_model_name
+
+        # For non-OpenRouter providers, don't try to fetch from OpenRouter API
+        if provider != "openrouter":
+            return {
+                "model_type": model_id,
+                "provider": provider,
+                "provider_model_name": provider_model_name,
+                "model": {"id": model_id, "name": provider_model_name or model_id},
+            }
+
+        # Try to fetch info from OpenRouter API for OpenRouter models
+        model_info = self._fetch_model_info(model_id=model_id)
 
         if model_info:
             return {
-                "model_type": model_type,  # Keep original for backward compatibility
+                "model_type": model_id,
+                "provider": provider,
+                "provider_model_name": provider_model_name,
                 "model": model_info,
             }
         else:
-            # Fallback to just the model_type if we can't fetch clean info
-            return {"model_type": model_type, "model": {"id": model_type, "name": model_type}}
+            # Fallback if we can't fetch clean info from OpenRouter
+            return {
+                "model_type": model_id,
+                "provider": provider,
+                "provider_model_name": provider_model_name,
+                "model": {"id": model_id, "name": provider_model_name or model_id},
+            }
 
     def run(self, **kwargs) -> None:
         """

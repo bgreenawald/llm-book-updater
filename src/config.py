@@ -3,7 +3,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from src.llm_model import GEMINI_FLASH
+from src.llm_model import GEMINI_FLASH, ModelConfig
 
 if TYPE_CHECKING:
     from src.llm_model import LlmModel
@@ -45,7 +45,7 @@ class PhaseConfig:
 
     phase_type: PhaseType
     enabled: bool = True
-    model_type: str = GEMINI_FLASH
+    model_type: ModelConfig = field(default_factory=lambda: GEMINI_FLASH)
     temperature: float = 0.2
     reasoning: Optional[dict[str, str]] = None
     system_prompt_path: Optional[Path] = None
