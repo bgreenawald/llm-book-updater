@@ -141,7 +141,7 @@ class LlmModel:
             LlmModelError: If the API call fails after all retries.
             json.JSONDecodeError: If the response cannot be decoded as JSON.
         """
-        last_error = None
+        last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 from src.llm_model import GEMINI_FLASH
 
@@ -47,7 +47,7 @@ class PhaseConfig:
     enabled: bool = True
     model_type: str = GEMINI_FLASH
     temperature: float = 0.2
-    reasoning: Optional[Dict[str, str]] = None
+    reasoning: Optional[dict[str, str]] = None
     system_prompt_path: Optional[Path] = None
     user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None

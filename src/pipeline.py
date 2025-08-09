@@ -330,6 +330,7 @@ class Pipeline:
         )
 
         # Create the phase instance using the factory with explicit arguments
+        phase: LlmPhase
         if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
             phase = PhaseFactory.create_standard_phase(
                 config=factory_config,

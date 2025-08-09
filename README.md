@@ -90,11 +90,11 @@ The system includes an optional cost tracking feature for OpenRouter API usage. 
 2. Use the cost tracking wrapper in your code:
    ```python
    from src.cost_tracking_wrapper import add_generation_id, calculate_and_log_costs
-   
+
    # After each API call, add the generation ID
    processed_body, generation_id = self.model.chat_completion(...)
    add_generation_id(phase_name=self.name, generation_id=generation_id)
-   
+
    # At the end of your pipeline, calculate and log costs
    phase_names = ["modernize", "edit", "final"]
    run_costs = calculate_and_log_costs(phase_names)

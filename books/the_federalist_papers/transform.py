@@ -13,7 +13,7 @@ import sys
 def join_paragraphs(lines: list[str]) -> list[str]:
     """
     Collapse consecutive non-blank, non-header lines into a single line.
-    Blank lines and lines starting with '# ' are always emitted as-is.
+    Blank lines and lines starting with '# ' or '## ' are always emitted as-is.
     """
     out: list[str] = []
     paragraph_lines: list[str] = []
@@ -28,7 +28,7 @@ def join_paragraphs(lines: list[str]) -> list[str]:
                 paragraph_lines = []
             out.append(line)
         # markdown header: flush paragraph, then emit header
-        elif line.startswith("# "):
+        elif line.startswith("# ") or line.startswith("## "):
             if paragraph_lines:
                 combined = " ".join(line.strip() for line in paragraph_lines) + "\n"
                 out.append(combined)
@@ -53,7 +53,7 @@ def transform(lines: list[str]) -> list[str]:
       3. If the subject == "The Same Subject Continued",
          skip blank(s) again and collect until the next blank as an
          extension. Append that to the subject.
-      4. Emit "# No.… - <subject>" and skip all consumed lines.
+      4. Emit "## No.… - <subject>" and skip all consumed lines.
     """
     out: list[str] = []
     n = len(lines)
@@ -106,7 +106,8 @@ def transform(lines: list[str]) -> list[str]:
                     skip_to += 1
 
             # 4) emit header and advance
-            new_line = f"# {line.strip()} - {subject}\n\n"
+            ordinal = line.strip()[3:]  # Extract everything after "No."
+            new_line = f"## No.{ordinal} - {subject}\n\n"
             out.append(new_line)
             i = skip_to
 

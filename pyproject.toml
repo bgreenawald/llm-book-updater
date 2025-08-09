@@ -18,7 +18,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.1.0",
+    "ruff>=0.12.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.0.0",
+    "pre-commit>=4.0.1",
+    "mypy>=1.13.0",
+    "bandit>=1.8.0",
 ]
 
 [tool.ruff]
@@ -80,6 +85,6 @@ line-ending = "auto"
 
 [dependency-groups]
 dev = [
+    "bandit>=1.8.6",
     "pytest>=8.4.1",
-    "ruff>=0.12.1",
 ]

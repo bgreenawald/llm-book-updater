@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
@@ -15,8 +16,21 @@ from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
 
 
-def test_pipeline_metadata():
+@patch("src.llm_model.LlmModel")
+@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+def test_pipeline_metadata(mock_cost_wrapper, mock_llm_model):
     """Test that pipeline metadata is correctly collected and saved."""
+    # Mock the LlmModel to avoid API key requirements
+    mock_model_instance = Mock()
+    mock_model_instance.model_id = "test/model"
+    mock_model_instance.temperature = 0.2
+    mock_llm_model.return_value = mock_model_instance
+
+    # Mock the cost wrapper to avoid API dependencies
+    mock_wrapper_instance = Mock()
+    mock_wrapper_instance.enabled = False
+    mock_cost_wrapper.return_value = mock_wrapper_instance
+
     try:
         # Create temporary directory for test
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -128,8 +142,21 @@ def test_pipeline_metadata():
         raise
 
 
-def test_cost_analysis_saving():
+@patch("src.llm_model.LlmModel")
+@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_model):
     """Test that cost analysis data is correctly saved."""
+    # Mock the LlmModel to avoid API key requirements
+    mock_model_instance = Mock()
+    mock_model_instance.model_id = "test/model"
+    mock_model_instance.temperature = 0.2
+    mock_llm_model.return_value = mock_model_instance
+
+    # Mock the cost wrapper to avoid API dependencies
+    mock_wrapper_instance = Mock()
+    mock_wrapper_instance.enabled = False
+    mock_cost_wrapper.return_value = mock_wrapper_instance
+
     try:
         # Create temporary directory for test
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,8 +267,21 @@ def test_cost_analysis_saving():
         raise
 
 
-def test_metadata_with_disabled_phases():
+@patch("src.llm_model.LlmModel")
+@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_model):
     """Test that metadata is correctly collected for disabled phases."""
+    # Mock the LlmModel to avoid API key requirements
+    mock_model_instance = Mock()
+    mock_model_instance.model_id = "test/model"
+    mock_model_instance.temperature = 0.2
+    mock_llm_model.return_value = mock_model_instance
+
+    # Mock the cost wrapper to avoid API dependencies
+    mock_wrapper_instance = Mock()
+    mock_wrapper_instance.enabled = False
+    mock_cost_wrapper.return_value = mock_wrapper_instance
+
     try:
         # Create temporary directory for test
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -312,8 +352,21 @@ def test_metadata_with_disabled_phases():
         raise
 
 
-def test_metadata_with_failed_phases():
+@patch("src.llm_model.LlmModel")
+@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_model):
     """Test that metadata is correctly collected for failed phases."""
+    # Mock the LlmModel to avoid API key requirements
+    mock_model_instance = Mock()
+    mock_model_instance.model_id = "test/model"
+    mock_model_instance.temperature = 0.2
+    mock_llm_model.return_value = mock_model_instance
+
+    # Mock the cost wrapper to avoid API dependencies
+    mock_wrapper_instance = Mock()
+    mock_wrapper_instance.enabled = False
+    mock_cost_wrapper.return_value = mock_wrapper_instance
+
     try:
         # Create temporary directory for test
         with tempfile.TemporaryDirectory() as temp_dir:
