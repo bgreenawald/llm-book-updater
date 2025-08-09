@@ -7,8 +7,12 @@ from enum import Enum
 from typing import Any, Optional, Tuple
 
 import requests
+from dotenv import load_dotenv
 
 from src.logging_config import setup_logging
+
+# Load environment variables from .env to ensure API keys are available
+load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="llm_model")
@@ -172,15 +176,26 @@ class OpenRouterClient(ProviderClient):
             "Content-Type": "application/json",
         }
 
+        # Some OpenAI o* models (e.g., openai/o4-*, openai/o3-*) routed via
+        # OpenRouter also do not accept custom temperature values. Detect and
+        # omit temperature in that case to avoid 400 errors from upstream.
+        provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
+        is_o_series_model = provider_model.lower().startswith("o")
+
+        # Remove unsupported parameters for OpenRouter chat completions
+        # (e.g., a "reasoning" dict intended for other APIs)
+        kwargs.pop("reasoning", None)
+
         data = {
             "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": temperature,
             **kwargs,
         }
+        if not is_o_series_model:
+            data["temperature"] = temperature
 
         resp_data = self._make_api_call(headers=headers, data=data)
 
@@ -284,10 +299,9 @@ class GeminiClient(ProviderClient):
 
         try:
             # Configure generation settings
-            generation_config = {
-                "temperature": temperature,
-                **kwargs,
-            }
+            # Remove unsupported parameters (e.g., reasoning)
+            kwargs.pop("reasoning", None)
+            generation_config = {"temperature": temperature, **kwargs}
 
             model = client.GenerativeModel(
                 model_name=model_name,
@@ -509,10 +523,13 @@ class LlmModel:
         # Ensure model_name is a concrete string
         model_name: str = self.model_config.provider_model_name or self.model_config.model_id
 
+        # Allow per-call temperature override without duplicating keyword
+        call_temperature: float = kwargs.pop("temperature", self.temperature)
+
         return client.chat_completion(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model_name=model_name,
-            temperature=self.temperature,
+            temperature=call_temperature,
             **kwargs,
         )
