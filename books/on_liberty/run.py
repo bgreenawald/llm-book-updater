@@ -3,39 +3,44 @@ from pathlib import Path
 from typing import List
 
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import DEEPSEEK, GEMINI_FLASH, GEMINI_PRO
+from src.llm_model import ModelConfig, Provider
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
+
+# Use OpenRouter for all phases
+OPENROUTER_GEMINI_FLASH_LITE = ModelConfig(Provider.OPENROUTER, "google/gemini-2.5-flash-lite")
+GOOGLE_GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "gemini-2.5-flash-lite")
+CHATGPT_GPT5_NANO = ModelConfig(Provider.OPENAI, "gpt-5-nano")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model_type=GEMINI_FLASH,
+        model_type=GOOGLE_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model_type=GEMINI_PRO,
+        model_type=CHATGPT_GPT5_NANO,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model_type=DEEPSEEK,
+        model_type=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model_type=GEMINI_FLASH,
+        model_type=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model_type=GEMINI_FLASH,
+        model_type=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model_type=GEMINI_FLASH,
+        model_type=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
 ]

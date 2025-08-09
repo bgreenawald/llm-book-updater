@@ -8,8 +8,13 @@ to existing LLM calls without modifying the core classes.
 import os
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
+
 from src.cost_tracker import CostTracker, RunCosts
 from src.logging_config import setup_logging
+
+# Load environment variables from .env to ensure API keys are available
+load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="cost_tracking_wrapper")
@@ -83,6 +88,32 @@ class CostTrackingWrapper:
             }
 
         module_logger.debug(f"Added generation ID {generation_id} for phase {phase_name}")
+
+    def set_generation_model_info(
+        self,
+        generation_id: str,
+        model: Optional[str] = None,
+        prompt_tokens: Optional[int] = None,
+        completion_tokens: Optional[int] = None,
+    ) -> None:
+        """
+        Register or update model/token information for a generation ID.
+
+        This is useful for providers (e.g., OpenAI) where token usage is known
+        at call time but phase association is handled elsewhere.
+        """
+        if not self.enabled:
+            return
+
+        self.model_info[generation_id] = {
+            "model": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+        }
+        module_logger.debug(
+            f"Registered model info for generation {generation_id}: model={model}, "
+            f"prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens}"
+        )
 
     def calculate_and_log_costs(self, phase_names: List[str]) -> Optional[RunCosts]:
         """
@@ -192,6 +223,25 @@ def add_generation_id(
     wrapper = get_cost_tracking_wrapper()
     if wrapper:
         wrapper.add_generation_id(phase_name, generation_id, model, prompt_tokens, completion_tokens)
+
+
+def register_generation_model_info(
+    generation_id: str,
+    model: Optional[str] = None,
+    prompt_tokens: Optional[int] = None,
+    completion_tokens: Optional[int] = None,
+) -> None:
+    """
+    Public helper to register or update model/token info for a generation ID.
+    """
+    wrapper = get_cost_tracking_wrapper()
+    if wrapper:
+        wrapper.set_generation_model_info(
+            generation_id=generation_id,
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
 
 
 def calculate_and_log_costs(phase_names: List[str]) -> Optional[RunCosts]:

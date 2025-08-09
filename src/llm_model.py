@@ -9,6 +9,7 @@ from typing import Any, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 
+from src.cost_tracking_wrapper import register_generation_model_info
 from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
@@ -181,10 +182,6 @@ class OpenRouterClient(ProviderClient):
         provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
         is_gpt5_series_model = provider_model.lower().startswith("gpt-5")
 
-        # Remove unsupported parameters for OpenRouter chat completions
-        # (e.g., a "reasoning" dict intended for other APIs)
-        kwargs.pop("reasoning", None)
-
         data: dict[str, Any] = {
             "model": model_name,
             "messages": [
@@ -247,29 +244,57 @@ class OpenAIClient(ProviderClient):
             # temperature parameter for these models to avoid 400 errors.
             is_gpt5_series_model = model_name.lower().startswith("gpt-5")
 
-            # Remove unsupported/unknown parameters for chat.completions
-            # (e.g., a "reasoning" dict intended for Responses API)
-            kwargs.pop("reasoning", None)
-
             request_kwargs: dict[str, Any] = {
                 "model": model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                "instructions": system_prompt,
+                "input": user_prompt,
             }
 
             if not is_gpt5_series_model:
                 request_kwargs["temperature"] = temperature
 
-            response = client.chat.completions.create(**request_kwargs, **kwargs)
+            response = client.responses.create(**request_kwargs, **kwargs)
 
-            content = response.choices[0].message.content
-            if not content:
-                raise ValueError("Empty response from OpenAI")
+            # Extract content from the new responses API format
+            # Response format: response.output[0] should be a message with content[0].text
+            if not response.output:
+                raise ValueError("Empty response output from OpenAI")
 
-            if response.choices[0].finish_reason == "length":
+            # Find the first message object in output (skip reasoning items)
+            output_message = None
+            for output_item in response.output:
+                if hasattr(output_item, "type") and output_item.type == "message":
+                    output_message = output_item
+                    break
+
+            if output_message is None:
+                raise ValueError("No message output found in OpenAI response")
+
+            if not output_message.content or not output_message.content[0].text:
+                raise ValueError("Empty response content from OpenAI")
+
+            content = output_message.content[0].text
+
+            # Check if response was truncated (status might indicate this)
+            if output_message.status == "incomplete" or response.status == "incomplete":
                 module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
+
+            # Register token usage for cost tracking if available
+            try:
+                usage = getattr(response, "usage", None)
+                prompt_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
+                completion_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
+
+                if prompt_tokens is not None or completion_tokens is not None:
+                    register_generation_model_info(
+                        generation_id=response.id,
+                        model=model_name,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                    )
+            except Exception:
+                # Swallow any optional usage extraction issues without failing the call
+                pass
 
             return content, response.id
 
@@ -289,10 +314,9 @@ class GeminiClient(ProviderClient):
         """Lazy initialization of Gemini client."""
         if self._client is None:
             try:
-                import google.generativeai as genai
+                from google import genai
 
-                genai.configure(api_key=self.api_key)
-                self._client = genai
+                self._client = genai.Client(api_key=self.api_key)
             except ImportError as e:
                 raise LlmModelError(f"Google GenAI SDK not available: {e}")
         return self._client
@@ -309,24 +333,43 @@ class GeminiClient(ProviderClient):
         client = self._get_client()
 
         try:
+            from google.genai import types
+
             # Configure generation settings
             # Remove unsupported parameters (e.g., reasoning)
             kwargs.pop("reasoning", None)
-            generation_config = {"temperature": temperature, **kwargs}
 
-            model = client.GenerativeModel(
-                model_name=model_name,
-                system_instruction=system_prompt,
-                generation_config=generation_config,
-            )
+            # Build the generation config
+            config = types.GenerateContentConfig(temperature=temperature, **kwargs)
 
-            response = model.generate_content(user_prompt)
+            # Combine system prompt and user prompt into contents
+            contents = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+
+            response = client.models.generate_content(model=model_name, contents=contents, config=config)
 
             if not response.text:
                 raise ValueError("Empty response from Gemini")
 
             # Gemini doesn't provide a completion ID in the same way, so we'll generate one
             generation_id = f"gemini_{int(time.time())}"
+
+            # Extract and register token usage for cost tracking if available
+            try:
+                usage_metadata = getattr(response, "usage_metadata", None)
+                if usage_metadata:
+                    prompt_tokens = getattr(usage_metadata, "prompt_token_count", None)
+                    completion_tokens = getattr(usage_metadata, "candidates_token_count", None)
+
+                    if prompt_tokens is not None or completion_tokens is not None:
+                        register_generation_model_info(
+                            generation_id=generation_id,
+                            model=model_name,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                        )
+            except Exception as e:
+                # Log but don't fail if we can't extract usage metadata
+                module_logger.debug(f"Could not extract Gemini usage metadata: {e}")
 
             return response.text, generation_id
 

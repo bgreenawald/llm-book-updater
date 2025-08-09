@@ -29,8 +29,12 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 import requests
+from dotenv import load_dotenv
 
 from src.logging_config import setup_logging
+
+# Load environment variables from .env to ensure API keys are available
+load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="cost_tracker")
@@ -108,21 +112,27 @@ class CostTracker:
     - Log cost information
     """
 
-    # Cost per 1M tokens (as of January 2025) - approximate pricing
-    # These prices are estimates based on public pricing and may vary
+    # Fallback pricing per 1M tokens (USD). Prefer live pricing from OpenRouter models API.
     OPENAI_PRICING = {
-        "o4-mini": {"input": 0.15, "output": 0.60},  # $0.15/$0.60 per 1M tokens
+        # From openrouter_models.json (per-token -> per 1M tokens):
+        # openai/o4-mini: prompt 0.0000011, completion 0.0000044
+        "o4-mini": {"input": 1.10, "output": 4.40},
+        # openai/gpt-4o: prompt 0.0000025, completion 0.00001
         "gpt-4o": {"input": 2.50, "output": 10.00},
+        # openai/gpt-4o-mini: prompt 0.00000015, completion 0.0000006
         "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+        # Legacy baseline if needed
         "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
     }
 
     GEMINI_PRICING = {
-        "gemini-2.5-flash": {"input": 0.075, "output": 0.30},  # $0.075/$0.30 per 1M tokens
-        "gemini-2.5-pro": {"input": 1.25, "output": 5.00},
-        "gemini-2.5-flash-lite": {"input": 0.075, "output": 0.30},
-        "gemini-1.5-pro": {"input": 1.25, "output": 5.00},
-        "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
+        # From openrouter_models.json (per-token -> per 1M tokens)
+        # google/gemini-2.5-flash: prompt 0.0000003, completion 0.0000025
+        "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
+        # google/gemini-2.5-pro: prompt 0.00000125, completion 0.00001
+        "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
+        # google/gemini-2.5-flash-lite: prompt 0.0000001, completion 0.0000004
+        "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
     }
 
     def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1"):
@@ -140,6 +150,111 @@ class CostTracker:
             "Content-Type": "application/json",
         }
         self.generation_stats_cache: Dict[str, GenerationStats] = {}
+        # Cache of model pricing from OpenRouter models API.
+        # Keys include OpenRouter ids (e.g., "openai/gpt-4o"), provider model names
+        # (e.g., "gpt-4o"), and variants stripped of suffixes like ":free".
+        self._model_pricing_index: Dict[str, Tuple[float, float]] = {}
+        self._model_pricing_loaded: bool = False
+
+    def _load_openrouter_model_pricing(self) -> None:
+        """
+        Load pricing from OpenRouter models endpoint and build a fast lookup index.
+
+        The endpoint returns per-token USD prices as strings under pricing.prompt and
+        pricing.completion. We index by several keys to improve matching across providers:
+        - Full OpenRouter id (e.g., "google/gemini-2.5-flash")
+        - Suffix after provider (e.g., "gemini-2.5-flash")
+        - Variant without any trailing ":..." tag (e.g., "kimi-k2" from "kimi-k2:free")
+        """
+        if self._model_pricing_loaded:
+            return
+
+        url = f"{self.base_url}/models" if self.base_url else "https://openrouter.ai/api/v1/models"
+        try:
+            # This endpoint is public; headers are optional, but include them if present.
+            response = requests.get(url, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("data", [])
+
+            index: Dict[str, Tuple[float, float]] = {}
+            for model in models:
+                model_id = model.get("id")
+                pricing = model.get("pricing", {}) or {}
+                prompt_str = pricing.get("prompt")
+                completion_str = pricing.get("completion")
+                if not model_id or prompt_str is None or completion_str is None:
+                    continue
+                # Convert to floats (per-token USD)
+                try:
+                    prompt_price = float(prompt_str)
+                    completion_price = float(completion_str)
+                except (TypeError, ValueError):
+                    continue
+
+                keys: List[str] = []
+                keys.append(model_id)
+
+                # Add suffix after provider (e.g., "openai/gpt-4o" -> "gpt-4o")
+                if "/" in model_id:
+                    suffix = model_id.split("/", 1)[1]
+                    keys.append(suffix)
+                    # Strip any ":variant" suffix
+                    if ":" in suffix:
+                        base_variant = suffix.split(":", 1)[0]
+                        keys.append(base_variant)
+
+                # Also strip any :variant from full id and add as key
+                if ":" in model_id:
+                    base_id = model_id.split(":", 1)[0]
+                    keys.append(base_id)
+
+                for key in keys:
+                    # Prefer first-seen price; don't overwrite to avoid oscillations
+                    if key and key not in index:
+                        index[key] = (prompt_price, completion_price)
+
+            self._model_pricing_index = index
+            self._model_pricing_loaded = True
+            module_logger.info(f"Loaded OpenRouter pricing for {len(self._model_pricing_index)} model keys")
+        except requests.exceptions.RequestException as e:
+            module_logger.warning(f"Failed to load OpenRouter model pricing: {e}")
+            self._model_pricing_loaded = False
+        except (ValueError, json.JSONDecodeError) as e:
+            module_logger.warning(f"Invalid response parsing OpenRouter models: {e}")
+            self._model_pricing_loaded = False
+
+    def _get_pricing_for_model(self, model: str) -> Optional[Tuple[float, float]]:
+        """
+        Get per-token USD pricing for the given model from OpenRouter models index.
+
+        Returns a tuple of (prompt_price_per_token, completion_price_per_token) if found.
+        """
+        if not self._model_pricing_loaded:
+            self._load_openrouter_model_pricing()
+
+        if not model:
+            return None
+
+        # Try exact match
+        if model in self._model_pricing_index:
+            return self._model_pricing_index[model]
+
+        # Try treating as OpenRouter id suffix (after provider)
+        suffix = model.split("/", 1)[1] if "/" in model else model
+        if suffix in self._model_pricing_index:
+            return self._model_pricing_index[suffix]
+
+        # Try removing any ":variant"
+        if ":" in suffix and suffix.split(":", 1)[0] in self._model_pricing_index:
+            return self._model_pricing_index[suffix.split(":", 1)[0]]
+
+        # Try lowercased key as a last resort (index is case-sensitive but most ids are lowercase)
+        lower = suffix.lower()
+        if lower in self._model_pricing_index:
+            return self._model_pricing_index[lower]
+
+        return None
 
     def _detect_provider_from_generation_id(self, generation_id: str) -> Provider:
         """
@@ -151,8 +266,14 @@ class CostTracker:
         Returns:
             Provider enum value
         """
-        # OpenAI generation IDs typically start with "chatcmpl-"
-        if generation_id.startswith("chatcmpl-"):
+        # OpenAI generation IDs:
+        # - Legacy Chat Completions: "chatcmpl-..." / "cmpl-..."
+        # - New Responses API: "resp_..."
+        if (
+            generation_id.startswith("chatcmpl-")
+            or generation_id.startswith("cmpl-")
+            or generation_id.startswith("resp_")
+        ):
             return Provider.OPENAI
 
         # Gemini generation IDs are custom generated with timestamp
@@ -174,30 +295,33 @@ class CostTracker:
         Returns:
             Tuple of (estimated_cost, estimation_method)
         """
-        # Try to find pricing for the exact model
+        # Prefer OpenRouter models pricing (per-token USD) if available
+        pricing_tuple = self._get_pricing_for_model(model)
+        if pricing_tuple is not None:
+            prompt_price, completion_price = pricing_tuple
+            total_cost = prompt_tokens * prompt_price + completion_tokens * completion_price
+            return total_cost, "openrouter_models_pricing"
+
+        # Fallback to static per-1M pricing heuristics
         pricing = None
-        estimation_method = "exact_model_pricing"
+        estimation_method = "exact_model_pricing_fallback"
 
         if model in self.OPENAI_PRICING:
             pricing = self.OPENAI_PRICING[model]
         else:
-            # Fallback to similar model pricing
             if "4o-mini" in model or "mini" in model.lower():
                 pricing = self.OPENAI_PRICING["o4-mini"]
-                estimation_method = "similar_model_pricing"
+                estimation_method = "similar_model_pricing_fallback"
             elif "4o" in model or "gpt-4" in model:
                 pricing = self.OPENAI_PRICING["gpt-4o"]
-                estimation_method = "similar_model_pricing"
+                estimation_method = "similar_model_pricing_fallback"
             else:
-                # Default to GPT-3.5 pricing
                 pricing = self.OPENAI_PRICING["gpt-3.5-turbo"]
-                estimation_method = "default_model_pricing"
+                estimation_method = "default_model_pricing_fallback"
 
-        # Calculate cost: (tokens / 1M) * price_per_1M
         input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
         output_cost = (completion_tokens / 1_000_000) * pricing["output"]
         total_cost = input_cost + output_cost
-
         return total_cost, estimation_method
 
     def _estimate_gemini_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> Tuple[float, str]:
@@ -212,33 +336,36 @@ class CostTracker:
         Returns:
             Tuple of (estimated_cost, estimation_method)
         """
-        # Try to find pricing for the exact model
+        # Prefer OpenRouter models pricing (per-token USD) if available
+        pricing_tuple = self._get_pricing_for_model(model)
+        if pricing_tuple is not None:
+            prompt_price, completion_price = pricing_tuple
+            total_cost = prompt_tokens * prompt_price + completion_tokens * completion_price
+            return total_cost, "openrouter_models_pricing"
+
+        # Fallback to static per-1M pricing heuristics
         pricing = None
-        estimation_method = "exact_model_pricing"
+        estimation_method = "exact_model_pricing_fallback"
 
         if model in self.GEMINI_PRICING:
             pricing = self.GEMINI_PRICING[model]
         else:
-            # Fallback to similar model pricing
             if "flash" in model.lower() and "lite" in model.lower():
                 pricing = self.GEMINI_PRICING["gemini-2.5-flash-lite"]
-                estimation_method = "similar_model_pricing"
+                estimation_method = "similar_model_pricing_fallback"
             elif "flash" in model.lower():
                 pricing = self.GEMINI_PRICING["gemini-2.5-flash"]
-                estimation_method = "similar_model_pricing"
+                estimation_method = "similar_model_pricing_fallback"
             elif "pro" in model.lower():
                 pricing = self.GEMINI_PRICING["gemini-2.5-pro"]
-                estimation_method = "similar_model_pricing"
+                estimation_method = "similar_model_pricing_fallback"
             else:
-                # Default to Flash pricing
                 pricing = self.GEMINI_PRICING["gemini-2.5-flash"]
-                estimation_method = "default_model_pricing"
+                estimation_method = "default_model_pricing_fallback"
 
-        # Calculate cost: (tokens / 1M) * price_per_1M
         input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
         output_cost = (completion_tokens / 1_000_000) * pricing["output"]
         total_cost = input_cost + output_cost
-
         return total_cost, estimation_method
 
     def get_generation_stats(
@@ -300,11 +427,56 @@ class CostTracker:
                 )
                 return stats
 
-            except requests.exceptions.RequestException as e:
-                module_logger.warning(f"Failed to retrieve stats for generation {generation_id}: {e}")
-                return None
-            except (KeyError, ValueError, json.JSONDecodeError) as e:
-                module_logger.warning(f"Invalid response format for generation {generation_id}: {e}")
+            except (requests.exceptions.RequestException, KeyError, ValueError, json.JSONDecodeError) as e:
+                # If OpenRouter lookup fails but we have sufficient info, fall back to estimation
+                module_logger.warning(
+                    f"OpenRouter stats fetch failed for generation {generation_id}: {e}. "
+                    "Attempting estimation if model/tokens were provided."
+                )
+                if model is not None and prompt_tokens is not None and completion_tokens is not None:
+                    model_str: str = model
+                    prompt_tokens_int: int = int(prompt_tokens)
+                    completion_tokens_int: int = int(completion_tokens)
+
+                    # Infer provider from model string for better estimation routing
+                    lower_model = model_str.lower()
+                    if "openai" in lower_model or lower_model.startswith("gpt") or lower_model.startswith("o4"):
+                        estimated_cost, estimation_method = self._estimate_openai_cost(
+                            model=model_str,
+                            prompt_tokens=prompt_tokens_int,
+                            completion_tokens=completion_tokens_int,
+                        )
+                        provider_for_estimation = Provider.OPENAI
+                    elif "gemini" in lower_model or lower_model.startswith("google/"):
+                        estimated_cost, estimation_method = self._estimate_gemini_cost(
+                            model=model_str,
+                            prompt_tokens=prompt_tokens_int,
+                            completion_tokens=completion_tokens_int,
+                        )
+                        provider_for_estimation = Provider.GEMINI
+                    else:
+                        # Default generic estimation using OpenAI pricing heuristics
+                        estimated_cost, estimation_method = self._estimate_openai_cost(
+                            model=model_str,
+                            prompt_tokens=prompt_tokens_int,
+                            completion_tokens=completion_tokens_int,
+                        )
+                        provider_for_estimation = Provider.OPENAI
+
+                    stats = GenerationStats(
+                        generation_id=generation_id,
+                        model=model_str,
+                        prompt_tokens=prompt_tokens_int,
+                        completion_tokens=completion_tokens_int,
+                        total_tokens=prompt_tokens_int + completion_tokens_int,
+                        cost=estimated_cost,
+                        currency="USD",
+                        provider=provider_for_estimation,
+                        is_estimated=True,
+                        estimation_method=f"fallback_from_openrouter:{estimation_method}",
+                    )
+                    self.generation_stats_cache[generation_id] = stats
+                    return stats
                 return None
 
         else:
@@ -317,23 +489,23 @@ class CostTracker:
                 return None
 
             # Local non-optional copies for type checkers
-            model_str: str = model
-            prompt_tokens_int: int = int(prompt_tokens)
-            completion_tokens_int: int = int(completion_tokens)
+            model_name: str = model
+            prompt_token_count: int = int(prompt_tokens)
+            completion_token_count: int = int(completion_tokens)
 
-            total_tokens = prompt_tokens_int + completion_tokens_int
+            total_tokens = prompt_token_count + completion_token_count
 
             if provider == Provider.OPENAI:
                 estimated_cost, estimation_method = self._estimate_openai_cost(
-                    model=model_str,
-                    prompt_tokens=prompt_tokens_int,
-                    completion_tokens=completion_tokens_int,
+                    model=model_name,
+                    prompt_tokens=prompt_token_count,
+                    completion_tokens=completion_token_count,
                 )
             elif provider == Provider.GEMINI:
                 estimated_cost, estimation_method = self._estimate_gemini_cost(
-                    model=model_str,
-                    prompt_tokens=prompt_tokens_int,
-                    completion_tokens=completion_tokens_int,
+                    model=model_name,
+                    prompt_tokens=prompt_token_count,
+                    completion_tokens=completion_token_count,
                 )
             else:
                 module_logger.warning(f"Unsupported provider for cost estimation: {provider.value}")
@@ -341,9 +513,9 @@ class CostTracker:
 
             stats = GenerationStats(
                 generation_id=generation_id,
-                model=model_str,
-                prompt_tokens=prompt_tokens_int,
-                completion_tokens=completion_tokens_int,
+                model=model_name,
+                prompt_tokens=prompt_token_count,
+                completion_tokens=completion_token_count,
                 total_tokens=total_tokens,
                 cost=estimated_cost,
                 currency="USD",

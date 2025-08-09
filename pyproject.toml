@@ -12,6 +12,7 @@ dependencies = [
     "openai>=1.82.0",
     "psutil>=7.0.0",
     "pypandoc>=1.15",
+    "python-dotenv>=1.1.1",
     "streamlit>=1.45.1",
     "streamlit-ace>=0.1.1",
     "tqdm>=4.67.1",
