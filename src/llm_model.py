@@ -3,12 +3,12 @@ import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
 
+from src.common.provider import Provider
 from src.cost_tracking_wrapper import register_generation_model_info
 from src.logging_config import setup_logging
 
@@ -17,14 +17,6 @@ load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="llm_model")
-
-
-class Provider(Enum):
-    """Enumeration of supported LLM providers."""
-
-    OPENROUTER = "openrouter"
-    OPENAI = "openai"
-    GEMINI = "gemini"
 
 
 @dataclass
@@ -405,6 +397,8 @@ class LlmModel:
         # Provider-specific API key environments
         openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
         gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        # Prompt logging control
+        enable_prompt_logging: Optional[bool] = None,
     ) -> None:
         """
         Initialize LLM client with provider routing capabilities.
@@ -419,9 +413,19 @@ class LlmModel:
             openrouter_backoff_factor: Backoff multiplier for OpenRouter.
             openai_api_key_env: Environment variable for OpenAI API key.
             gemini_api_key_env: Environment variable for Gemini API key.
+            enable_prompt_logging: Whether to enable prompt content logging (defaults to False).
+                If None, checks LLM_ENABLE_PROMPT_LOGGING environment variable.
         """
         self.model_config = model
         self.temperature = temperature
+
+        # Determine prompt logging setting
+        if enable_prompt_logging is None:
+            # Check environment variable, default to False for security
+            env_value = os.getenv("LLM_ENABLE_PROMPT_LOGGING", "false").lower()
+            self.enable_prompt_logging = env_value in ("true", "1", "yes", "on")
+        else:
+            self.enable_prompt_logging = enable_prompt_logging
 
         # Initialize provider clients
         self._clients: dict[Provider, ProviderClient] = {}
@@ -511,6 +515,7 @@ class LlmModel:
         openrouter_backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
         gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        enable_prompt_logging: Optional[bool] = None,
     ) -> "LlmModel":
         """Create a new LlmModel instance with the specified configuration."""
         return cls(
@@ -523,6 +528,7 @@ class LlmModel:
             openrouter_backoff_factor=openrouter_backoff_factor,
             openai_api_key_env=openai_api_key_env,
             gemini_api_key_env=gemini_api_key_env,
+            enable_prompt_logging=enable_prompt_logging,
         )
 
     @property
@@ -544,14 +550,15 @@ class LlmModel:
 
     def _log_prompt(self, role: str, content: str) -> None:
         """
-        Logs a preview of the prompt content.
+        Logs a preview of the prompt content if prompt logging is enabled.
 
         Args:
             role (str): The role of the prompt (e.g., "System", "User").
             content (str): The full content of the prompt.
         """
-        preview = content if len(content) <= 200 else content[:200] + "..."
-        module_logger.trace(f"{role} prompt: {preview}")
+        if self.enable_prompt_logging:
+            preview = content if len(content) <= 200 else content[:200] + "..."
+            module_logger.trace(f"{role} prompt: {preview}")
 
     def chat_completion(
         self,

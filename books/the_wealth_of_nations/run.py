@@ -2,8 +2,9 @@ import sys
 from pathlib import Path
 from typing import List
 
+from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import ModelConfig, Provider
+from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
@@ -15,32 +16,32 @@ OPENROUTER_DEEPSEEK = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1-052
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model_type=OPENROUTER_GEMINI_FLASH,
+        model=OPENROUTER_GEMINI_FLASH,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model_type=OPENROUTER_GEMINI_PRO,
+        model=OPENROUTER_GEMINI_PRO,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model_type=OPENROUTER_DEEPSEEK,
+        model=OPENROUTER_DEEPSEEK,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model_type=OPENROUTER_GEMINI_FLASH,
+        model=OPENROUTER_GEMINI_FLASH,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model_type=OPENROUTER_GEMINI_FLASH,
+        model=OPENROUTER_GEMINI_FLASH,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model_type=OPENROUTER_GEMINI_FLASH,
+        model=OPENROUTER_GEMINI_FLASH,
         reasoning={"effort": "high"},
     ),
 ]

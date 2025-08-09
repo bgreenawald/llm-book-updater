@@ -133,7 +133,8 @@ model = LlmModel.create(model=GROK_3_MINI, temperature=0.2)
 ### Custom Model Configurations
 
 ```python
-from src.llm_model import ModelConfig, Provider, LlmModel
+from src.common.provider import Provider
+from src.llm_model import ModelConfig, LlmModel
 
 # Custom OpenAI model
 custom_openai = ModelConfig(

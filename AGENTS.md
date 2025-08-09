@@ -36,6 +36,44 @@
 - PRs: clear description, reasoning, test plan (commands run), and screenshots or sample CLI output where useful.
 - CI must pass (pre-commit, lint, tests). Include any migration notes in PR description.
 
+## Provider Configuration
+
+### Required Environment Variables
+
+The LLM Book Updater supports multiple LLM providers. Each provider requires specific environment variables to be set:
+
+**OpenAI:**
+- `OPENAI_API_KEY` - Your OpenAI API key for direct OpenAI API access
+
+**OpenRouter:**
+- `OPENROUTER_API_KEY` - Your OpenRouter API key for accessing multiple models
+- `OPENROUTER_BASE_URL` (optional) - Override the default base URL (defaults to `https://openrouter.ai/api/v1`)
+
+**Gemini:**
+- `GEMINI_API_KEY` - Your Google Gemini API key for Gemini models
+
+### .env.example Template
+
+Create a `.env` file in your project root with the following template:
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=sk-...your-openai-key-here...
+
+# OpenRouter Configuration
+OPENROUTER_API_KEY=sk-or-v1-...your-openrouter-key-here...
+# Optional: Override default OpenRouter base URL
+# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+# Gemini Configuration
+GEMINI_API_KEY=...your-gemini-key-here...
+
+# Optional: Cost tracking (for OpenRouter)
+# OPENROUTER_COST_TRACKING=true
+```
+
+Note: Only set the environment variables for the providers you plan to use. The system will automatically select the appropriate client based on the model configuration.
+
 ## Security & Configuration Tips
 - Do not commit API keys. Use env vars (e.g., `OPENROUTER_API_KEY`).
 - Large artifacts belong in `build/` and are not tracked; keep inputs/outputs reproducible.

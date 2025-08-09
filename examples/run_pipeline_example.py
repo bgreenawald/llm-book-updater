@@ -20,7 +20,7 @@ def main():
     run_phases: List[PhaseConfig] = [
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
-            model_type=OPENAI_04_MINI,
+            model=OPENAI_04_MINI,
             temperature=0.3,  # Example: Set a custom temperature
         ),
         PhaseConfig(
@@ -29,21 +29,21 @@ def main():
         ),
         PhaseConfig(
             phase_type=PhaseType.ANNOTATE,
-            model_type=GEMINI_PRO,
+            model=GEMINI_PRO,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
-            model_type=OPENAI_04_MINI,
+            model=OPENAI_04_MINI,
         ),
         # Example: Add annotation phases
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,
-            model_type=GEMINI_PRO,
+            model=GEMINI_PRO,
             temperature=0.4,
         ),
         PhaseConfig(
             phase_type=PhaseType.SUMMARY,
-            model_type=OPENAI_04_MINI,
+            model=OPENAI_04_MINI,
             temperature=0.3,
         ),
     ]

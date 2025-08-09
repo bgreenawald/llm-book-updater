@@ -113,7 +113,7 @@ class Pipeline:
                     post_processors_info.append(str(processor))
 
         # Get model metadata
-        model_metadata = self._get_model_metadata(model_type=phase_config.model_type)
+        model_metadata = self._get_model_metadata(model_type=phase_config.model)
 
         # Base metadata that's always available
         metadata = {
@@ -311,7 +311,7 @@ class Pipeline:
 
         # Initialize the model
         model = LlmModel.create(
-            model=phase_config.model_type,
+            model=phase_config.model,
             temperature=phase_config.temperature,
         )
 
@@ -326,7 +326,7 @@ class Pipeline:
             user_prompt_path=phase_config.user_prompt_path,
             book_name=self.config.book_name,
             author_name=self.config.author_name,
-            model=model,
+            llm_model_instance=model,
             temperature=phase_config.temperature,
             reasoning=phase_config.reasoning,
             post_processors=phase_config.post_processors,

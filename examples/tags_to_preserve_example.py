@@ -80,17 +80,17 @@ def main():
     run_phases: List[PhaseConfig] = [
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
-            model_type=OPENAI_04_MINI,
+            model=OPENAI_04_MINI,
             temperature=0.3,
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
-            model_type=GEMINI_PRO,
+            model=GEMINI_PRO,
             temperature=0.2,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
-            model_type=OPENAI_04_MINI,
+            model=OPENAI_04_MINI,
             temperature=0.1,
         ),
     ]

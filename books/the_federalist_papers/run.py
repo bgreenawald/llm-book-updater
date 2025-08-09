@@ -2,8 +2,9 @@ import sys
 from pathlib import Path
 from typing import List
 
+from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import ModelConfig, Provider
+from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
@@ -13,32 +14,32 @@ OPENROUTER_GEMINI_FLASH_LITE = ModelConfig(Provider.OPENROUTER, "google/gemini-2
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model_type=OPENROUTER_GEMINI_FLASH_LITE,
+        model=OPENROUTER_GEMINI_FLASH_LITE,
         reasoning={"effort": "high"},
     ),
 ]

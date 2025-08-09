@@ -16,15 +16,15 @@ from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
 
 
-@patch("src.llm_model.LlmModel")
+@patch("src.llm_model.LlmModel.create")
 @patch("src.cost_tracking_wrapper.CostTrackingWrapper")
-def test_pipeline_metadata(mock_cost_wrapper, mock_llm_model):
+def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
     """Test that pipeline metadata is correctly collected and saved."""
-    # Mock the LlmModel to avoid API key requirements
+    # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
     mock_model_instance.temperature = 0.2
-    mock_llm_model.return_value = mock_model_instance
+    mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
     mock_wrapper_instance = Mock()
@@ -142,15 +142,15 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_model):
         raise
 
 
-@patch("src.llm_model.LlmModel")
+@patch("src.llm_model.LlmModel.create")
 @patch("src.cost_tracking_wrapper.CostTrackingWrapper")
-def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_model):
+def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
     """Test that cost analysis data is correctly saved."""
-    # Mock the LlmModel to avoid API key requirements
+    # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
     mock_model_instance.temperature = 0.2
-    mock_llm_model.return_value = mock_model_instance
+    mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
     mock_wrapper_instance = Mock()
@@ -267,15 +267,15 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_model):
         raise
 
 
-@patch("src.llm_model.LlmModel")
+@patch("src.llm_model.LlmModel.create")
 @patch("src.cost_tracking_wrapper.CostTrackingWrapper")
-def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_model):
+def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for disabled phases."""
-    # Mock the LlmModel to avoid API key requirements
+    # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
     mock_model_instance.temperature = 0.2
-    mock_llm_model.return_value = mock_model_instance
+    mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
     mock_wrapper_instance = Mock()
@@ -352,15 +352,15 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_model):
         raise
 
 
-@patch("src.llm_model.LlmModel")
+@patch("src.llm_model.LlmModel.create")
 @patch("src.cost_tracking_wrapper.CostTrackingWrapper")
-def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_model):
+def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for failed phases."""
-    # Mock the LlmModel to avoid API key requirements
+    # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
     mock_model_instance.temperature = 0.2
-    mock_llm_model.return_value = mock_model_instance
+    mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
     mock_wrapper_instance = Mock()

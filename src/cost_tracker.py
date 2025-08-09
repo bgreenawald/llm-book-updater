@@ -25,12 +25,12 @@ pricing and may not reflect actual charges, especially for enterprise pricing.
 
 import json
 from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
 
+from src.common.provider import Provider
 from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
@@ -38,14 +38,6 @@ load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = setup_logging(log_name="cost_tracker")
-
-
-class Provider(Enum):
-    """Enumeration of supported LLM providers for cost tracking."""
-
-    OPENROUTER = "openrouter"
-    OPENAI = "openai"
-    GEMINI = "gemini"
 
 
 @dataclass

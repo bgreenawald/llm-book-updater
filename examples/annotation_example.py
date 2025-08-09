@@ -11,8 +11,9 @@ This example shows how to:
 
 from pathlib import Path
 
+from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import LlmModel
+from src.llm_model import ModelConfig
 from src.pipeline import Pipeline
 
 
@@ -39,11 +40,8 @@ def main():
     user_prompts_dir = Path("prompts")
     user_prompt = user_prompts_dir / "edit_user.md"  # Example user prompt
 
-    # Initialize the LLM model
-    model = LlmModel(
-        model="gpt-4",
-        temperature=temperature,
-    )
+    # Define the model configuration
+    model = ModelConfig(Provider.OPENAI, "gpt-4")
 
     # Example 1: Add introduction annotations to each section
     print("Running introduction annotation phase...")
@@ -56,7 +54,7 @@ def main():
         phases=[
             PhaseConfig(
                 phase_type=PhaseType.INTRODUCTION,
-                model_type=model.model_id,
+                model=model,
                 temperature=temperature,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
@@ -78,7 +76,7 @@ def main():
         phases=[
             PhaseConfig(
                 phase_type=PhaseType.SUMMARY,
-                model_type=model.model_id,
+                model=model,
                 temperature=temperature,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
@@ -100,7 +98,7 @@ def main():
         phases=[
             PhaseConfig(
                 phase_type=PhaseType.EDIT,
-                model_type=model.model_id,
+                model=model,
                 temperature=temperature,
                 system_prompt_path=standard_prompt,
                 user_prompt_path=user_prompt,
@@ -122,14 +120,14 @@ def main():
         phases=[
             PhaseConfig(
                 phase_type=PhaseType.INTRODUCTION,
-                model_type=model.model_id,
+                model=model,
                 temperature=temperature,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
             ),
             PhaseConfig(
                 phase_type=PhaseType.SUMMARY,
-                model_type=model.model_id,
+                model=model,
                 temperature=temperature,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
