@@ -334,15 +334,26 @@ class GeminiClient(ProviderClient):
             # Remove unsupported parameters (e.g., reasoning)
             kwargs.pop("reasoning", None)
 
-            # Build the generation config with system_instruction if provided
-            if system_prompt:
-                config = types.GenerateContentConfig(
-                    system_instruction=system_prompt, temperature=temperature, **kwargs
-                )
-            else:
-                config = types.GenerateContentConfig(temperature=temperature, **kwargs)
+            # Extract contents if provided in kwargs (for advanced content structures)
+            contents = kwargs.pop("contents", user_prompt)
 
-            response = client.models.generate_content(model=model_name, contents=user_prompt, config=config)
+            # Build config_kwargs from remaining kwargs, avoiding duplicates
+            config_kwargs = dict(kwargs)
+
+            # Explicitly set system_instruction and temperature, overriding any in kwargs
+            if system_prompt:
+                config_kwargs["system_instruction"] = system_prompt
+            else:
+                # Remove system_instruction if it exists in kwargs and no system_prompt provided
+                config_kwargs.pop("system_instruction", None)
+
+            # Always set temperature explicitly to avoid duplicates
+            config_kwargs["temperature"] = temperature
+
+            # Create the config with deduplicated parameters
+            config = types.GenerateContentConfig(**config_kwargs)
+
+            response = client.models.generate_content(model=model_name, contents=contents, config=config)
 
             if not response.text:
                 raise ValueError("Empty response from Gemini")
