@@ -68,6 +68,17 @@ class LlmModelError(Exception):
 class ProviderClient(ABC):
     """Abstract base class for provider-specific LLM clients."""
 
+    @property
+    @abstractmethod
+    def supports_batch(self) -> bool:
+        """
+        Check if this provider supports batch processing.
+
+        Returns:
+            bool: True if batch processing is supported, False otherwise
+        """
+        pass
+
     @abstractmethod
     def chat_completion(
         self,
@@ -84,6 +95,46 @@ class ProviderClient(ABC):
             Tuple of (response_content, generation_id)
         """
         pass
+
+    def batch_chat_completion(
+        self,
+        requests: list[dict[str, Any]],
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """
+        Make batch chat completion calls.
+
+        Args:
+            requests: List of request dictionaries, each containing:
+                - system_prompt: System prompt for the request
+                - user_prompt: User prompt for the request
+                - metadata: Optional metadata to include in response
+            model_name: Name of the model to use
+            temperature: Temperature setting for the model
+            **kwargs: Additional arguments
+
+        Returns:
+            List of response dictionaries, each containing:
+                - content: Response content
+                - generation_id: Generation ID for tracking
+                - metadata: Original metadata from request
+        """
+        # Default implementation: process sequentially
+        responses = []
+        for request in requests:
+            content, generation_id = self.chat_completion(
+                system_prompt=request["system_prompt"],
+                user_prompt=request["user_prompt"],
+                model_name=model_name,
+                temperature=temperature,
+                **kwargs,
+            )
+            responses.append(
+                {"content": content, "generation_id": generation_id, "metadata": request.get("metadata", {})}
+            )
+        return responses
 
 
 class OpenRouterClient(ProviderClient):
@@ -102,6 +153,11 @@ class OpenRouterClient(ProviderClient):
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.backoff_factor = backoff_factor
+
+    @property
+    def supports_batch(self) -> bool:
+        """OpenRouter does not support batch processing."""
+        return False
 
     def _should_retry(self, error: Exception) -> bool:
         """Determine if an error should trigger a retry."""
@@ -208,6 +264,11 @@ class OpenAIClient(ProviderClient):
         self.api_key = api_key
         self._client = None
 
+    @property
+    def supports_batch(self) -> bool:
+        """OpenAI supports batch processing."""
+        return True
+
     def _get_client(self):
         """Lazy initialization of OpenAI client."""
         if self._client is None:
@@ -297,6 +358,24 @@ class OpenAIClient(ProviderClient):
             module_logger.error(f"OpenAI API call failed: {e}")
             raise LlmModelError(f"OpenAI API call failed: {e}")
 
+    def batch_chat_completion(
+        self,
+        requests: list[dict[str, Any]],
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """
+        Process batch chat completion requests using OpenAI's batch API.
+
+        Note: This is a placeholder implementation. OpenAI's actual batch API
+        requires job submission and async retrieval. For now, this processes
+        requests sequentially.
+        """
+        # TODO: Implement actual OpenAI batch API integration
+        # For now, use the default sequential processing
+        return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
 
 class GeminiClient(ProviderClient):
     """Client for Google Gemini SDK calls."""
@@ -304,6 +383,11 @@ class GeminiClient(ProviderClient):
     def __init__(self, api_key: str):
         self.api_key = api_key
         self._client = None
+
+    @property
+    def supports_batch(self) -> bool:
+        """Gemini supports batch processing."""
+        return True
 
     def _get_client(self):
         """Lazy initialization of Gemini client."""
@@ -384,6 +468,24 @@ class GeminiClient(ProviderClient):
         except Exception as e:
             module_logger.error(f"Gemini API call failed: {e}")
             raise LlmModelError(f"Gemini API call failed: {e}")
+
+    def batch_chat_completion(
+        self,
+        requests: list[dict[str, Any]],
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """
+        Process batch chat completion requests using Gemini's batch API.
+
+        Note: This is a placeholder implementation. Gemini's batch API
+        may have specific requirements. For now, this processes
+        requests sequentially.
+        """
+        # TODO: Implement actual Gemini batch API integration
+        # For now, use the default sequential processing
+        return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
 
 
 class LlmModel:
@@ -575,6 +677,75 @@ class LlmModel:
         if self.enable_prompt_logging:
             preview = content if len(content) <= 200 else content[:200] + "..."
             module_logger.trace(f"{role} prompt: {preview}")
+
+    def supports_batch(self) -> bool:
+        """
+        Check if the current provider supports batch processing.
+
+        Returns:
+            bool: True if batch processing is supported, False otherwise
+        """
+        client = self._get_client()
+        return client.supports_batch
+
+    @property
+    def default_batch_size(self) -> int:
+        """
+        Get the default batch size for the current provider.
+
+        Returns:
+            int: Default batch size
+        """
+        # Provider-specific defaults
+        if self.model_config.provider == Provider.OPENAI:
+            return 50  # OpenAI typically supports larger batches
+        elif self.model_config.provider == Provider.GEMINI:
+            return 20  # Gemini batch size recommendation
+        else:
+            return 10  # Conservative default for other providers
+
+    def batch_chat_completion(
+        self,
+        requests: list[dict[str, Any]],
+        temperature: Optional[float] = None,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """
+        Make batch chat completion calls using the appropriate provider.
+
+        Args:
+            requests: List of request dictionaries
+            temperature: Optional temperature override
+            **kwargs: Additional arguments
+
+        Returns:
+            List of response dictionaries
+
+        Raises:
+            LlmModelError: When batch API calls fail
+            ValueError: If provider doesn't support batch processing
+        """
+        client = self._get_client()
+
+        if not client.supports_batch:
+            raise ValueError(f"Provider {self.model_config.provider.value} does not support batch processing")
+
+        # Log batch info if enabled
+        if self.enable_prompt_logging:
+            module_logger.trace(f"Processing batch of {len(requests)} requests")
+
+        # Ensure model_name is a concrete string
+        model_name: str = self.model_config.provider_model_name or self.model_config.model_id
+
+        # Use provided temperature or default
+        call_temperature: float = temperature if temperature is not None else self.temperature
+
+        return client.batch_chat_completion(
+            requests=requests,
+            model_name=model_name,
+            temperature=call_temperature,
+            **kwargs,
+        )
 
     def chat_completion(
         self,
