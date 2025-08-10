@@ -334,13 +334,15 @@ class GeminiClient(ProviderClient):
             # Remove unsupported parameters (e.g., reasoning)
             kwargs.pop("reasoning", None)
 
-            # Build the generation config
-            config = types.GenerateContentConfig(temperature=temperature, **kwargs)
+            # Build the generation config with system_instruction if provided
+            if system_prompt:
+                config = types.GenerateContentConfig(
+                    system_instruction=system_prompt, temperature=temperature, **kwargs
+                )
+            else:
+                config = types.GenerateContentConfig(temperature=temperature, **kwargs)
 
-            # Combine system prompt and user prompt into contents
-            contents = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
-
-            response = client.models.generate_content(model=model_name, contents=contents, config=config)
+            response = client.models.generate_content(model=model_name, contents=user_prompt, config=config)
 
             if not response.text:
                 raise ValueError("Empty response from Gemini")
