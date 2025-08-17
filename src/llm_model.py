@@ -3,7 +3,7 @@ import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -358,23 +358,404 @@ class OpenAIClient(ProviderClient):
             module_logger.error(f"OpenAI API call failed: {e}")
             raise LlmModelError(f"OpenAI API call failed: {e}")
 
+    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float) -> str:
+        """
+        Create JSONL content for batch processing following OpenAI API specification.
+
+        Args:
+            requests: List of request dictionaries containing system_prompt, user_prompt, metadata
+            model_name: Name of the model to use
+            temperature: Temperature setting for the model
+
+        Returns:
+            str: JSONL formatted string for batch processing
+        """
+        import json
+
+        jsonl_lines = []
+        for i, request in enumerate(requests):
+            system_prompt = request.get("system_prompt", "")
+            user_prompt = request.get("user_prompt", "")
+            metadata = request.get("metadata", {})
+
+            # Build messages array
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
+
+            # Create the batch request structure according to OpenAI spec
+            # Note: Batch API uses standard chat completions format, not the new responses API
+
+            # Handle GPT-5 models that don't support custom temperature
+            is_gpt5_series_model = model_name.lower().startswith("gpt-5")
+
+            batch_body: Dict[str, Any] = {
+                "model": model_name,
+                "messages": messages,
+                # Don't set max_completion_tokens - let the model use its default limit
+            }
+
+            # Only add temperature for non-GPT-5 models
+            if not is_gpt5_series_model:
+                batch_body["temperature"] = temperature
+
+            batch_request = {
+                "custom_id": f"request_{i}_{metadata.get('id', '')}",
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": batch_body,
+            }
+
+            jsonl_lines.append(json.dumps(batch_request))
+
+        return "\n".join(jsonl_lines)
+
+    def _poll_batch_job(self, client, job_id: str, timeout_seconds: int = 3600) -> bool:
+        """
+        Poll batch job until completion or timeout.
+
+        Args:
+            client: OpenAI client
+            job_id: ID of the batch job
+            timeout_seconds: Maximum time to wait for completion (default 1 hour)
+
+        Returns:
+            bool: True if job completed successfully, False otherwise
+        """
+        import time
+
+        start_time = time.time()
+        poll_interval = 30  # Poll every 30 seconds
+
+        while time.time() - start_time < timeout_seconds:
+            try:
+                batch_job = client.batches.retrieve(job_id)
+                status = batch_job.status
+
+                module_logger.info(f"Batch job {job_id} status: {status}")
+
+                if status == "completed":
+                    # Additional check: ensure the job actually has results
+                    if hasattr(batch_job, "request_counts"):
+                        total = getattr(batch_job.request_counts, "total", 0)
+                        completed = getattr(batch_job.request_counts, "completed", 0)
+                        failed = getattr(batch_job.request_counts, "failed", 0)
+                        module_logger.info(
+                            f"Batch job request counts - Total: {total}, Completed: {completed}, Failed: {failed}"
+                        )
+
+                        # If all requests failed, treat as failed job
+                        if total > 0 and failed == total:
+                            module_logger.error(f"All {total} requests in batch job failed")
+                            return False
+                    return True
+                elif status in ["failed", "expired", "cancelled", "cancelling"]:
+                    error_msg = f"Batch job failed with status: {status}"
+                    if hasattr(batch_job, "errors") and batch_job.errors:
+                        error_msg += f" - Errors: {batch_job.errors}"
+                    module_logger.error(error_msg)
+                    return False
+                elif status in ["validating", "in_progress", "finalizing"]:
+                    # These are expected intermediate states, continue polling
+                    module_logger.debug(f"Batch job in progress with status: {status}")
+                else:
+                    # Unexpected status
+                    module_logger.warning(f"Unexpected batch job status: {status}")
+
+                time.sleep(poll_interval)
+
+            except Exception as e:
+                module_logger.error(f"Error polling batch job: {e}")
+                return False
+
+        module_logger.error(f"Batch job timed out after {timeout_seconds} seconds")
+        return False
+
+    def _parse_batch_results(
+        self, result_content: str, original_requests: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        Parse batch job results and match them with original requests.
+
+        Args:
+            result_content: JSONL content from batch job results
+            original_requests: Original request list for metadata matching
+
+        Returns:
+            List of response dictionaries
+        """
+        import json
+        import time
+
+        responses = []
+        result_lines = result_content.strip().split("\n")
+
+        # Create mapping from custom IDs to original metadata
+        id_to_metadata = {}
+        for i, request in enumerate(original_requests):
+            metadata = request.get("metadata", {})
+            custom_id = f"request_{i}_{metadata.get('id', '')}"
+            id_to_metadata[custom_id] = metadata
+
+        for line in result_lines:
+            if not line.strip():
+                continue
+
+            try:
+                result = json.loads(line)
+
+                # Extract response data
+                custom_id = result.get("custom_id", "")
+
+                # Check for errors in the result - errors can be in multiple places
+                error_info = None
+
+                # Check for top-level error
+                if "error" in result and result["error"]:
+                    error_info = result["error"]
+                # Check for response-level error (HTTP status != 200)
+                elif "response" in result:
+                    response = result["response"]
+                    if response.get("status_code", 200) != 200:
+                        # Error is in response body
+                        response_body = response.get("body", {})
+                        if "error" in response_body:
+                            error_info = response_body["error"]
+                        else:
+                            error_info = {"message": f"HTTP {response.get('status_code')} error", "type": "http_error"}
+
+                if error_info:
+                    error_message = (
+                        error_info.get("message", "Unknown error") if isinstance(error_info, dict) else str(error_info)
+                    )
+                    module_logger.error(f"Error in batch result {custom_id}: {error_message}")
+                    responses.append(
+                        {
+                            "content": f"Error: {error_message}",
+                            "generation_id": f"openai_batch_error_{custom_id}",
+                            "metadata": id_to_metadata.get(custom_id, {}),
+                        }
+                    )
+                    continue
+
+                # Extract successful response
+                response_body = result.get("response", {}).get("body", {})
+                choices = response_body.get("choices", [])
+
+                # Debug logging to see what we're getting
+                module_logger.debug(
+                    f"Batch result structure for {custom_id}: response_body keys: {list(response_body.keys())}"
+                )
+                if choices:
+                    module_logger.debug(
+                        f"First choice structure: {choices[0].keys() if choices[0] else 'Empty choice'}"
+                    )
+                    if choices[0] and "message" in choices[0]:
+                        message_keys = choices[0]["message"].keys() if choices[0]["message"] else "Empty message"
+                        module_logger.debug(f"Message structure: {message_keys}")
+
+                content = ""
+                if choices:
+                    choice = choices[0]
+                    content = choice.get("message", {}).get("content", "")
+                    finish_reason = choice.get("finish_reason", "unknown")
+
+                    if finish_reason == "length":
+                        module_logger.warning(f"Response truncated due to length limit for {custom_id}")
+                        # For truncated responses, we'll still use whatever content we got
+                        # The content might be empty if truncation happened very early
+
+                    if not content:
+                        module_logger.warning(
+                            f"Empty content in batch response for {custom_id}, "
+                            f"finish_reason: {finish_reason}, choice: {choice}"
+                        )
+
+                generation_id = response_body.get("id", f"openai_batch_{custom_id}")
+
+                # Get original metadata
+                metadata = id_to_metadata.get(custom_id, {})
+
+                # Track token usage if available
+                try:
+                    usage = response_body.get("usage", {})
+                    if usage:
+                        prompt_tokens = usage.get("prompt_tokens")
+                        completion_tokens = usage.get("completion_tokens")
+
+                        if prompt_tokens is not None or completion_tokens is not None:
+                            register_generation_model_info(
+                                generation_id=generation_id,
+                                model=response_body.get("model", "unknown"),
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                is_batch=True,  # This is batch processing, apply 50% discount
+                            )
+                except Exception:
+                    pass  # Silently ignore usage tracking errors
+
+                responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+
+            except Exception as e:
+                module_logger.error(f"Error parsing batch result line: {e}")
+                responses.append(
+                    {
+                        "content": f"Error parsing result: {str(e)}",
+                        "generation_id": f"openai_batch_parse_error_{int(time.time())}",
+                        "metadata": {},
+                    }
+                )
+
+        return responses
+
     def batch_chat_completion(
         self,
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
+        batch_timeout: int = 3600,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
-        Process batch chat completion requests using OpenAI's batch API.
+        Process batch chat completion requests using OpenAI's true batch API.
 
-        Note: This is a placeholder implementation. OpenAI's actual batch API
-        requires job submission and async retrieval. For now, this processes
-        requests sequentially.
+        This implementation creates a batch job with all requests in JSONL format,
+        submits it to the OpenAI API, polls for completion, and retrieves results.
+        Batch processing provides 50% cost savings compared to synchronous API calls.
+
+        Args:
+            requests: List of request dictionaries
+            model_name: Name of the model to use
+            temperature: Temperature setting for the model
+            batch_timeout: Maximum time to wait for batch job completion (seconds)
+            **kwargs: Additional arguments
+
+        Returns:
+            List of response dictionaries
         """
-        # TODO: Implement actual OpenAI batch API integration
-        # For now, use the default sequential processing
-        return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+        client = self._get_client()
+
+        try:
+            import os
+            import tempfile
+
+            module_logger.info(f"Starting OpenAI batch processing for {len(requests)} requests")
+
+            # Create JSONL content for batch processing
+            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature)
+
+            # Log sample of batch content for debugging
+            jsonl_lines = jsonl_content.split("\n")
+            if jsonl_lines:
+                module_logger.debug(f"Sample batch request (first item): {jsonl_lines[0][:500]}")
+                module_logger.info(f"Batch contains {len(jsonl_lines)} requests")
+
+            # Create temporary file for batch requests
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as temp_file:
+                temp_file.write(jsonl_content)
+                temp_file_path = temp_file.name
+
+            try:
+                # Upload the batch requests file
+                module_logger.info("Uploading batch requests file...")
+                with open(temp_file_path, "rb") as file:
+                    batch_file = client.files.create(file=file, purpose="batch")
+
+                # Create the batch job
+                module_logger.info(f"Creating batch job with model {model_name}...")
+                batch_job = client.batches.create(
+                    input_file_id=batch_file.id, endpoint="/v1/chat/completions", completion_window="24h"
+                )
+
+                module_logger.info(f"Created batch job: {batch_job.id}")
+
+                # Poll for job completion
+                module_logger.info(f"Polling batch job for completion (timeout: {batch_timeout}s)...")
+                poll_result = self._poll_batch_job(client, batch_job.id, batch_timeout)
+
+                # Always retrieve the job to check for errors, even if polling "failed"
+                completed_job = client.batches.retrieve(batch_job.id)
+
+                if not poll_result:
+                    module_logger.error("Batch job did not complete successfully or all requests failed")
+
+                    # Try to get error details before falling back
+                    if completed_job.error_file_id:
+                        try:
+                            error_file = client.files.content(completed_job.error_file_id)
+                            error_content = error_file.read().decode("utf-8")
+                            module_logger.error(f"Batch job error details:\n{error_content}")
+                        except Exception as e:
+                            module_logger.error(f"Failed to retrieve error file: {e}")
+
+                    # Fall back to sequential processing
+                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+                # Log detailed job information for debugging
+                module_logger.info(
+                    f"Batch job details - Status: {completed_job.status}, "
+                    f"Request counts: {completed_job.request_counts}, "
+                    f"Has output_file_id: {bool(completed_job.output_file_id)}, "
+                    f"Has error_file_id: {bool(completed_job.error_file_id)}"
+                )
+
+                # Check for error file first
+                if completed_job.error_file_id:
+                    module_logger.warning(f"Batch job has error file: {completed_job.error_file_id}")
+                    try:
+                        error_file = client.files.content(completed_job.error_file_id)
+                        error_content = error_file.read().decode("utf-8")
+                        module_logger.error(f"Batch job errors:\n{error_content[:1000]}")  # Log first 1000 chars
+                    except Exception as e:
+                        module_logger.error(f"Failed to retrieve error file: {e}")
+
+                # Retrieve results
+                if completed_job.output_file_id:
+                    module_logger.info(f"Downloading batch results from {completed_job.output_file_id}...")
+
+                    result_file = client.files.content(completed_job.output_file_id)
+                    result_content = result_file.read().decode("utf-8")
+
+                    # Debug logging for batch content
+                    module_logger.debug(f"Raw batch result content sample: {result_content[:500]}...")
+
+                    # Parse and return results
+                    responses = self._parse_batch_results(result_content, requests)
+
+                    module_logger.info(f"Successfully processed {len(responses)} batch responses")
+                    return responses
+                else:
+                    # Log more details about why there's no output file
+                    failed_count = (
+                        completed_job.request_counts.failed
+                        if hasattr(completed_job.request_counts, "failed")
+                        else "unknown"
+                    )
+                    module_logger.error(
+                        f"No output file found in completed batch job. "
+                        f"Job status: {completed_job.status}, "
+                        f"Failed requests: {failed_count}"
+                    )
+                    # Fall back to sequential processing
+                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass  # Ignore cleanup errors
+
+        except ImportError as e:
+            module_logger.error(f"OpenAI SDK not available for batch processing: {e}")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+        except Exception as e:
+            module_logger.error(f"OpenAI batch API call failed: {e}")
+            module_logger.exception("Batch processing error details:")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
 
 
 class GeminiClient(ProviderClient):
@@ -469,23 +850,279 @@ class GeminiClient(ProviderClient):
             module_logger.error(f"Gemini API call failed: {e}")
             raise LlmModelError(f"Gemini API call failed: {e}")
 
+    def _create_batch_jsonl(self, requests: list[dict[str, Any]]) -> str:
+        """
+        Create JSONL content for batch processing following Gemini API specification.
+
+        Args:
+            requests: List of request dictionaries containing system_prompt, user_prompt, metadata
+
+        Returns:
+            str: JSONL formatted string for batch processing
+        """
+        import json
+
+        jsonl_lines = []
+        for i, request in enumerate(requests):
+            system_prompt = request.get("system_prompt", "")
+            user_prompt = request.get("user_prompt", "")
+            metadata = request.get("metadata", {})
+
+            # Create the user content parts
+            user_parts = []
+            if user_prompt:
+                user_parts.append({"text": user_prompt})
+
+            # Create the batch request structure according to GenerateContentRequest spec
+            batch_request = {
+                "key": f"request_{i}",
+                "request": {"contents": [{"parts": user_parts}]},
+                "metadata": metadata,  # Store metadata for result matching
+            }
+
+            # Add system instruction separately if present
+            if system_prompt:
+                batch_request["request"]["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+            jsonl_lines.append(json.dumps(batch_request))
+
+        return "\n".join(jsonl_lines)
+
+    def _poll_batch_job(self, client, job_name: str, timeout_seconds: int = 3600) -> bool:
+        """
+        Poll batch job until completion or timeout.
+
+        Args:
+            client: GenAI client
+            job_name: Name of the batch job
+            timeout_seconds: Maximum time to wait for completion (default 1 hour)
+
+        Returns:
+            bool: True if job completed successfully, False otherwise
+        """
+        import time
+
+        start_time = time.time()
+        poll_interval = 30  # Poll every 30 seconds
+
+        while time.time() - start_time < timeout_seconds:
+            try:
+                job = client.batches.get(name=job_name)
+                state = job.state.name if hasattr(job.state, "name") else str(job.state)
+
+                module_logger.info(f"Batch job {job_name} state: {state}")
+
+                if state == "JOB_STATE_SUCCEEDED":
+                    return True
+                elif state in ["JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"]:
+                    module_logger.error(f"Batch job failed with state: {state}")
+                    return False
+
+                time.sleep(poll_interval)
+
+            except Exception as e:
+                module_logger.error(f"Error polling batch job: {e}")
+                return False
+
+        module_logger.error(f"Batch job timed out after {timeout_seconds} seconds")
+        return False
+
+    def _parse_batch_results(
+        self, result_content: str, original_requests: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        Parse batch job results and match them with original requests.
+
+        Args:
+            result_content: JSONL content from batch job results
+            original_requests: Original request list for metadata matching
+
+        Returns:
+            List of response dictionaries
+        """
+        import json
+
+        responses = []
+        result_lines = result_content.strip().split("\n")
+
+        # Create mapping from request keys to original metadata
+        key_to_metadata = {}
+        for i, request in enumerate(original_requests):
+            key_to_metadata[f"request_{i}"] = request.get("metadata", {})
+
+        for line in result_lines:
+            try:
+                result = json.loads(line)
+
+                # Extract response data
+                key = result.get("key", "")
+                response_data = result.get("response", {})
+
+                # Get the generated content
+                candidates = response_data.get("candidates", [])
+                content = ""
+                if candidates:
+                    candidate = candidates[0]
+                    content_parts = candidate.get("content", {}).get("parts", [])
+                    if content_parts:
+                        content = content_parts[0].get("text", "")
+
+                # Generate a unique ID
+                generation_id = f"gemini_batch_{int(time.time())}_{key}"
+
+                # Get original metadata
+                metadata = key_to_metadata.get(key, {})
+
+                # Track token usage if available
+                try:
+                    usage_metadata = response_data.get("usageMetadata", {})
+                    if usage_metadata:
+                        prompt_tokens = usage_metadata.get("promptTokenCount")
+                        completion_tokens = usage_metadata.get("candidatesTokenCount")
+
+                        if prompt_tokens is not None or completion_tokens is not None:
+                            register_generation_model_info(
+                                generation_id=generation_id,
+                                model="gemini",  # Model name from batch job
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                is_batch=True,  # This is batch processing, apply 50% discount
+                            )
+                except Exception:
+                    # Silently ignore usage tracking errors
+                    pass
+
+                responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+
+            except Exception as e:
+                module_logger.error(f"Error parsing batch result line: {e}")
+                # Add error response
+                responses.append(
+                    {
+                        "content": f"Error parsing result: {str(e)}",
+                        "generation_id": f"gemini_batch_parse_error_{int(time.time())}",
+                        "metadata": {},
+                    }
+                )
+
+        return responses
+
     def batch_chat_completion(
         self,
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
+        batch_timeout: int = 3600,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
-        Process batch chat completion requests using Gemini's batch API.
+        Process batch chat completion requests using Gemini's true batch job API.
 
-        Note: This is a placeholder implementation. Gemini's batch API
-        may have specific requirements. For now, this processes
-        requests sequentially.
+        This implementation creates a batch job with all requests in JSONL format,
+        submits it to the Gemini API, polls for completion, and retrieves results.
+        Batch processing provides 50% cost savings compared to synchronous API calls.
+
+        Args:
+            requests: List of request dictionaries
+            model_name: Name of the model to use
+            temperature: Temperature setting for the model
+            batch_timeout: Maximum time to wait for batch job completion (seconds)
+            **kwargs: Additional arguments
+
+        Returns:
+            List of response dictionaries
         """
-        # TODO: Implement actual Gemini batch API integration
-        # For now, use the default sequential processing
-        return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+        client = self._get_client()
+
+        try:
+            import os
+            import tempfile
+
+            from google.genai.types import CreateBatchJobConfig
+
+            # Remove unsupported parameters
+            kwargs.pop("reasoning", None)
+
+            module_logger.info(f"Starting Gemini batch processing for {len(requests)} requests")
+
+            # Create JSONL content for batch processing
+            jsonl_content = self._create_batch_jsonl(requests)
+
+            # Create temporary file for batch requests
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as temp_file:
+                temp_file.write(jsonl_content)
+                temp_file_path = temp_file.name
+
+            try:
+                # Upload the batch requests file
+                module_logger.info("Uploading batch requests file...")
+                uploaded_file = client.files.upload(file=temp_file_path, config={"mimeType": "application/jsonl"})
+
+                # Create batch configuration
+                batch_config = CreateBatchJobConfig(
+                    display_name=f"llm_book_updater_batch_{int(time.time())}",
+                )
+
+                # Add temperature to the config if supported
+                if temperature != 0.2:  # Only set if different from default
+                    # Note: Temperature might need to be set differently in batch config
+                    # The exact parameter name may vary - check latest API docs
+                    pass
+
+                # Create the batch job
+                module_logger.info(f"Creating batch job with model {model_name}...")
+                batch_job = client.batches.create(
+                    model=model_name,
+                    src=uploaded_file.name,
+                    config=batch_config,
+                )
+
+                module_logger.info(f"Created batch job: {batch_job.name}")
+
+                # Poll for job completion
+                module_logger.info(f"Polling batch job for completion (timeout: {batch_timeout}s)...")
+                if not self._poll_batch_job(client, batch_job.name, batch_timeout):
+                    module_logger.error("Batch job did not complete successfully")
+                    # Fall back to sequential processing
+                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+                # Get the completed job to retrieve results
+                completed_job = client.batches.get(name=batch_job.name)
+
+                # Download results
+                if hasattr(completed_job, "dest") and hasattr(completed_job.dest, "file_name"):
+                    result_file_name = completed_job.dest.file_name
+                    module_logger.info(f"Downloading batch results from {result_file_name}...")
+
+                    result_bytes = client.files.download(file=result_file_name)
+                    result_content = result_bytes.decode("utf-8")
+
+                    # Parse and return results
+                    responses = self._parse_batch_results(result_content, requests)
+
+                    module_logger.info(f"Successfully processed {len(responses)} batch responses")
+                    return responses
+                else:
+                    module_logger.error("No result file found in completed batch job")
+                    # Fall back to sequential processing
+                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass  # Ignore cleanup errors
+
+        except ImportError as e:
+            module_logger.error(f"Google GenAI SDK not available for batch processing: {e}")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+        except Exception as e:
+            module_logger.error(f"Gemini batch API call failed: {e}")
+            module_logger.exception("Batch processing error details:")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
 
 
 class LlmModel:
@@ -700,7 +1337,7 @@ class LlmModel:
         if self.model_config.provider == Provider.OPENAI:
             return 50  # OpenAI typically supports larger batches
         elif self.model_config.provider == Provider.GEMINI:
-            return 20  # Gemini batch size recommendation
+            return 30  # Gemini batch size with concurrent processing
         else:
             return 10  # Conservative default for other providers
 

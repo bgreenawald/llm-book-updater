@@ -99,12 +99,20 @@ class CostTrackingWrapper:
         model: Optional[str] = None,
         prompt_tokens: Optional[int] = None,
         completion_tokens: Optional[int] = None,
+        is_batch: bool = False,
     ) -> None:
         """
         Register or update model/token information for a generation ID.
 
         This is useful for providers (e.g., OpenAI) where token usage is known
         at call time but phase association is handled elsewhere.
+
+        Args:
+            generation_id: Unique identifier for this generation
+            model: Model name used
+            prompt_tokens: Number of tokens in the prompt
+            completion_tokens: Number of tokens in the completion
+            is_batch: Whether this was batch processing (applies 50% discount)
         """
         if not self.enabled:
             return
@@ -114,6 +122,7 @@ class CostTrackingWrapper:
                 "model": model,
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
+                "is_batch": is_batch,
             }
         module_logger.debug(
             f"Registered model info for generation {generation_id}: model={model}, "
@@ -243,9 +252,17 @@ def register_generation_model_info(
     model: Optional[str] = None,
     prompt_tokens: Optional[int] = None,
     completion_tokens: Optional[int] = None,
+    is_batch: bool = False,
 ) -> None:
     """
     Public helper to register or update model/token info for a generation ID.
+
+    Args:
+        generation_id: Unique identifier for this generation
+        model: Model name used
+        prompt_tokens: Number of tokens in the prompt
+        completion_tokens: Number of tokens in the completion
+        is_batch: Whether this was batch processing (applies 50% discount)
     """
     wrapper = get_cost_tracking_wrapper()
     if wrapper:
@@ -254,6 +271,7 @@ def register_generation_model_info(
             model=model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            is_batch=is_batch,
         )
 
 

@@ -65,6 +65,9 @@ class PhaseConfig:
     post_processors: Optional[List[Union[str, "PostProcessor", PostProcessorType]]] = None
     book_name: Optional[str] = None
     author_name: Optional[str] = None
+    # Batch processing parameters
+    use_batch: bool = False
+    batch_size: Optional[int] = None
 
     def __post_init__(self) -> None:
         """

@@ -22,6 +22,8 @@ run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.EDIT,
         model=CHATGPT_GPT5_NANO,
+        use_batch=True,
+        batch_size=10,
         reasoning={"effort": "high"},
     ),
     PhaseConfig(

@@ -614,7 +614,10 @@ class LlmPhase(ABC):
             blocks = list(zip(current_blocks, original_blocks))
 
             # Check if we should use batch processing
-            if self.use_batch and hasattr(self.model, "supports_batch"):
+            has_method = hasattr(self.model, "supports_batch")
+            supports = self.model.supports_batch() if has_method else "N/A"
+            logger.info(f"BATCH DEBUG: use_batch={self.use_batch}, has_method={has_method}, supports={supports}")
+            if self.use_batch and hasattr(self.model, "supports_batch") and self.model.supports_batch():
                 logger.info(f"Using batch processing with batch_size={self.batch_size}")
 
                 # Determine batch size

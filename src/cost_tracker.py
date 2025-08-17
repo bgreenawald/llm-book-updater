@@ -324,7 +324,9 @@ class CostTracker:
         total_cost = input_cost + output_cost
         return total_cost, estimation_method
 
-    def _estimate_gemini_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> Tuple[float, str]:
+    def _estimate_gemini_cost(
+        self, model: str, prompt_tokens: int, completion_tokens: int, is_batch: bool = False
+    ) -> Tuple[float, str]:
         """
         Estimate cost for Gemini API calls based on token usage.
 
@@ -332,6 +334,7 @@ class CostTracker:
             model: Model name
             prompt_tokens: Number of prompt tokens
             completion_tokens: Number of completion tokens
+            is_batch: Whether this was batch processing (50% discount applies)
 
         Returns:
             Tuple of (estimated_cost, estimation_method)
@@ -341,6 +344,10 @@ class CostTracker:
         if pricing_tuple is not None:
             prompt_price, completion_price = pricing_tuple
             total_cost = prompt_tokens * prompt_price + completion_tokens * completion_price
+            # Apply 50% batch discount if applicable
+            if is_batch:
+                total_cost *= 0.5
+                return total_cost, "openrouter_models_pricing_batch_discount"
             return total_cost, "openrouter_models_pricing"
 
         # Fallback to static per-1M pricing heuristics
@@ -366,6 +373,12 @@ class CostTracker:
         input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
         output_cost = (completion_tokens / 1_000_000) * pricing["output"]
         total_cost = input_cost + output_cost
+
+        # Apply 50% batch discount if applicable
+        if is_batch:
+            total_cost *= 0.5
+            estimation_method += "_batch_discount"
+
         return total_cost, estimation_method
 
     def get_generation_stats(
@@ -375,6 +388,7 @@ class CostTracker:
         prompt_tokens: Optional[int] = None,
         completion_tokens: Optional[int] = None,
         provider: Optional[Provider] = None,
+        is_batch: bool = False,
     ) -> Optional[GenerationStats]:
         """
         Query or estimate generation statistics from any supported provider.
@@ -385,6 +399,7 @@ class CostTracker:
             prompt_tokens: Number of prompt tokens (for cost estimation)
             completion_tokens: Number of completion tokens (for cost estimation)
             provider: Provider to use for queries (if None, will detect from generation ID)
+            is_batch: Whether this was batch processing (50% discount applies)
 
         Returns:
             GenerationStats object if successful, None otherwise
@@ -455,6 +470,7 @@ class CostTracker:
                             model=model_str,
                             prompt_tokens=prompt_tokens_int,
                             completion_tokens=completion_tokens_int,
+                            is_batch=is_batch,
                         )
                         provider_for_estimation = Provider.GEMINI
                     else:
@@ -509,6 +525,7 @@ class CostTracker:
                     model=model_name,
                     prompt_tokens=prompt_token_count,
                     completion_tokens=completion_token_count,
+                    is_batch=is_batch,
                 )
             else:
                 module_logger.warning(f"Unsupported provider for cost estimation: {provider.value}")
@@ -575,6 +592,7 @@ class CostTracker:
                 prompt_tokens=gen_model_info.get("prompt_tokens"),
                 completion_tokens=gen_model_info.get("completion_tokens"),
                 provider=gen_model_info.get("provider"),
+                is_batch=gen_model_info.get("is_batch", False),
             )
 
             if stats:
