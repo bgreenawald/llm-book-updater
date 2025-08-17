@@ -330,6 +330,8 @@ class Pipeline:
             temperature=phase_config.temperature,
             reasoning=phase_config.reasoning,
             post_processors=phase_config.post_processors,
+            use_batch=phase_config.use_batch,
+            batch_size=phase_config.batch_size,
         )
 
         # Create the phase instance using the factory with explicit arguments

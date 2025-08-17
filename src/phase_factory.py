@@ -131,6 +131,8 @@ class PhaseFactory:
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
             length_reduction=length_reduction,
+            use_batch=config.use_batch,
+            batch_size=config.batch_size,
         )
 
     @staticmethod
@@ -185,6 +187,8 @@ class PhaseFactory:
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
             length_reduction=length_reduction,
+            use_batch=config.use_batch,
+            batch_size=config.batch_size,
         )
 
     @staticmethod
@@ -239,6 +243,8 @@ class PhaseFactory:
             reasoning=config.reasoning,
             post_processor_chain=post_processor_chain,
             length_reduction=length_reduction,
+            use_batch=config.use_batch,
+            batch_size=config.batch_size,
         )
 
     @staticmethod

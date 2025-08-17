@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 from tqdm import tqdm
@@ -39,6 +39,8 @@ class LlmPhase(ABC):
         reasoning: Optional[Dict[str, str]] = None,
         post_processor_chain: Optional[Any] = None,
         length_reduction: Optional[Any] = None,
+        use_batch: bool = False,
+        batch_size: Optional[int] = None,
     ) -> None:
         """
         Initialize the LLM phase with all necessary parameters.
@@ -58,6 +60,8 @@ class LlmPhase(ABC):
             reasoning (Optional[Dict[str, Dict[str, str]]]): Reasoning configuration for the model
             post_processor_chain (Optional[Any]): Chain of post-processors to apply
             length_reduction (Optional[Any]): Length reduction parameter for the phase
+            use_batch (bool): Whether to use batch processing for LLM calls (if supported)
+            batch_size (Optional[int]): Number of items to process in each batch (defaults to provider limits)
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -73,6 +77,8 @@ class LlmPhase(ABC):
         self.reasoning = reasoning or {}
         self.post_processor_chain = post_processor_chain
         self.length_reduction = length_reduction
+        self.use_batch = use_batch
+        self.batch_size = batch_size
 
         # Initialize content storage
         self.input_text = ""
@@ -451,13 +457,136 @@ class LlmPhase(ABC):
 
         return len(lines) > 0  # Must have at least one tag to be considered "only tags"
 
+    def _process_batch(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        """
+        Process a batch of markdown blocks using batch API if available.
+
+        Args:
+            batch: List of tuples containing (current_block, original_block)
+            **kwargs: Additional arguments to pass to the processing methods
+
+        Returns:
+            List of processed block strings
+        """
+        try:
+            # Check if the model supports batch processing
+            if hasattr(self.model, "supports_batch") and self.model.supports_batch():
+                logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
+
+                # Prepare batch requests
+                batch_requests: List[Optional[Dict[str, Any]]] = []
+                for current_block, original_block in batch:
+                    current_header, current_body = self._get_header_and_body(block=current_block)
+                    original_header, original_body = self._get_header_and_body(block=original_block)
+
+                    # Skip empty blocks or blocks with only special tags
+                    if (not current_body.strip() and not original_body.strip()) or (
+                        self._contains_only_special_tags(current_body)
+                        and self._contains_only_special_tags(original_body)
+                    ):
+                        batch_requests.append(None)  # Mark as skip
+                        continue
+
+                    # Format the user message
+                    user_message = self._format_user_message(
+                        current_body=current_body,
+                        original_body=original_body,
+                        current_header=current_header,
+                        original_header=original_header,
+                    )
+
+                    batch_requests.append(
+                        {
+                            "system_prompt": self.system_prompt,
+                            "user_prompt": user_message,
+                            "metadata": {
+                                "current_header": current_header,
+                                "current_body": current_body,
+                                "original_body": original_body,
+                            },
+                        }
+                    )
+
+                # Process non-None requests through batch API
+                valid_requests = [req for req in batch_requests if req is not None]
+                if valid_requests:
+                    batch_responses = self.model.batch_chat_completion(
+                        requests=valid_requests, temperature=self.temperature, **kwargs
+                    )
+                else:
+                    batch_responses = []
+
+                # Reconstruct results maintaining original order
+                processed_blocks = []
+                response_idx = 0
+                for i, (current_block, original_block) in enumerate(batch):
+                    if batch_requests[i] is None:
+                        # This was a skipped block
+                        current_header, current_body = self._get_header_and_body(block=current_block)
+                        processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+                    else:
+                        # Get the response for this block
+                        response = batch_responses[response_idx]
+                        response_idx += 1
+
+                        request = batch_requests[i]
+                        assert request is not None  # Type guard for mypy
+                        metadata = request["metadata"]
+                        processed_body = response["content"]
+                        generation_id = response.get("generation_id")
+
+                        # Track generation ID for cost calculation
+                        if generation_id:
+                            add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+                        # Apply post-processing
+                        processed_body = self._apply_post_processing(
+                            original_block=metadata["current_body"], llm_block=processed_body, **kwargs
+                        )
+
+                        # Reconstruct the block
+                        current_header = metadata["current_header"]
+                        if processed_body.strip():
+                            processed_blocks.append(f"{current_header}\n\n{processed_body}\n\n")
+                        else:
+                            processed_blocks.append(f"{current_header}\n\n")
+
+                return processed_blocks
+
+            else:
+                # Fall back to sequential processing
+                logger.debug("Model does not support batch processing, falling back to sequential processing")
+                return self._process_batch_sequential(batch, **kwargs)
+
+        except Exception as e:
+            logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
+            return self._process_batch_sequential(batch, **kwargs)
+
+    def _process_batch_sequential(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        """
+        Process a batch of blocks sequentially (fallback when batch API is not available).
+
+        Args:
+            batch: List of tuples containing (current_block, original_block)
+            **kwargs: Additional arguments to pass to the processing methods
+
+        Returns:
+            List of processed block strings
+        """
+        processed_blocks = []
+        for current_block, original_block in batch:
+            processed_block = self._process_block(current_block, original_block, **kwargs)
+            processed_blocks.append(processed_block)
+        return processed_blocks
+
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
         Process all markdown blocks in the input text.
 
         This method identifies markdown blocks in the input text and processes
-        them in parallel using the LLM model. It handles both current and
-        original content to ensure proper processing.
+        them either in batches (if supported and enabled) or in parallel using
+        the LLM model. It handles both current and original content to ensure
+        proper processing.
 
         Args:
             **kwargs: Additional arguments to pass to the processing methods
@@ -482,19 +611,42 @@ class LlmPhase(ABC):
                 msg = f"Block length mismatch: {len(current_blocks)} != {len(original_blocks)}"
                 raise ValueError(msg)
 
-            # Process blocks in parallel
             blocks = list(zip(current_blocks, original_blocks))
-            logger.debug("Starting parallel block processing")
 
-            func = partial(self._process_block, **kwargs)
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                processed_blocks = list(
-                    tqdm(
-                        iterable=executor.map(lambda args: func(*args), blocks),
-                        total=len(blocks),
-                        desc=f"Processing {self.name}",
+            # Check if we should use batch processing
+            has_method = hasattr(self.model, "supports_batch")
+            supports = self.model.supports_batch() if has_method else "N/A"
+            logger.info(f"BATCH DEBUG: use_batch={self.use_batch}, has_method={has_method}, supports={supports}")
+            if self.use_batch and hasattr(self.model, "supports_batch") and self.model.supports_batch():
+                logger.info(f"Using batch processing with batch_size={self.batch_size}")
+
+                # Determine batch size
+                if self.batch_size:
+                    batch_size = self.batch_size
+                else:
+                    # Use a default batch size or provider-specific limit
+                    batch_size = getattr(self.model, "default_batch_size", 10)
+
+                # Process blocks in batches
+                processed_blocks = []
+                for i in tqdm(range(0, len(blocks), batch_size), desc=f"Processing {self.name} (batches)"):
+                    batch = blocks[i : i + batch_size]
+                    batch_results = self._process_batch(batch, **kwargs)
+                    processed_blocks.extend(batch_results)
+
+            else:
+                # Process blocks in parallel (original behavior)
+                logger.debug("Starting parallel block processing")
+
+                func = partial(self._process_block, **kwargs)
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    processed_blocks = list(
+                        tqdm(
+                            iterable=executor.map(lambda args: func(*args), blocks),
+                            total=len(blocks),
+                            desc=f"Processing {self.name}",
+                        )
                     )
-                )
 
             logger.debug(f"Successfully processed {len(processed_blocks)} blocks")
             logger.debug("Joining processed blocks into final content")
