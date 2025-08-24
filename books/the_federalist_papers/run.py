@@ -9,38 +9,52 @@ from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
 # Use OpenRouter for all phases
-OPENROUTER_GEMINI_FLASH_LITE = ModelConfig(Provider.OPENROUTER, "google/gemini-2.5-flash-lite-preview-06-17")
+GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-2.5-pro")
+CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
+CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=GOOGLE_GEMINI_PRO,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        batch_size=10,
+        reasoning={"effort": "medium"},
     ),
 ]
 
