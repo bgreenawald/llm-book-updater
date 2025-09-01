@@ -614,7 +614,7 @@ class OpenAIClient(ProviderClient):
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
-        batch_timeout: int = 3600,
+        batch_timeout: int = 3600 * 24,  # 24 hours
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -1324,22 +1324,6 @@ class LlmModel:
         """
         client = self._get_client()
         return client.supports_batch
-
-    @property
-    def default_batch_size(self) -> int:
-        """
-        Get the default batch size for the current provider.
-
-        Returns:
-            int: Default batch size
-        """
-        # Provider-specific defaults
-        if self.model_config.provider == Provider.OPENAI:
-            return 50  # OpenAI typically supports larger batches
-        elif self.model_config.provider == Provider.GEMINI:
-            return 30  # Gemini batch size with concurrent processing
-        else:
-            return 10  # Conservative default for other providers
 
     def batch_chat_completion(
         self,

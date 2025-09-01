@@ -61,7 +61,7 @@ class LlmPhase(ABC):
             post_processor_chain (Optional[Any]): Chain of post-processors to apply
             length_reduction (Optional[Any]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
-            batch_size (Optional[int]): Number of items to process in each batch (defaults to provider limits)
+            batch_size (Optional[int]): Number of items to process in each batch (if None, processes all blocks at once)
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -618,21 +618,18 @@ class LlmPhase(ABC):
             supports = self.model.supports_batch() if has_method else "N/A"
             logger.info(f"BATCH DEBUG: use_batch={self.use_batch}, has_method={has_method}, supports={supports}")
             if self.use_batch and hasattr(self.model, "supports_batch") and self.model.supports_batch():
-                logger.info(f"Using batch processing with batch_size={self.batch_size}")
-
-                # Determine batch size
                 if self.batch_size:
-                    batch_size = self.batch_size
+                    # If batch_size is specified, process in chunks
+                    logger.info(f"Using batch processing with batch_size={self.batch_size} for {len(blocks)} blocks")
+                    processed_blocks = []
+                    for i in tqdm(range(0, len(blocks), self.batch_size), desc=f"Processing {self.name} (batches)"):
+                        batch = blocks[i : i + self.batch_size]
+                        batch_results = self._process_batch(batch, **kwargs)
+                        processed_blocks.extend(batch_results)
                 else:
-                    # Use a default batch size or provider-specific limit
-                    batch_size = getattr(self.model, "default_batch_size", 10)
-
-                # Process blocks in batches
-                processed_blocks = []
-                for i in tqdm(range(0, len(blocks), batch_size), desc=f"Processing {self.name} (batches)"):
-                    batch = blocks[i : i + batch_size]
-                    batch_results = self._process_batch(batch, **kwargs)
-                    processed_blocks.extend(batch_results)
+                    # Process all blocks at once in a single batch
+                    logger.info(f"Using batch processing for all {len(blocks)} blocks at once")
+                    processed_blocks = self._process_batch(blocks, **kwargs)
 
             else:
                 # Process blocks in parallel (original behavior)
