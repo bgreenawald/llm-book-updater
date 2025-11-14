@@ -358,14 +358,15 @@ class OpenAIClient(ProviderClient):
             module_logger.error(f"OpenAI API call failed: {e}")
             raise LlmModelError(f"OpenAI API call failed: {e}")
 
-    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float) -> str:
+    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float, **kwargs) -> str:
         """
-        Create JSONL content for batch processing following OpenAI API specification.
+        Create JSONL content for batch processing using the OpenAI Responses API.
 
         Args:
             requests: List of request dictionaries containing system_prompt, user_prompt, metadata
             model_name: Name of the model to use
             temperature: Temperature setting for the model
+            **kwargs: Additional parameters (e.g., effort under reasoning)
 
         Returns:
             str: JSONL formatted string for batch processing
@@ -378,32 +379,31 @@ class OpenAIClient(ProviderClient):
             user_prompt = request.get("user_prompt", "")
             metadata = request.get("metadata", {})
 
-            # Build messages array
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
-
-            # Create the batch request structure according to OpenAI spec
-            # Note: Batch API uses standard chat completions format, not the new responses API
-
             # Handle GPT-5 models that don't support custom temperature
             is_gpt5_series_model = model_name.lower().startswith("gpt-5")
 
+            # Build request body for Responses API
             batch_body: Dict[str, Any] = {
                 "model": model_name,
-                "messages": messages,
-                # Don't set max_completion_tokens - let the model use its default limit
+                "input": user_prompt,
             }
+
+            if system_prompt:
+                batch_body["instructions"] = system_prompt
 
             # Only add temperature for non-GPT-5 models
             if not is_gpt5_series_model:
                 batch_body["temperature"] = temperature
 
+            # Optional: pass through reasoning effort if provided (Responses API)
+            effort = kwargs.get("effort")
+            if effort is not None:
+                batch_body["reasoning"] = {"effort": effort}
+
             batch_request = {
                 "custom_id": f"request_{i}_{metadata.get('id', '')}",
                 "method": "POST",
-                "url": "/v1/chat/completions",
+                "url": "/v1/responses",
                 "body": batch_body,
             }
 
@@ -426,7 +426,7 @@ class OpenAIClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 30  # Poll every 30 seconds
+        poll_interval = 120  # Poll every 120 seconds
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -539,38 +539,33 @@ class OpenAIClient(ProviderClient):
                     )
                     continue
 
-                # Extract successful response
+                # Extract successful response (Responses API format)
                 response_body = result.get("response", {}).get("body", {})
-                choices = response_body.get("choices", [])
 
                 # Debug logging to see what we're getting
                 module_logger.debug(
                     f"Batch result structure for {custom_id}: response_body keys: {list(response_body.keys())}"
                 )
-                if choices:
-                    module_logger.debug(
-                        f"First choice structure: {choices[0].keys() if choices[0] else 'Empty choice'}"
-                    )
-                    if choices[0] and "message" in choices[0]:
-                        message_keys = choices[0]["message"].keys() if choices[0]["message"] else "Empty message"
-                        module_logger.debug(f"Message structure: {message_keys}")
 
                 content = ""
-                if choices:
-                    choice = choices[0]
-                    content = choice.get("message", {}).get("content", "")
-                    finish_reason = choice.get("finish_reason", "unknown")
+                output_items = response_body.get("output", []) or []
+                # Find the first assistant message and extract its text part
+                for item in output_items:
+                    if isinstance(item, dict) and item.get("type") == "message":
+                        content_parts = item.get("content", []) or []
+                        for part in content_parts:
+                            if isinstance(part, dict) and part.get("type") in ("output_text", "text"):
+                                content = part.get("text", "") or ""
+                                break
+                        if content:
+                            break
 
-                    if finish_reason == "length":
-                        module_logger.warning(f"Response truncated due to length limit for {custom_id}")
-                        # For truncated responses, we'll still use whatever content we got
-                        # The content might be empty if truncation happened very early
-
-                    if not content:
-                        module_logger.warning(
-                            f"Empty content in batch response for {custom_id}, "
-                            f"finish_reason: {finish_reason}, choice: {choice}"
-                        )
+                if not content:
+                    module_logger.warning(
+                        f"Empty content in batch response for {custom_id}, output keys: {
+                            [i.get('type') for i in output_items if isinstance(i, dict)]
+                        }"
+                    )
 
                 generation_id = response_body.get("id", f"openai_batch_{custom_id}")
 
@@ -581,8 +576,9 @@ class OpenAIClient(ProviderClient):
                 try:
                     usage = response_body.get("usage", {})
                     if usage:
-                        prompt_tokens = usage.get("prompt_tokens")
-                        completion_tokens = usage.get("completion_tokens")
+                        # Responses API uses input_tokens/output_tokens
+                        prompt_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
+                        completion_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
 
                         if prompt_tokens is not None or completion_tokens is not None:
                             register_generation_model_info(
@@ -643,7 +639,7 @@ class OpenAIClient(ProviderClient):
             module_logger.info(f"Starting OpenAI batch processing for {len(requests)} requests")
 
             # Create JSONL content for batch processing
-            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature)
+            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature, **kwargs)
 
             # Log sample of batch content for debugging
             jsonl_lines = jsonl_content.split("\n")
@@ -665,7 +661,7 @@ class OpenAIClient(ProviderClient):
                 # Create the batch job
                 module_logger.info(f"Creating batch job with model {model_name}...")
                 batch_job = client.batches.create(
-                    input_file_id=batch_file.id, endpoint="/v1/chat/completions", completion_window="24h"
+                    input_file_id=batch_file.id, endpoint="/v1/responses", completion_window="24h"
                 )
 
                 module_logger.info(f"Created batch job: {batch_job.id}")
@@ -903,7 +899,7 @@ class GeminiClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 30  # Poll every 30 seconds
+        poll_interval = 120  # Poll every 120 seconds
 
         while time.time() - start_time < timeout_seconds:
             try:

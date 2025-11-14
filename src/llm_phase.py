@@ -538,7 +538,7 @@ class LlmPhase(ABC):
                 valid_requests = [req for req in batch_requests if req is not None]
                 if valid_requests:
                     batch_responses = self.model.batch_chat_completion(
-                        requests=valid_requests, temperature=self.temperature, **kwargs
+                        requests=valid_requests, temperature=self.temperature, reasoning=self.reasoning, **kwargs
                     )
                 else:
                     batch_responses = []

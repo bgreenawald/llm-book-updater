@@ -9,40 +9,46 @@ from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
 # Use OpenRouter for all phases
-OPENROUTER_GEMINI_FLASH = ModelConfig(Provider.OPENROUTER, "google/gemini-2.5-flash")
-OPENROUTER_GEMINI_PRO = ModelConfig(Provider.OPENROUTER, "google/gemini-2.5-pro")
-OPENROUTER_DEEPSEEK = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1-0528")
+GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-2.5-pro")
+CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
+CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=OPENROUTER_GEMINI_FLASH,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=OPENROUTER_GEMINI_PRO,
-        reasoning={"effort": "high"},
+        model=GOOGLE_GEMINI_PRO,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=OPENROUTER_DEEPSEEK,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=OPENROUTER_GEMINI_FLASH,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=OPENROUTER_GEMINI_FLASH,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=OPENROUTER_GEMINI_FLASH,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
 ]
 
@@ -51,11 +57,11 @@ config = RunConfig(
     book_id="the_wealth_of_nations",
     book_name="The Wealth of Nations",
     author_name="Adam Smith",
-    input_file=Path(r"books/the_wealth_of_nations/input_small.md"),
+    input_file=Path(r"books/the_wealth_of_nations/input_transformed.md"),
     output_dir=Path(r"books/the_wealth_of_nations/output"),
-    original_file=Path(r"books/the_wealth_of_nations/input_small.md"),
+    original_file=Path(r"books/the_wealth_of_nations/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(35, 50),
+    length_reduction=(50, 65),
     max_workers=10,
 )
 
