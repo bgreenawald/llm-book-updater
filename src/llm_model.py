@@ -9,6 +9,17 @@ import requests
 from dotenv import load_dotenv
 
 from src.common.provider import Provider
+from src.constants import (
+    DEFAULT_OPENROUTER_BACKOFF_FACTOR,
+    DEFAULT_OPENROUTER_MAX_RETRIES,
+    DEFAULT_OPENROUTER_RETRY_DELAY,
+    GEMINI_DEFAULT_TEMPERATURE,
+    LLM_DEFAULT_TEMPERATURE,
+    OPENAI_BATCH_DEFAULT_TIMEOUT,
+    OPENAI_BATCH_POLLING_INTERVAL,
+    OPENROUTER_REQUEST_TIMEOUT,
+    PROMPT_PREVIEW_MAX_LENGTH,
+)
 from src.cost_tracking_wrapper import register_generation_model_info
 from src.logging_config import setup_logging
 
@@ -144,9 +155,9 @@ class OpenRouterClient(ProviderClient):
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
-        backoff_factor: float = 2.0,
+        max_retries: int = DEFAULT_OPENROUTER_MAX_RETRIES,
+        retry_delay: float = DEFAULT_OPENROUTER_RETRY_DELAY,
+        backoff_factor: float = DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -178,7 +189,7 @@ class OpenRouterClient(ProviderClient):
                     url=f"{self.base_url}/chat/completions",
                     headers=headers,
                     data=json.dumps(obj=data),
-                    timeout=30,
+                    timeout=OPENROUTER_REQUEST_TIMEOUT,
                 )
                 response.raise_for_status()
                 return response.json()
@@ -426,7 +437,7 @@ class OpenAIClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 120  # Poll every 120 seconds
+        poll_interval = OPENAI_BATCH_POLLING_INTERVAL
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -610,7 +621,7 @@ class OpenAIClient(ProviderClient):
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
-        batch_timeout: int = 3600 * 24,  # 24 hours
+        batch_timeout: int = OPENAI_BATCH_DEFAULT_TIMEOUT,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -899,7 +910,7 @@ class GeminiClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 120  # Poll every 120 seconds
+        poll_interval = OPENAI_BATCH_POLLING_INTERVAL
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -1060,7 +1071,7 @@ class GeminiClient(ProviderClient):
                 )
 
                 # Add temperature to the config if supported
-                if temperature != 0.2:  # Only set if different from default
+                if temperature != GEMINI_DEFAULT_TEMPERATURE:  # Only set if different from default
                     # Note: Temperature might need to be set differently in batch config
                     # The exact parameter name may vary - check latest API docs
                     pass
@@ -1138,7 +1149,7 @@ class LlmModel:
     def __init__(
         self,
         model: ModelConfig,
-        temperature: float = 0.2,
+        temperature: float = LLM_DEFAULT_TEMPERATURE,
         # OpenRouter settings
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
@@ -1258,7 +1269,7 @@ class LlmModel:
     def create(
         cls,
         model: ModelConfig,
-        temperature: float = 0.2,
+        temperature: float = LLM_DEFAULT_TEMPERATURE,
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
         openrouter_max_retries: int = DEFAULT_MAX_RETRIES,
@@ -1308,7 +1319,10 @@ class LlmModel:
             content (str): The full content of the prompt.
         """
         if self.enable_prompt_logging:
-            preview = content if len(content) <= 200 else content[:200] + "..."
+            if len(content) <= PROMPT_PREVIEW_MAX_LENGTH:
+                preview = content
+            else:
+                preview = content[:PROMPT_PREVIEW_MAX_LENGTH] + "..."
             module_logger.trace(f"{role} prompt: {preview}")
 
     def supports_batch(self) -> bool:

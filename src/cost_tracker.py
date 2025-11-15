@@ -31,6 +31,25 @@ import requests
 from dotenv import load_dotenv
 
 from src.common.provider import Provider
+from src.constants import (
+    BATCH_PROCESSING_DISCOUNT_RATE,
+    GEMINI_FLASH_INPUT_PRICE_PER_1M,
+    GEMINI_FLASH_LITE_INPUT_PRICE_PER_1M,
+    GEMINI_FLASH_LITE_OUTPUT_PRICE_PER_1M,
+    GEMINI_FLASH_OUTPUT_PRICE_PER_1M,
+    GEMINI_PRO_INPUT_PRICE_PER_1M,
+    GEMINI_PRO_OUTPUT_PRICE_PER_1M,
+    OPENAI_GPT4O_INPUT_PRICE_PER_1M,
+    OPENAI_GPT4O_MINI_INPUT_PRICE_PER_1M,
+    OPENAI_GPT4O_MINI_OUTPUT_PRICE_PER_1M,
+    OPENAI_GPT4O_OUTPUT_PRICE_PER_1M,
+    OPENAI_GPT35_INPUT_PRICE_PER_1M,
+    OPENAI_GPT35_OUTPUT_PRICE_PER_1M,
+    OPENAI_O4_MINI_INPUT_PRICE_PER_1M,
+    OPENAI_O4_MINI_OUTPUT_PRICE_PER_1M,
+    OPENROUTER_MODELS_API_TIMEOUT,
+    TOKENS_PER_MILLION,
+)
 from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
@@ -105,26 +124,39 @@ class CostTracker:
     """
 
     # Fallback pricing per 1M tokens (USD). Prefer live pricing from OpenRouter models API.
+    # These are imported from src.constants for maintainability.
     OPENAI_PRICING = {
-        # From openrouter_models.json (per-token -> per 1M tokens):
-        # openai/o4-mini: prompt 0.0000011, completion 0.0000044
-        "o4-mini": {"input": 1.10, "output": 4.40},
-        # openai/gpt-4o: prompt 0.0000025, completion 0.00001
-        "gpt-4o": {"input": 2.50, "output": 10.00},
-        # openai/gpt-4o-mini: prompt 0.00000015, completion 0.0000006
-        "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-        # Legacy baseline if needed
-        "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
+        "o4-mini": {
+            "input": OPENAI_O4_MINI_INPUT_PRICE_PER_1M,
+            "output": OPENAI_O4_MINI_OUTPUT_PRICE_PER_1M,
+        },
+        "gpt-4o": {
+            "input": OPENAI_GPT4O_INPUT_PRICE_PER_1M,
+            "output": OPENAI_GPT4O_OUTPUT_PRICE_PER_1M,
+        },
+        "gpt-4o-mini": {
+            "input": OPENAI_GPT4O_MINI_INPUT_PRICE_PER_1M,
+            "output": OPENAI_GPT4O_MINI_OUTPUT_PRICE_PER_1M,
+        },
+        "gpt-3.5-turbo": {
+            "input": OPENAI_GPT35_INPUT_PRICE_PER_1M,
+            "output": OPENAI_GPT35_OUTPUT_PRICE_PER_1M,
+        },
     }
 
     GEMINI_PRICING = {
-        # From openrouter_models.json (per-token -> per 1M tokens)
-        # google/gemini-2.5-flash: prompt 0.0000003, completion 0.0000025
-        "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
-        # google/gemini-2.5-pro: prompt 0.00000125, completion 0.00001
-        "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
-        # google/gemini-2.5-flash-lite: prompt 0.0000001, completion 0.0000004
-        "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
+        "gemini-2.5-flash": {
+            "input": GEMINI_FLASH_INPUT_PRICE_PER_1M,
+            "output": GEMINI_FLASH_OUTPUT_PRICE_PER_1M,
+        },
+        "gemini-2.5-pro": {
+            "input": GEMINI_PRO_INPUT_PRICE_PER_1M,
+            "output": GEMINI_PRO_OUTPUT_PRICE_PER_1M,
+        },
+        "gemini-2.5-flash-lite": {
+            "input": GEMINI_FLASH_LITE_INPUT_PRICE_PER_1M,
+            "output": GEMINI_FLASH_LITE_OUTPUT_PRICE_PER_1M,
+        },
     }
 
     def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1"):
@@ -164,7 +196,7 @@ class CostTracker:
         url = f"{self.base_url}/models" if self.base_url else "https://openrouter.ai/api/v1/models"
         try:
             # This endpoint is public; headers are optional, but include them if present.
-            response = requests.get(url, headers=self.headers, timeout=30)
+            response = requests.get(url, headers=self.headers, timeout=OPENROUTER_MODELS_API_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             models = data.get("data", [])
@@ -319,8 +351,8 @@ class CostTracker:
                 pricing = self.OPENAI_PRICING["gpt-3.5-turbo"]
                 estimation_method = "default_model_pricing_fallback"
 
-        input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
-        output_cost = (completion_tokens / 1_000_000) * pricing["output"]
+        input_cost = (prompt_tokens / TOKENS_PER_MILLION) * pricing["input"]
+        output_cost = (completion_tokens / TOKENS_PER_MILLION) * pricing["output"]
         total_cost = input_cost + output_cost
         return total_cost, estimation_method
 
@@ -344,9 +376,9 @@ class CostTracker:
         if pricing_tuple is not None:
             prompt_price, completion_price = pricing_tuple
             total_cost = prompt_tokens * prompt_price + completion_tokens * completion_price
-            # Apply 50% batch discount if applicable
+            # Apply batch discount if applicable
             if is_batch:
-                total_cost *= 0.5
+                total_cost *= BATCH_PROCESSING_DISCOUNT_RATE
                 return total_cost, "openrouter_models_pricing_batch_discount"
             return total_cost, "openrouter_models_pricing"
 
@@ -370,13 +402,13 @@ class CostTracker:
                 pricing = self.GEMINI_PRICING["gemini-2.5-flash"]
                 estimation_method = "default_model_pricing_fallback"
 
-        input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
-        output_cost = (completion_tokens / 1_000_000) * pricing["output"]
+        input_cost = (prompt_tokens / TOKENS_PER_MILLION) * pricing["input"]
+        output_cost = (completion_tokens / TOKENS_PER_MILLION) * pricing["output"]
         total_cost = input_cost + output_cost
 
-        # Apply 50% batch discount if applicable
+        # Apply batch discount if applicable
         if is_batch:
-            total_cost *= 0.5
+            total_cost *= BATCH_PROCESSING_DISCOUNT_RATE
             estimation_method += "_batch_discount"
 
         return total_cost, estimation_method

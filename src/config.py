@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 from src.common.provider import Provider
+from src.constants import DEFAULT_LENGTH_REDUCTION_BOUNDS, DEFAULT_TAGS_TO_PRESERVE
 from src.llm_model import ModelConfig
 
 if TYPE_CHECKING:
@@ -94,9 +95,9 @@ class RunConfig:
     phases: List[PhaseConfig] = field(default_factory=list)
     # Length reduction parameter for the entire run (can be int or tuple of bounds)
     # Default to 35-50% reduction if not specified
-    length_reduction: Optional[Union[int, Tuple[int, int]]] = (35, 50)
+    length_reduction: Optional[Union[int, Tuple[int, int]]] = DEFAULT_LENGTH_REDUCTION_BOUNDS
     # Tags to preserve during processing (f-string tags like {preface}, {license})
-    tags_to_preserve: List[str] = field(default_factory=lambda: ["{preface}", "{license}"])
+    tags_to_preserve: List[str] = field(default_factory=lambda: list(DEFAULT_TAGS_TO_PRESERVE))
     # Maximum number of workers for parallel processing across all phases
     max_workers: Optional[int] = None
 

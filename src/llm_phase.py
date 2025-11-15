@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 from tqdm import tqdm
 
+from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
 from src.logging_config import setup_logging
 
@@ -73,7 +74,7 @@ class LlmPhase(ABC):
         self.author_name = author_name
         self.model = model
         self.temperature = temperature
-        self.max_workers = max_workers or 1
+        self.max_workers = max_workers or DEFAULT_MAX_WORKERS
         self.reasoning = reasoning or {}
         self.post_processor_chain = post_processor_chain
         self.length_reduction = length_reduction
@@ -311,7 +312,7 @@ class LlmPhase(ABC):
                     format_params["length_reduction"] = str(self.length_reduction)
 
                 # Get tags to preserve from post-processor chain if available
-                tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+                tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
                 if self.post_processor_chain:
                     for processor in self.post_processor_chain.processors:
                         if hasattr(processor, "tags_to_preserve"):

@@ -11,6 +11,7 @@ import requests
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
+from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import LlmPhase
@@ -68,11 +69,11 @@ class Pipeline:
         Copy the input file to the output directory with index "00".
 
         This method copies the original input file to the output directory
-        with a filename that starts with "00-" to maintain the proper
-        ordering of files in the pipeline output.
+        with a filename that starts with the input file index prefix to maintain
+        the proper ordering of files in the pipeline output.
         """
         input_filename = self.config.input_file.name
-        output_filename = f"00-{input_filename}"
+        output_filename = f"{INPUT_FILE_INDEX_PREFIX}-{input_filename}"
         output_path = self.config.output_dir / output_filename
 
         try:
@@ -390,7 +391,7 @@ class Pipeline:
 
         try:
             url = "https://openrouter.ai/api/v1/models"
-            response = requests.get(url=url, timeout=10)
+            response = requests.get(url=url, timeout=OPENROUTER_API_TIMEOUT)
             response.raise_for_status()
 
             data = response.json()
