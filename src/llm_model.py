@@ -220,7 +220,7 @@ class OpenRouterClient(ProviderClient):
             error_msg += f": {last_error}"
 
         module_logger.error(error_msg)
-        raise LlmModelError(error_msg)
+        raise LlmModelError(error_msg) from last_error
 
     def chat_completion(
         self,
@@ -288,7 +288,7 @@ class OpenAIClient(ProviderClient):
 
                 self._client = openai.OpenAI(api_key=self.api_key)
             except ImportError as e:
-                raise LlmModelError(f"OpenAI SDK not available: {e}")
+                raise LlmModelError(f"OpenAI SDK not available: {e}") from e
         return self._client
 
     def chat_completion(
@@ -359,15 +359,15 @@ class OpenAIClient(ProviderClient):
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
                     )
-            except Exception:
-                # Swallow any optional usage extraction issues without failing the call
-                pass
+            except (AttributeError, TypeError, ValueError) as e:
+                # Usage extraction is optional; log but don't fail the call
+                module_logger.debug(f"Failed to extract usage metadata for {model_name}: {e}")
 
             return content, response.id
 
         except Exception as e:
             module_logger.error(f"OpenAI API call failed: {e}")
-            raise LlmModelError(f"OpenAI API call failed: {e}")
+            raise LlmModelError(f"OpenAI API call failed: {e}") from e
 
     def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float, **kwargs) -> str:
         """
@@ -476,7 +476,8 @@ class OpenAIClient(ProviderClient):
 
                 time.sleep(poll_interval)
 
-            except Exception as e:
+            except (AttributeError, TypeError) as e:
+                # Polling errors indicate API response structure issues
                 module_logger.error(f"Error polling batch job: {e}")
                 return False
 
@@ -599,12 +600,13 @@ class OpenAIClient(ProviderClient):
                                 completion_tokens=completion_tokens,
                                 is_batch=True,  # This is batch processing, apply 50% discount
                             )
-                except Exception:
-                    pass  # Silently ignore usage tracking errors
+                except (AttributeError, TypeError, ValueError, KeyError) as e:
+                    # Usage tracking is optional for batch; log but don't fail
+                    module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
 
                 responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
 
-            except Exception as e:
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
                 responses.append(
                     {
@@ -751,8 +753,9 @@ class OpenAIClient(ProviderClient):
                 # Clean up temporary file
                 try:
                     os.unlink(temp_file_path)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                except OSError as e:
+                    # Cleanup errors are non-critical but should be visible
+                    module_logger.debug(f"Failed to clean up temp file {temp_file_path}: {e}")
 
         except ImportError as e:
             module_logger.error(f"OpenAI SDK not available for batch processing: {e}")
@@ -785,7 +788,7 @@ class GeminiClient(ProviderClient):
 
                 self._client = genai.Client(api_key=self.api_key)
             except ImportError as e:
-                raise LlmModelError(f"Google GenAI SDK not available: {e}")
+                raise LlmModelError(f"Google GenAI SDK not available: {e}") from e
         return self._client
 
     def chat_completion(
@@ -855,7 +858,7 @@ class GeminiClient(ProviderClient):
 
         except Exception as e:
             module_logger.error(f"Gemini API call failed: {e}")
-            raise LlmModelError(f"Gemini API call failed: {e}")
+            raise LlmModelError(f"Gemini API call failed: {e}") from e
 
     def _create_batch_jsonl(self, requests: list[dict[str, Any]]) -> str:
         """
@@ -927,7 +930,8 @@ class GeminiClient(ProviderClient):
 
                 time.sleep(poll_interval)
 
-            except Exception as e:
+            except (AttributeError, TypeError) as e:
+                # Polling errors indicate API response structure issues
                 module_logger.error(f"Error polling batch job: {e}")
                 return False
 
@@ -995,13 +999,13 @@ class GeminiClient(ProviderClient):
                                 completion_tokens=completion_tokens,
                                 is_batch=True,  # This is batch processing, apply 50% discount
                             )
-                except Exception:
-                    # Silently ignore usage tracking errors
-                    pass
+                except (AttributeError, TypeError, ValueError, KeyError) as e:
+                    # Usage tracking is optional for batch; log but don't fail
+                    module_logger.debug(f"Failed to track Gemini batch usage for {generation_id}: {e}")
 
                 responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
 
-            except Exception as e:
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError, AttributeError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
                 # Add error response
                 responses.append(
@@ -1118,8 +1122,9 @@ class GeminiClient(ProviderClient):
                 # Clean up temporary file
                 try:
                     os.unlink(temp_file_path)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                except OSError as e:
+                    # Cleanup errors are non-critical but should be visible
+                    module_logger.debug(f"Failed to clean up temp file {temp_file_path}: {e}")
 
         except ImportError as e:
             module_logger.error(f"Google GenAI SDK not available for batch processing: {e}")

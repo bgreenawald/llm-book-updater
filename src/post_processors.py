@@ -363,10 +363,15 @@ class PostProcessorChain(PostProcessor):
                 logger.debug(f"Applying post-processor {i + 1}/{len(self.processors)}: {processor.name}")
                 current_block = processor.process(original_block, current_block, **kwargs)
                 logger.debug(f"Post-processor {processor.name} completed successfully")
-            except Exception as e:
+            except (ValueError, KeyError, AttributeError, TypeError, IndexError) as e:
+                # Common post-processor errors are logged but non-fatal
                 logger.error(f"Error in post-processor {processor.name}: {str(e)}")
                 logger.exception("Post-processor error stack trace")
-                # Continue with the chain, using the block as-is
+                continue
+            except Exception as e:
+                # Catch-all for unexpected errors; log and continue with chain
+                logger.error(f"Unexpected error in post-processor {processor.name}: {str(e)}")
+                logger.exception("Unexpected post-processor error stack trace")
                 continue
 
         logger.debug(f"Post-processing chain completed. Final block length: {len(current_block)} characters")

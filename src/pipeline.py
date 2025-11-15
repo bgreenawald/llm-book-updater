@@ -79,7 +79,7 @@ class Pipeline:
         try:
             shutil.copy2(src=self.config.input_file, dst=output_path)
             logger.info(f"Copied input file to output directory: {output_path}")
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             logger.error(f"Failed to copy input file to output directory: {str(e)}")
             raise
 
@@ -208,8 +208,9 @@ class Pipeline:
             with open(file=metadata_file, mode="w", encoding="utf-8") as f:
                 json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"Pipeline metadata saved to: {metadata_file}")
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             logger.error(f"Failed to save pipeline metadata: {str(e)}")
+            logger.exception("Metadata save error details")
 
     def _save_cost_analysis(self, cost_analysis: Dict[str, Any]) -> None:
         """
@@ -224,8 +225,9 @@ class Pipeline:
             with open(file=cost_file, mode="w", encoding="utf-8") as f:
                 json.dump(obj=cost_analysis, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"Cost analysis saved to: {cost_file}")
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             logger.error(f"Failed to save cost analysis: {str(e)}")
+            logger.exception("Cost analysis save error details")
 
     def _get_phase_output_path(self, phase_index: int) -> Path:
         """
@@ -409,7 +411,8 @@ class Pipeline:
             logger.warning(f"Model not found in OpenRouter API: {model_id}")
             return None
 
-        except Exception as e:
+        except (requests.RequestException, KeyError, ValueError, json.JSONDecodeError) as e:
+            # Model info is optional metadata; graceful degradation on failure
             logger.warning(f"Failed to fetch model info for {model_id}: {str(e)}")
             return None
 

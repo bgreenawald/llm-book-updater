@@ -189,9 +189,15 @@ class LlmPhase(ABC):
             )
             logger.debug("Post-processing completed successfully")
             return processed_block
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            # Common post-processor errors are logged but non-fatal; return unprocessed block
             logger.error(f"Error during post-processing: {str(e)}")
             logger.exception("Post-processing error stack trace")
+            return llm_block
+        except Exception as e:
+            # Catch-all for unexpected errors; log and return unprocessed block
+            logger.error(f"Unexpected error during post-processing: {str(e)}")
+            logger.exception("Unexpected post-processing error stack trace")
             return llm_block
 
     def _read_input_file(self) -> str:
@@ -589,7 +595,8 @@ class LlmPhase(ABC):
                 logger.debug("Model does not support batch processing, falling back to sequential processing")
                 return self._process_batch_sequential(batch, **kwargs)
 
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            # Batch processing errors trigger fallback to sequential processing
             logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
             return self._process_batch_sequential(batch, **kwargs)
 
