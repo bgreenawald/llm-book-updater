@@ -23,6 +23,10 @@ OPENAI_BATCH_DEFAULT_TIMEOUT = 3600 * 24  # seconds (24 hours)
 # OpenRouter Models API timeout
 OPENROUTER_MODELS_API_TIMEOUT = 30  # seconds
 
+# OpenRouter connection pooling configuration
+OPENROUTER_POOL_CONNECTIONS = 10  # Number of connection pools (one per host)
+OPENROUTER_POOL_MAXSIZE = 20  # Maximum connections per pool
+
 
 # =============================================================================
 # Processing Configuration

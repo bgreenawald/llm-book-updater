@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from src.common.provider import Provider
 from src.constants import (
@@ -17,6 +19,8 @@ from src.constants import (
     LLM_DEFAULT_TEMPERATURE,
     OPENAI_BATCH_DEFAULT_TIMEOUT,
     OPENAI_BATCH_POLLING_INTERVAL,
+    OPENROUTER_POOL_CONNECTIONS,
+    OPENROUTER_POOL_MAXSIZE,
     OPENROUTER_REQUEST_TIMEOUT,
     PROMPT_PREVIEW_MAX_LENGTH,
 )
@@ -149,7 +153,7 @@ class ProviderClient(ABC):
 
 
 class OpenRouterClient(ProviderClient):
-    """Client for OpenRouter API calls."""
+    """Client for OpenRouter API calls with connection pooling."""
 
     def __init__(
         self,
@@ -165,6 +169,43 @@ class OpenRouterClient(ProviderClient):
         self.retry_delay = retry_delay
         self.backoff_factor = backoff_factor
 
+        # Initialize session with connection pooling
+        self._session = requests.Session()
+
+        # Configure retry strategy for the session
+        # Note: This handles automatic retries at the connection level
+        # We still keep our application-level retry logic for custom backoff
+        retry_strategy = Retry(
+            total=0,  # Disable automatic retries; we handle retries manually
+            connect=3,  # But allow connection retries for network issues
+            read=3,  # And read retries for incomplete responses
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+        )
+
+        # Configure connection pooling
+        adapter = HTTPAdapter(
+            pool_connections=OPENROUTER_POOL_CONNECTIONS,
+            pool_maxsize=OPENROUTER_POOL_MAXSIZE,
+            max_retries=retry_strategy,
+        )
+
+        # Mount adapter for both http and https
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
+
+        # Set default headers for all requests
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+        )
+
+    def close(self) -> None:
+        """Close the session and release connection pool resources."""
+        if hasattr(self, "_session"):
+            self._session.close()
+
     @property
     def supports_batch(self) -> bool:
         """OpenRouter does not support batch processing."""
@@ -179,15 +220,24 @@ class OpenRouterClient(ProviderClient):
             return True
         return False
 
-    def _make_api_call(self, headers: dict, data: dict) -> dict:
-        """Makes a single API call to OpenRouter with retry logic."""
+    def _make_api_call(self, data: dict) -> dict:
+        """Makes a single API call to OpenRouter with retry logic using session.
+
+        Args:
+            data: Request payload to send to the API
+
+        Returns:
+            Response JSON from the API
+
+        Note:
+            Headers are already set in the session, so we don't need to pass them.
+        """
         last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
-                response = requests.post(
+                response = self._session.post(
                     url=f"{self.base_url}/chat/completions",
-                    headers=headers,
                     data=json.dumps(obj=data),
                     timeout=OPENROUTER_REQUEST_TIMEOUT,
                 )
@@ -231,11 +281,6 @@ class OpenRouterClient(ProviderClient):
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using OpenRouter API."""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
         # GPT-5 models (and variants) currently do not accept custom temperature
         # values. Detect and omit temperature to avoid 400 errors from upstream.
         provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
@@ -252,7 +297,7 @@ class OpenRouterClient(ProviderClient):
         if not is_gpt5_series_model:
             data["temperature"] = temperature
 
-        resp_data = self._make_api_call(headers=headers, data=data)
+        resp_data = self._make_api_call(data=data)
 
         choices = resp_data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):

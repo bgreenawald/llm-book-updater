@@ -180,6 +180,10 @@ class CostTracker:
         self._model_pricing_index: Dict[str, Tuple[float, float]] = {}
         self._model_pricing_loaded: bool = False
 
+        # Create a persistent session for API calls (minor optimization)
+        self._session = requests.Session()
+        self._session.headers.update(self.headers)
+
     def _load_openrouter_model_pricing(self) -> None:
         """
         Load pricing from OpenRouter models endpoint and build a fast lookup index.
@@ -196,7 +200,7 @@ class CostTracker:
         url = f"{self.base_url}/models" if self.base_url else "https://openrouter.ai/api/v1/models"
         try:
             # This endpoint is public; headers are optional, but include them if present.
-            response = requests.get(url, headers=self.headers, timeout=OPENROUTER_MODELS_API_TIMEOUT)
+            response = self._session.get(url, timeout=OPENROUTER_MODELS_API_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             models = data.get("data", [])
@@ -448,7 +452,7 @@ class CostTracker:
             # Use OpenRouter API to get actual costs
             try:
                 url = f"{self.base_url}/generation?id={generation_id}"
-                response = requests.get(url, headers=self.headers, timeout=30)
+                response = self._session.get(url, timeout=30)
                 response.raise_for_status()
 
                 data = response.json().get("data", {})
