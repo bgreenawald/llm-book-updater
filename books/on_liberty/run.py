@@ -9,42 +9,46 @@ from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
 # Use OpenRouter for all phases
-OPENROUTER_GEMINI_FLASH_LITE = ModelConfig(Provider.OPENROUTER, "google/gemini-2.5-flash-lite")
-GOOGLE_GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "gemini-2.5-flash-lite")
-CHATGPT_GPT5_NANO = ModelConfig(Provider.OPENAI, "gpt-5-nano")
+GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-2.5-pro")
+CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
+CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GOOGLE_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=CHATGPT_GPT5_NANO,
+        model=GOOGLE_GEMINI_PRO,
         use_batch=True,
-        batch_size=10,
-        reasoning={"effort": "high"},
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=OPENROUTER_GEMINI_FLASH_LITE,
-        reasoning={"effort": "high"},
+        model=CHATGPT_GPT5_MINI,
+        use_batch=True,
+        reasoning={"effort": "medium"},
     ),
 ]
 
@@ -53,9 +57,9 @@ config = RunConfig(
     book_id="on_liberty",
     book_name="On Liberty",
     author_name="John Stuart Mill",
-    input_file=Path(r"books/on_liberty/input_small.md"),
+    input_file=Path(r"books/on_liberty/input_transformed.md"),
     output_dir=Path(r"books/on_liberty/output"),
-    original_file=Path(r"books/on_liberty/input_small.md"),
+    original_file=Path(r"books/on_liberty/input_transformed.md"),
     phases=run_phases,
     length_reduction=(35, 50),
     max_workers=10,

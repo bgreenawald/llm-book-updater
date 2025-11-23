@@ -11,6 +11,7 @@ import requests
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
+from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import LlmPhase
@@ -44,6 +45,7 @@ class Pipeline:
         self._phase_instances: List[LlmPhase] = []
         self._phase_metadata: List[Dict[str, Any]] = []  # Collect comprehensive metadata for all phases
         self._model_cache: Dict[str, Dict[str, str]] = {}  # Cache for model information
+        self._llm_model_instances: Dict[str, LlmModel] = {}  # Cache for LlmModel instances (connection pooling)
 
     def __str__(self) -> str:
         """
@@ -63,22 +65,73 @@ class Pipeline:
         """
         return f"Pipeline(config={self.config})"
 
+    def _get_or_create_model(self, model_config: "ModelConfig", temperature: float) -> LlmModel:
+        """
+        Get or create a cached LlmModel instance for connection pooling.
+
+        This method implements model instance caching to reuse connection pools
+        across phases. Models are cached based on their configuration to ensure
+        connection pool reuse when the same model is used in multiple phases.
+
+        Args:
+            model_config: Configuration for the model to create
+            temperature: Temperature setting for the model
+
+        Returns:
+            LlmModel: A cached or newly created LlmModel instance
+        """
+        # Create cache key from model config and temperature
+        # Include temperature in key as it affects model behavior
+        cache_key = f"{model_config.provider.value}:{model_config.model_id}:{temperature}"
+
+        # Return cached instance if available
+        if cache_key in self._llm_model_instances:
+            logger.debug(f"Reusing cached LlmModel instance: {cache_key}")
+            return self._llm_model_instances[cache_key]
+
+        # Create new instance and cache it
+        logger.debug(f"Creating new LlmModel instance: {cache_key}")
+        model = LlmModel.create(
+            model=model_config,
+            temperature=temperature,
+        )
+        self._llm_model_instances[cache_key] = model
+        return model
+
+    def _cleanup_model_instances(self) -> None:
+        """
+        Clean up all cached model instances and their connection pools.
+
+        This method should be called at the end of the pipeline run to properly
+        close all connection pools and release resources.
+        """
+        logger.debug(f"Cleaning up {len(self._llm_model_instances)} cached model instances")
+        for cache_key, model in self._llm_model_instances.items():
+            try:
+                # Close OpenRouter client session if it exists
+                if hasattr(model, "_client") and hasattr(model._client, "close"):
+                    model._client.close()
+                    logger.debug(f"Closed connection pool for model: {cache_key}")
+            except Exception as e:
+                # Cleanup errors are non-critical but should be logged
+                logger.debug(f"Error closing model instance {cache_key}: {e}")
+
     def _copy_input_file_to_output(self) -> None:
         """
         Copy the input file to the output directory with index "00".
 
         This method copies the original input file to the output directory
-        with a filename that starts with "00-" to maintain the proper
-        ordering of files in the pipeline output.
+        with a filename that starts with the input file index prefix to maintain
+        the proper ordering of files in the pipeline output.
         """
         input_filename = self.config.input_file.name
-        output_filename = f"00-{input_filename}"
+        output_filename = f"{INPUT_FILE_INDEX_PREFIX}-{input_filename}"
         output_path = self.config.output_dir / output_filename
 
         try:
             shutil.copy2(src=self.config.input_file, dst=output_path)
             logger.info(f"Copied input file to output directory: {output_path}")
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             logger.error(f"Failed to copy input file to output directory: {str(e)}")
             raise
 
@@ -207,8 +260,9 @@ class Pipeline:
             with open(file=metadata_file, mode="w", encoding="utf-8") as f:
                 json.dump(obj=metadata, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"Pipeline metadata saved to: {metadata_file}")
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             logger.error(f"Failed to save pipeline metadata: {str(e)}")
+            logger.exception("Metadata save error details")
 
     def _save_cost_analysis(self, cost_analysis: Dict[str, Any]) -> None:
         """
@@ -223,8 +277,9 @@ class Pipeline:
             with open(file=cost_file, mode="w", encoding="utf-8") as f:
                 json.dump(obj=cost_analysis, fp=f, indent=2, ensure_ascii=False)
             logger.info(f"Cost analysis saved to: {cost_file}")
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             logger.error(f"Failed to save cost analysis: {str(e)}")
+            logger.exception("Cost analysis save error details")
 
     def _get_phase_output_path(self, phase_index: int) -> Path:
         """
@@ -309,9 +364,9 @@ class Pipeline:
 
         logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
-        # Initialize the model
-        model = LlmModel.create(
-            model=phase_config.model,
+        # Get or create the model (uses caching for connection pool reuse)
+        model = self._get_or_create_model(
+            model_config=phase_config.model,
             temperature=phase_config.temperature,
         )
 
@@ -390,7 +445,7 @@ class Pipeline:
 
         try:
             url = "https://openrouter.ai/api/v1/models"
-            response = requests.get(url=url, timeout=10)
+            response = requests.get(url=url, timeout=OPENROUTER_API_TIMEOUT)
             response.raise_for_status()
 
             data = response.json()
@@ -408,7 +463,8 @@ class Pipeline:
             logger.warning(f"Model not found in OpenRouter API: {model_id}")
             return None
 
-        except Exception as e:
+        except (requests.RequestException, KeyError, ValueError, json.JSONDecodeError) as e:
+            # Model info is optional metadata; graceful degradation on failure
             logger.warning(f"Failed to fetch model info for {model_id}: {str(e)}")
             return None
 
@@ -555,6 +611,9 @@ class Pipeline:
             # Save cost analysis data if available
             if cost_analysis:
                 self._save_cost_analysis(cost_analysis=cost_analysis)
+
+            # Clean up model instances and connection pools
+            self._cleanup_model_instances()
 
 
 def run_pipeline(config: RunConfig) -> None:

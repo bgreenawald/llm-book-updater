@@ -7,8 +7,23 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from src.common.provider import Provider
+from src.constants import (
+    DEFAULT_OPENROUTER_BACKOFF_FACTOR,
+    DEFAULT_OPENROUTER_MAX_RETRIES,
+    DEFAULT_OPENROUTER_RETRY_DELAY,
+    GEMINI_DEFAULT_TEMPERATURE,
+    LLM_DEFAULT_TEMPERATURE,
+    OPENAI_BATCH_DEFAULT_TIMEOUT,
+    OPENAI_BATCH_POLLING_INTERVAL,
+    OPENROUTER_POOL_CONNECTIONS,
+    OPENROUTER_POOL_MAXSIZE,
+    OPENROUTER_REQUEST_TIMEOUT,
+    PROMPT_PREVIEW_MAX_LENGTH,
+)
 from src.cost_tracking_wrapper import register_generation_model_info
 from src.logging_config import setup_logging
 
@@ -138,21 +153,58 @@ class ProviderClient(ABC):
 
 
 class OpenRouterClient(ProviderClient):
-    """Client for OpenRouter API calls."""
+    """Client for OpenRouter API calls with connection pooling."""
 
     def __init__(
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
-        backoff_factor: float = 2.0,
+        max_retries: int = DEFAULT_OPENROUTER_MAX_RETRIES,
+        retry_delay: float = DEFAULT_OPENROUTER_RETRY_DELAY,
+        backoff_factor: float = DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     ):
         self.api_key = api_key
         self.base_url = base_url
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.backoff_factor = backoff_factor
+
+        # Initialize session with connection pooling
+        self._session = requests.Session()
+
+        # Configure retry strategy for the session
+        # Note: This handles automatic retries at the connection level
+        # We still keep our application-level retry logic for custom backoff
+        retry_strategy = Retry(
+            total=0,  # Disable automatic retries; we handle retries manually
+            connect=3,  # But allow connection retries for network issues
+            read=3,  # And read retries for incomplete responses
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+        )
+
+        # Configure connection pooling
+        adapter = HTTPAdapter(
+            pool_connections=OPENROUTER_POOL_CONNECTIONS,
+            pool_maxsize=OPENROUTER_POOL_MAXSIZE,
+            max_retries=retry_strategy,
+        )
+
+        # Mount adapter for both http and https
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
+
+        # Set default headers for all requests
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+        )
+
+    def close(self) -> None:
+        """Close the session and release connection pool resources."""
+        if hasattr(self, "_session"):
+            self._session.close()
 
     @property
     def supports_batch(self) -> bool:
@@ -168,17 +220,26 @@ class OpenRouterClient(ProviderClient):
             return True
         return False
 
-    def _make_api_call(self, headers: dict, data: dict) -> dict:
-        """Makes a single API call to OpenRouter with retry logic."""
+    def _make_api_call(self, data: dict) -> dict:
+        """Makes a single API call to OpenRouter with retry logic using session.
+
+        Args:
+            data: Request payload to send to the API
+
+        Returns:
+            Response JSON from the API
+
+        Note:
+            Headers are already set in the session, so we don't need to pass them.
+        """
         last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
-                response = requests.post(
+                response = self._session.post(
                     url=f"{self.base_url}/chat/completions",
-                    headers=headers,
                     data=json.dumps(obj=data),
-                    timeout=30,
+                    timeout=OPENROUTER_REQUEST_TIMEOUT,
                 )
                 response.raise_for_status()
                 return response.json()
@@ -209,7 +270,7 @@ class OpenRouterClient(ProviderClient):
             error_msg += f": {last_error}"
 
         module_logger.error(error_msg)
-        raise LlmModelError(error_msg)
+        raise LlmModelError(error_msg) from last_error
 
     def chat_completion(
         self,
@@ -220,11 +281,6 @@ class OpenRouterClient(ProviderClient):
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using OpenRouter API."""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
         # GPT-5 models (and variants) currently do not accept custom temperature
         # values. Detect and omit temperature to avoid 400 errors from upstream.
         provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
@@ -241,7 +297,7 @@ class OpenRouterClient(ProviderClient):
         if not is_gpt5_series_model:
             data["temperature"] = temperature
 
-        resp_data = self._make_api_call(headers=headers, data=data)
+        resp_data = self._make_api_call(data=data)
 
         choices = resp_data.get("choices", [])
         if not choices or not choices[0].get("message", {}).get("content"):
@@ -277,7 +333,7 @@ class OpenAIClient(ProviderClient):
 
                 self._client = openai.OpenAI(api_key=self.api_key)
             except ImportError as e:
-                raise LlmModelError(f"OpenAI SDK not available: {e}")
+                raise LlmModelError(f"OpenAI SDK not available: {e}") from e
         return self._client
 
     def chat_completion(
@@ -348,24 +404,25 @@ class OpenAIClient(ProviderClient):
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
                     )
-            except Exception:
-                # Swallow any optional usage extraction issues without failing the call
-                pass
+            except (AttributeError, TypeError, ValueError) as e:
+                # Usage extraction is optional; log but don't fail the call
+                module_logger.debug(f"Failed to extract usage metadata for {model_name}: {e}")
 
             return content, response.id
 
         except Exception as e:
             module_logger.error(f"OpenAI API call failed: {e}")
-            raise LlmModelError(f"OpenAI API call failed: {e}")
+            raise LlmModelError(f"OpenAI API call failed: {e}") from e
 
-    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float) -> str:
+    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float, **kwargs) -> str:
         """
-        Create JSONL content for batch processing following OpenAI API specification.
+        Create JSONL content for batch processing using the OpenAI Responses API.
 
         Args:
             requests: List of request dictionaries containing system_prompt, user_prompt, metadata
             model_name: Name of the model to use
             temperature: Temperature setting for the model
+            **kwargs: Additional parameters (e.g., effort under reasoning)
 
         Returns:
             str: JSONL formatted string for batch processing
@@ -378,32 +435,31 @@ class OpenAIClient(ProviderClient):
             user_prompt = request.get("user_prompt", "")
             metadata = request.get("metadata", {})
 
-            # Build messages array
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
-
-            # Create the batch request structure according to OpenAI spec
-            # Note: Batch API uses standard chat completions format, not the new responses API
-
             # Handle GPT-5 models that don't support custom temperature
             is_gpt5_series_model = model_name.lower().startswith("gpt-5")
 
+            # Build request body for Responses API
             batch_body: Dict[str, Any] = {
                 "model": model_name,
-                "messages": messages,
-                # Don't set max_completion_tokens - let the model use its default limit
+                "input": user_prompt,
             }
+
+            if system_prompt:
+                batch_body["instructions"] = system_prompt
 
             # Only add temperature for non-GPT-5 models
             if not is_gpt5_series_model:
                 batch_body["temperature"] = temperature
 
+            # Optional: pass through reasoning effort if provided (Responses API)
+            effort = kwargs.get("effort")
+            if effort is not None:
+                batch_body["reasoning"] = {"effort": effort}
+
             batch_request = {
                 "custom_id": f"request_{i}_{metadata.get('id', '')}",
                 "method": "POST",
-                "url": "/v1/chat/completions",
+                "url": "/v1/responses",
                 "body": batch_body,
             }
 
@@ -426,7 +482,7 @@ class OpenAIClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 30  # Poll every 30 seconds
+        poll_interval = OPENAI_BATCH_POLLING_INTERVAL
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -465,7 +521,8 @@ class OpenAIClient(ProviderClient):
 
                 time.sleep(poll_interval)
 
-            except Exception as e:
+            except (AttributeError, TypeError) as e:
+                # Polling errors indicate API response structure issues
                 module_logger.error(f"Error polling batch job: {e}")
                 return False
 
@@ -539,38 +596,33 @@ class OpenAIClient(ProviderClient):
                     )
                     continue
 
-                # Extract successful response
+                # Extract successful response (Responses API format)
                 response_body = result.get("response", {}).get("body", {})
-                choices = response_body.get("choices", [])
 
                 # Debug logging to see what we're getting
                 module_logger.debug(
                     f"Batch result structure for {custom_id}: response_body keys: {list(response_body.keys())}"
                 )
-                if choices:
-                    module_logger.debug(
-                        f"First choice structure: {choices[0].keys() if choices[0] else 'Empty choice'}"
-                    )
-                    if choices[0] and "message" in choices[0]:
-                        message_keys = choices[0]["message"].keys() if choices[0]["message"] else "Empty message"
-                        module_logger.debug(f"Message structure: {message_keys}")
 
                 content = ""
-                if choices:
-                    choice = choices[0]
-                    content = choice.get("message", {}).get("content", "")
-                    finish_reason = choice.get("finish_reason", "unknown")
+                output_items = response_body.get("output", []) or []
+                # Find the first assistant message and extract its text part
+                for item in output_items:
+                    if isinstance(item, dict) and item.get("type") == "message":
+                        content_parts = item.get("content", []) or []
+                        for part in content_parts:
+                            if isinstance(part, dict) and part.get("type") in ("output_text", "text"):
+                                content = part.get("text", "") or ""
+                                break
+                        if content:
+                            break
 
-                    if finish_reason == "length":
-                        module_logger.warning(f"Response truncated due to length limit for {custom_id}")
-                        # For truncated responses, we'll still use whatever content we got
-                        # The content might be empty if truncation happened very early
-
-                    if not content:
-                        module_logger.warning(
-                            f"Empty content in batch response for {custom_id}, "
-                            f"finish_reason: {finish_reason}, choice: {choice}"
-                        )
+                if not content:
+                    module_logger.warning(
+                        f"Empty content in batch response for {custom_id}, output keys: {
+                            [i.get('type') for i in output_items if isinstance(i, dict)]
+                        }"
+                    )
 
                 generation_id = response_body.get("id", f"openai_batch_{custom_id}")
 
@@ -581,8 +633,9 @@ class OpenAIClient(ProviderClient):
                 try:
                     usage = response_body.get("usage", {})
                     if usage:
-                        prompt_tokens = usage.get("prompt_tokens")
-                        completion_tokens = usage.get("completion_tokens")
+                        # Responses API uses input_tokens/output_tokens
+                        prompt_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
+                        completion_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
 
                         if prompt_tokens is not None or completion_tokens is not None:
                             register_generation_model_info(
@@ -592,12 +645,13 @@ class OpenAIClient(ProviderClient):
                                 completion_tokens=completion_tokens,
                                 is_batch=True,  # This is batch processing, apply 50% discount
                             )
-                except Exception:
-                    pass  # Silently ignore usage tracking errors
+                except (AttributeError, TypeError, ValueError, KeyError) as e:
+                    # Usage tracking is optional for batch; log but don't fail
+                    module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
 
                 responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
 
-            except Exception as e:
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
                 responses.append(
                     {
@@ -614,7 +668,7 @@ class OpenAIClient(ProviderClient):
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
-        batch_timeout: int = 3600,
+        batch_timeout: int = OPENAI_BATCH_DEFAULT_TIMEOUT,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -643,7 +697,7 @@ class OpenAIClient(ProviderClient):
             module_logger.info(f"Starting OpenAI batch processing for {len(requests)} requests")
 
             # Create JSONL content for batch processing
-            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature)
+            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature, **kwargs)
 
             # Log sample of batch content for debugging
             jsonl_lines = jsonl_content.split("\n")
@@ -665,7 +719,7 @@ class OpenAIClient(ProviderClient):
                 # Create the batch job
                 module_logger.info(f"Creating batch job with model {model_name}...")
                 batch_job = client.batches.create(
-                    input_file_id=batch_file.id, endpoint="/v1/chat/completions", completion_window="24h"
+                    input_file_id=batch_file.id, endpoint="/v1/responses", completion_window="24h"
                 )
 
                 module_logger.info(f"Created batch job: {batch_job.id}")
@@ -744,8 +798,9 @@ class OpenAIClient(ProviderClient):
                 # Clean up temporary file
                 try:
                     os.unlink(temp_file_path)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                except OSError as e:
+                    # Cleanup errors are non-critical but should be visible
+                    module_logger.debug(f"Failed to clean up temp file {temp_file_path}: {e}")
 
         except ImportError as e:
             module_logger.error(f"OpenAI SDK not available for batch processing: {e}")
@@ -778,7 +833,7 @@ class GeminiClient(ProviderClient):
 
                 self._client = genai.Client(api_key=self.api_key)
             except ImportError as e:
-                raise LlmModelError(f"Google GenAI SDK not available: {e}")
+                raise LlmModelError(f"Google GenAI SDK not available: {e}") from e
         return self._client
 
     def chat_completion(
@@ -848,7 +903,7 @@ class GeminiClient(ProviderClient):
 
         except Exception as e:
             module_logger.error(f"Gemini API call failed: {e}")
-            raise LlmModelError(f"Gemini API call failed: {e}")
+            raise LlmModelError(f"Gemini API call failed: {e}") from e
 
     def _create_batch_jsonl(self, requests: list[dict[str, Any]]) -> str:
         """
@@ -903,7 +958,7 @@ class GeminiClient(ProviderClient):
         import time
 
         start_time = time.time()
-        poll_interval = 30  # Poll every 30 seconds
+        poll_interval = OPENAI_BATCH_POLLING_INTERVAL
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -920,7 +975,8 @@ class GeminiClient(ProviderClient):
 
                 time.sleep(poll_interval)
 
-            except Exception as e:
+            except (AttributeError, TypeError) as e:
+                # Polling errors indicate API response structure issues
                 module_logger.error(f"Error polling batch job: {e}")
                 return False
 
@@ -988,13 +1044,13 @@ class GeminiClient(ProviderClient):
                                 completion_tokens=completion_tokens,
                                 is_batch=True,  # This is batch processing, apply 50% discount
                             )
-                except Exception:
-                    # Silently ignore usage tracking errors
-                    pass
+                except (AttributeError, TypeError, ValueError, KeyError) as e:
+                    # Usage tracking is optional for batch; log but don't fail
+                    module_logger.debug(f"Failed to track Gemini batch usage for {generation_id}: {e}")
 
                 responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
 
-            except Exception as e:
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError, AttributeError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
                 # Add error response
                 responses.append(
@@ -1064,7 +1120,7 @@ class GeminiClient(ProviderClient):
                 )
 
                 # Add temperature to the config if supported
-                if temperature != 0.2:  # Only set if different from default
+                if temperature != GEMINI_DEFAULT_TEMPERATURE:  # Only set if different from default
                     # Note: Temperature might need to be set differently in batch config
                     # The exact parameter name may vary - check latest API docs
                     pass
@@ -1111,8 +1167,9 @@ class GeminiClient(ProviderClient):
                 # Clean up temporary file
                 try:
                     os.unlink(temp_file_path)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                except OSError as e:
+                    # Cleanup errors are non-critical but should be visible
+                    module_logger.debug(f"Failed to clean up temp file {temp_file_path}: {e}")
 
         except ImportError as e:
             module_logger.error(f"Google GenAI SDK not available for batch processing: {e}")
@@ -1142,7 +1199,7 @@ class LlmModel:
     def __init__(
         self,
         model: ModelConfig,
-        temperature: float = 0.2,
+        temperature: float = LLM_DEFAULT_TEMPERATURE,
         # OpenRouter settings
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
@@ -1262,7 +1319,7 @@ class LlmModel:
     def create(
         cls,
         model: ModelConfig,
-        temperature: float = 0.2,
+        temperature: float = LLM_DEFAULT_TEMPERATURE,
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
         openrouter_max_retries: int = DEFAULT_MAX_RETRIES,
@@ -1312,7 +1369,10 @@ class LlmModel:
             content (str): The full content of the prompt.
         """
         if self.enable_prompt_logging:
-            preview = content if len(content) <= 200 else content[:200] + "..."
+            if len(content) <= PROMPT_PREVIEW_MAX_LENGTH:
+                preview = content
+            else:
+                preview = content[:PROMPT_PREVIEW_MAX_LENGTH] + "..."
             module_logger.trace(f"{role} prompt: {preview}")
 
     def supports_batch(self) -> bool:
@@ -1324,22 +1384,6 @@ class LlmModel:
         """
         client = self._get_client()
         return client.supports_batch
-
-    @property
-    def default_batch_size(self) -> int:
-        """
-        Get the default batch size for the current provider.
-
-        Returns:
-            int: Default batch size
-        """
-        # Provider-specific defaults
-        if self.model_config.provider == Provider.OPENAI:
-            return 50  # OpenAI typically supports larger batches
-        elif self.model_config.provider == Provider.GEMINI:
-            return 30  # Gemini batch size with concurrent processing
-        else:
-            return 10  # Conservative default for other providers
 
     def batch_chat_completion(
         self,

@@ -173,8 +173,10 @@ class CostTrackingWrapper:
                 module_logger.info("No API calls were made, no costs to calculate")
                 return None
 
-        except Exception as e:
+        except (KeyError, ValueError, AttributeError, TypeError) as e:
+            # Cost calculation errors are logged but shouldn't break the pipeline
             module_logger.error(f"Failed to calculate run costs: {e}")
+            module_logger.exception("Cost calculation error details")
             return None
 
     def get_phase_generation_count(self, phase_name: str) -> int:

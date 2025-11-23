@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 from tqdm import tqdm
 
+from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
 from src.logging_config import setup_logging
 
@@ -61,7 +62,7 @@ class LlmPhase(ABC):
             post_processor_chain (Optional[Any]): Chain of post-processors to apply
             length_reduction (Optional[Any]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
-            batch_size (Optional[int]): Number of items to process in each batch (defaults to provider limits)
+            batch_size (Optional[int]): Number of items to process in each batch (if None, processes all blocks at once)
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -73,7 +74,7 @@ class LlmPhase(ABC):
         self.author_name = author_name
         self.model = model
         self.temperature = temperature
-        self.max_workers = max_workers or 1
+        self.max_workers = max_workers or DEFAULT_MAX_WORKERS
         self.reasoning = reasoning or {}
         self.post_processor_chain = post_processor_chain
         self.length_reduction = length_reduction
@@ -188,9 +189,15 @@ class LlmPhase(ABC):
             )
             logger.debug("Post-processing completed successfully")
             return processed_block
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            # Common post-processor errors are logged but non-fatal; return unprocessed block
             logger.error(f"Error during post-processing: {str(e)}")
             logger.exception("Post-processing error stack trace")
+            return llm_block
+        except Exception as e:
+            # Catch-all for unexpected errors; log and return unprocessed block
+            logger.error(f"Unexpected error during post-processing: {str(e)}")
+            logger.exception("Unexpected post-processing error stack trace")
             return llm_block
 
     def _read_input_file(self) -> str:
@@ -311,7 +318,7 @@ class LlmPhase(ABC):
                     format_params["length_reduction"] = str(self.length_reduction)
 
                 # Get tags to preserve from post-processor chain if available
-                tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+                tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
                 if self.post_processor_chain:
                     for processor in self.post_processor_chain.processors:
                         if hasattr(processor, "tags_to_preserve"):
@@ -457,6 +464,32 @@ class LlmPhase(ABC):
 
         return len(lines) > 0  # Must have at least one tag to be considered "only tags"
 
+    def _assemble_processed_block(
+        self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
+    ) -> str:
+        """
+        Assemble the final processed block from components.
+
+        This method can be overridden by subclasses to customize how the block is assembled.
+        For example, IntroductionAnnotationPhase prepends the LLM response, while
+        SummaryAnnotationPhase appends it.
+
+        Args:
+            current_header: The header of the current block
+            current_body: The body of the current block
+            llm_response: The processed response from the LLM
+            original_body: The original body for reference
+            **kwargs: Additional context
+
+        Returns:
+            The assembled block as a string
+        """
+        # Default behavior: replace the body with the LLM response
+        if llm_response.strip():
+            return f"{current_header}\n\n{llm_response}\n\n"
+        else:
+            return f"{current_header}\n\n"
+
     def _process_batch(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
         """
         Process a batch of markdown blocks using batch API if available.
@@ -503,6 +536,7 @@ class LlmPhase(ABC):
                                 "current_header": current_header,
                                 "current_body": current_body,
                                 "original_body": original_body,
+                                "original_header": original_header,
                             },
                         }
                     )
@@ -511,7 +545,7 @@ class LlmPhase(ABC):
                 valid_requests = [req for req in batch_requests if req is not None]
                 if valid_requests:
                     batch_responses = self.model.batch_chat_completion(
-                        requests=valid_requests, temperature=self.temperature, **kwargs
+                        requests=valid_requests, temperature=self.temperature, reasoning=self.reasoning, **kwargs
                     )
                 else:
                     batch_responses = []
@@ -544,12 +578,15 @@ class LlmPhase(ABC):
                             original_block=metadata["current_body"], llm_block=processed_body, **kwargs
                         )
 
-                        # Reconstruct the block
-                        current_header = metadata["current_header"]
-                        if processed_body.strip():
-                            processed_blocks.append(f"{current_header}\n\n{processed_body}\n\n")
-                        else:
-                            processed_blocks.append(f"{current_header}\n\n")
+                        # Use the subclass-specific assembly method
+                        processed_block = self._assemble_processed_block(
+                            current_header=metadata["current_header"],
+                            current_body=metadata["current_body"],
+                            llm_response=processed_body,
+                            original_body=metadata["original_body"],
+                            **kwargs,
+                        )
+                        processed_blocks.append(processed_block)
 
                 return processed_blocks
 
@@ -558,7 +595,8 @@ class LlmPhase(ABC):
                 logger.debug("Model does not support batch processing, falling back to sequential processing")
                 return self._process_batch_sequential(batch, **kwargs)
 
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            # Batch processing errors trigger fallback to sequential processing
             logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
             return self._process_batch_sequential(batch, **kwargs)
 
@@ -618,21 +656,18 @@ class LlmPhase(ABC):
             supports = self.model.supports_batch() if has_method else "N/A"
             logger.info(f"BATCH DEBUG: use_batch={self.use_batch}, has_method={has_method}, supports={supports}")
             if self.use_batch and hasattr(self.model, "supports_batch") and self.model.supports_batch():
-                logger.info(f"Using batch processing with batch_size={self.batch_size}")
-
-                # Determine batch size
                 if self.batch_size:
-                    batch_size = self.batch_size
+                    # If batch_size is specified, process in chunks
+                    logger.info(f"Using batch processing with batch_size={self.batch_size} for {len(blocks)} blocks")
+                    processed_blocks = []
+                    for i in tqdm(range(0, len(blocks), self.batch_size), desc=f"Processing {self.name} (batches)"):
+                        batch = blocks[i : i + self.batch_size]
+                        batch_results = self._process_batch(batch, **kwargs)
+                        processed_blocks.extend(batch_results)
                 else:
-                    # Use a default batch size or provider-specific limit
-                    batch_size = getattr(self.model, "default_batch_size", 10)
-
-                # Process blocks in batches
-                processed_blocks = []
-                for i in tqdm(range(0, len(blocks), batch_size), desc=f"Processing {self.name} (batches)"):
-                    batch = blocks[i : i + batch_size]
-                    batch_results = self._process_batch(batch, **kwargs)
-                    processed_blocks.extend(batch_results)
+                    # Process all blocks at once in a single batch
+                    logger.info(f"Using batch processing for all {len(blocks)} blocks at once")
+                    processed_blocks = self._process_batch(blocks, **kwargs)
 
             else:
                 # Process blocks in parallel (original behavior)
@@ -688,6 +723,28 @@ class StandardLlmPhase(LlmPhase):
     This phase processes markdown blocks by sending them to an LLM model
     and applying post-processing to clean up the results.
     """
+
+    def _assemble_processed_block(
+        self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
+    ) -> str:
+        """
+        Assemble the block by replacing the body with the LLM response.
+
+        Args:
+            current_header: The header of the current block
+            current_body: The body of the current block (unused in standard phase)
+            llm_response: The processed content from the LLM
+            original_body: The original body for reference (unused in standard phase)
+            **kwargs: Additional context
+
+        Returns:
+            The block with the LLM response as the body
+        """
+        # Standard behavior: replace the body with the LLM response
+        if llm_response.strip():
+            return f"{current_header}\n\n{llm_response}\n\n"
+        else:
+            return f"{current_header}\n\n"
 
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
@@ -758,6 +815,25 @@ class IntroductionAnnotationPhase(LlmPhase):
     Uses the block content as input to generate an introduction, then prepends it to the block.
     """
 
+    def _assemble_processed_block(
+        self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
+    ) -> str:
+        """
+        Assemble the block with the introduction prepended to the original content.
+
+        Args:
+            current_header: The header of the current block
+            current_body: The body of the current block
+            llm_response: The introduction generated by the LLM
+            original_body: The original body for reference
+            **kwargs: Additional context
+
+        Returns:
+            The block with introduction prepended
+        """
+        # Prepend the introduction to the current body
+        return f"{current_header}\n\n{llm_response}\n\n{current_body}\n\n"
+
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single Markdown block by adding an introduction annotation at the beginning.
@@ -818,6 +894,25 @@ class SummaryAnnotationPhase(LlmPhase):
     LLM phase that adds summary annotations to the end of each block.
     Uses the block content as input to generate a summary, then appends it to the block.
     """
+
+    def _assemble_processed_block(
+        self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
+    ) -> str:
+        """
+        Assemble the block with the summary appended to the original content.
+
+        Args:
+            current_header: The header of the current block
+            current_body: The body of the current block
+            llm_response: The summary generated by the LLM
+            original_body: The original body for reference
+            **kwargs: Additional context
+
+        Returns:
+            The block with summary appended
+        """
+        # Append the summary to the current body
+        return f"{current_header}\n\n{current_body}\n\n{llm_response}\n\n"
 
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """

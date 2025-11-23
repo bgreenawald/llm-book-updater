@@ -5,6 +5,10 @@
 
 {preface}
 
+## License
+
+{license}
+
 ## No. I. - General Introduction
 
 For the Independent Journal.
