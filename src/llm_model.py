@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
+from loguru import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -25,13 +26,12 @@ from src.constants import (
     PROMPT_PREVIEW_MAX_LENGTH,
 )
 from src.cost_tracking_wrapper import register_generation_model_info
-from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
 load_dotenv(override=True)
 
 # Initialize module-level logger
-module_logger = setup_logging(log_name="llm_model")
+module_logger = logger
 
 
 @dataclass

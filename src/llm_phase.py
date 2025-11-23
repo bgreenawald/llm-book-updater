@@ -10,10 +10,9 @@ from tqdm import tqdm
 
 from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
-from src.logging_config import setup_logging
 
 # Initialize module-level logger
-module_logger = setup_logging(log_name="llm_phase")
+module_logger = logger
 
 
 class LlmPhase(ABC):
@@ -617,6 +616,38 @@ class LlmPhase(ABC):
             processed_blocks.append(processed_block)
         return processed_blocks
 
+    def _extract_blocks(self, text: str) -> List[str]:
+        """
+        Extract markdown blocks from text, including preamble.
+
+        Args:
+            text (str): The text to extract blocks from
+
+        Returns:
+            List[str]: List of extracted blocks
+        """
+        pattern = r"(?:^|\n)(#{1,6}\s+.*?)(?=\n#{1,6}\s+|\n*$)"
+        matches = list(re.finditer(pattern, text, flags=re.DOTALL))
+
+        blocks = []
+        if not matches:
+            if text.strip():
+                blocks.append(text)
+            return blocks
+
+        # Check for preamble
+        first_match = matches[0]
+        if first_match.start() > 0:
+            preamble = text[: first_match.start()]
+            if preamble.strip():
+                blocks.append(preamble)
+
+        # Add matched blocks
+        for match in matches:
+            blocks.append(match.group(1))
+
+        return blocks
+
     def _process_markdown_blocks(self, **kwargs) -> None:
         """
         Process all markdown blocks in the input text.
@@ -632,12 +663,11 @@ class LlmPhase(ABC):
         try:
             # Pattern to match markdown headers and their content
             # Use a different approach that works better with re.DOTALL
-            pattern = r"(?:^|\n)(#{1,6}\s+.*?)(?=\n#{1,6}\s+|\n*$)"
             logger.info(f"Starting to process markdown blocks with {self.max_workers} workers")
 
             # Find all markdown blocks in both current and original text
-            current_blocks = re.findall(pattern=pattern, string=self.input_text, flags=re.DOTALL)
-            original_blocks = re.findall(pattern=pattern, string=self.original_text, flags=re.DOTALL)
+            current_blocks = self._extract_blocks(self.input_text)
+            original_blocks = self._extract_blocks(self.original_text)
             logger.info(f"Found {len(current_blocks)} current markdown blocks to process")
             logger.info(f"Found {len(original_blocks)} original markdown blocks")
 

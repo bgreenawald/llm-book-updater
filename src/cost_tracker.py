@@ -29,6 +29,7 @@ from typing import Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
+from loguru import logger
 
 from src.common.provider import Provider
 from src.constants import (
@@ -50,13 +51,12 @@ from src.constants import (
     OPENROUTER_MODELS_API_TIMEOUT,
     TOKENS_PER_MILLION,
 )
-from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
 load_dotenv(override=True)
 
 # Initialize module-level logger
-module_logger = setup_logging(log_name="cost_tracker")
+module_logger = logger
 
 
 @dataclass

@@ -15,11 +15,10 @@ from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import LlmModel, LlmModelError
 from src.llm_phase import LlmPhase
-from src.logging_config import setup_logging
 from src.phase_factory import PhaseFactory
 
 # Initialize module-level logger
-module_logger = setup_logging(log_name="pipeline")
+module_logger = logger
 
 # Metadata version for compatibility
 METADATA_VERSION = "0.0.0-alpha"
