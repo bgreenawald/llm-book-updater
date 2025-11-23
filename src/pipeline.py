@@ -108,13 +108,14 @@ class Pipeline:
         logger.debug(f"Cleaning up {len(self._llm_model_instances)} cached model instances")
         for cache_key, model in self._llm_model_instances.items():
             try:
-                # Close OpenRouter client session if it exists
-                if hasattr(model, "_client") and hasattr(model._client, "close"):
-                    model._client.close()
-                    logger.debug(f"Closed connection pool for model: {cache_key}")
+                # Use the public API so LlmModel can manage its own resources
+                model.close()
+                logger.debug(f"Closed model instance: {cache_key}")
             except Exception as e:
                 # Cleanup errors are non-critical but should be logged
-                logger.debug(f"Error closing model instance {cache_key}: {e}")
+                logger.debug(f"Error closing model instance {cache_key}: {e!r}")
+        # Avoid reusing closed instances on subsequent runs
+        self._llm_model_instances.clear()
 
     def _copy_input_file_to_output(self) -> None:
         """
