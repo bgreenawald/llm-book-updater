@@ -1428,6 +1428,23 @@ class LlmModel:
             **kwargs,
         )
 
+    def close(self) -> None:
+        """
+        Close all provider clients and release resources (e.g., connection pools).
+
+        This method iterates through all initialized provider clients and calls
+        their close() method if available. This is important for proper cleanup
+        of HTTP sessions and connection pools, especially for OpenRouter.
+        """
+        for provider, client in self._clients.items():
+            try:
+                if hasattr(client, "close") and callable(client.close):
+                    client.close()
+                    module_logger.debug(f"Closed {provider.value} client")
+            except Exception as e:
+                # Cleanup errors are non-critical but should be logged
+                module_logger.debug(f"Error closing {provider.value} client: {e!r}")
+
     def chat_completion(
         self,
         system_prompt: str,
