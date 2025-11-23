@@ -10,15 +10,15 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+from loguru import logger
 
 from src.cost_tracker import CostTracker, RunCosts
-from src.logging_config import setup_logging
 
 # Load environment variables from .env to ensure API keys are available
 load_dotenv(override=True)
 
 # Initialize module-level logger
-module_logger = setup_logging(log_name="cost_tracking_wrapper")
+module_logger = logger
 
 
 class CostTrackingWrapper:
