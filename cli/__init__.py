@@ -9,12 +9,14 @@ Usage:
     python -m cli --help
 
 Available commands:
-    build   Build books from markdown sources to EPUB/PDF formats
-    run     Run pipeline processing for books from markdown sources
+    build                Build books from markdown sources to EPUB/PDF formats
+    run                  Run pipeline processing for books from markdown sources
+    consolidate-metadata Consolidate multiple metadata files into one
 
 Examples:
     python -m cli build the_federalist_papers v1.0.0
     python -m cli run on_liberty
+    python -m cli consolidate-metadata books/on_liberty/output
 """
 
 import sys
@@ -22,6 +24,7 @@ import sys
 import click
 
 from .build import build_command
+from .consolidate import consolidate_command
 from .run import run_command
 
 
@@ -35,6 +38,7 @@ def cli():
 # Add the subcommands
 cli.add_command(build_command)
 cli.add_command(run_command)
+cli.add_command(consolidate_command)
 
 
 def main() -> None:
