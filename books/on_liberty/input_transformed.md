@@ -1,12 +1,12 @@
 # On Liberty
 
-## Preface (Modern Edition)
-
-{preface}
-
 ## License
 
 {license}
+
+## Preface (Modern Edition)
+
+{preface}
 
 ## CHAPTER I. - INTRODUCTORY.
 

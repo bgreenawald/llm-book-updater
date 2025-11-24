@@ -33,12 +33,12 @@ class TestDefaultRenderAssets(unittest.TestCase):
 
     def test_default_assets_when_none_exist(self):
         """Test that default assets are used when book has no custom assets."""
-        # Test with a book that doesn't have its own assets (on_liberty)
+        # Test with a book that doesn't have its own assets (the_wealth_of_nations)
         config = BookConfig(
-            name="on_liberty",
+            name="the_wealth_of_nations",
             version="1.0.0",
-            title="On Liberty",
-            author="John Stuart Mill",
+            title="The Wealth of Nations",
+            author="Adam Smith",
         )
 
         # All assets should point to defaults
