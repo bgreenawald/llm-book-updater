@@ -89,3 +89,6 @@ secrets/
 
 # Windows
 Thumbs.db
+
+# Ignore covers
+*.png

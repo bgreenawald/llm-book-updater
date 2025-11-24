@@ -32,8 +32,8 @@ class WealthOfNationsBuilder(BaseBookBuilder):
             Dictionary mapping file types to their source paths
         """
         return {
-            "modernized": self.config.source_output_dir / "03-input_small Final_1.md",
-            "annotated": self.config.source_output_dir / "06-input_small Annotate_1.md",
+            "modernized": self.config.source_output_dir / "03-input_transformed Final_1.md",
+            "annotated": self.config.source_output_dir / "06-input_transformed Annotate_1.md",
         }
 
     def get_original_file(self) -> Optional[Path]:

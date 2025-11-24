@@ -8,16 +8,16 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-# Use OpenRouter for all phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-2.5-pro")
+# Model configurations for pipeline phases
+GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
 CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
 CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
+GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=CHATGPT_GPT5_MINI,
-        use_batch=True,
+        model=GROK_41,
         reasoning={"effort": "medium"},
     ),
     PhaseConfig(
@@ -34,20 +34,17 @@ run_phases: List[PhaseConfig] = [
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=CHATGPT_GPT5_MINI,
-        use_batch=True,
+        model=GROK_41,
         reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=CHATGPT_GPT5_MINI,
-        use_batch=True,
+        model=GROK_41,
         reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=CHATGPT_GPT5_MINI,
-        use_batch=True,
+        model=GROK_41,
         reasoning={"effort": "medium"},
     ),
 ]
