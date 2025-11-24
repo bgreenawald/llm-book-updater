@@ -21,7 +21,7 @@ from src.phase_factory import PhaseFactory
 module_logger = logger
 
 # Metadata version for compatibility
-METADATA_VERSION = "0.0.0-alpha"
+METADATA_VERSION = "0.0"
 
 
 class Pipeline:
