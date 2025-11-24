@@ -100,6 +100,9 @@ class RunConfig:
     tags_to_preserve: List[str] = field(default_factory=lambda: list(DEFAULT_TAGS_TO_PRESERVE))
     # Maximum number of workers for parallel processing across all phases
     max_workers: Optional[int] = None
+    # Phase index to start execution from (0-based). Phases before this will be skipped.
+    # Useful for resuming after a failed phase.
+    start_from_phase: int = 0
 
     def __str__(self) -> str:
         return (

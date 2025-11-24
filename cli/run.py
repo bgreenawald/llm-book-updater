@@ -12,12 +12,13 @@ import click
 from .common import get_books_with_run, validate_book_exists
 
 
-def run_book(book_name: str) -> None:
+def run_book(book_name: str, start_from_phase: int = 0) -> None:
     """
     Run a specific book by importing its run module and calling the main function.
 
     Args:
         book_name: Name of the book to run
+        start_from_phase: Phase index to start execution from (0-based)
 
     Raises:
         ImportError: If the book's run module cannot be imported
@@ -27,6 +28,12 @@ def run_book(book_name: str) -> None:
         # Import the book's run module
         module_path = f"books.{book_name}.run"
         run_module = importlib.import_module(module_path)
+
+        # Modify the config in the run module to set start_from_phase
+        if hasattr(run_module, "config"):
+            run_module.config.start_from_phase = start_from_phase
+            if start_from_phase > 0:
+                click.echo(f"Starting from phase {start_from_phase}")
 
         # Call the main function
         if hasattr(run_module, "main"):
@@ -45,8 +52,14 @@ def run_book(book_name: str) -> None:
 
 @click.command("run")
 @click.argument("book_name", required=True)
+@click.option(
+    "--start-from-phase",
+    type=int,
+    default=0,
+    help="Phase index to start execution from (0-based). Useful for resuming after a failure.",
+)
 @click.help_option("--help", "-h")
-def run_command(book_name: str) -> None:
+def run_command(book_name: str, start_from_phase: int) -> None:
     """
     Run pipeline processing for books from markdown sources.
 
@@ -55,6 +68,7 @@ def run_command(book_name: str) -> None:
     Examples:
       python -m cli run the_federalist_papers
       python -m cli run on_liberty
+      python -m cli run on_liberty --start-from-phase 3
     """
     available_books = get_books_with_run()
 
@@ -65,4 +79,4 @@ def run_command(book_name: str) -> None:
     matched_book_name = validate_book_exists(book_name, available_books)
 
     click.echo(f"Running pipeline for book '{matched_book_name}'...")
-    run_book(matched_book_name)
+    run_book(matched_book_name, start_from_phase=start_from_phase)
