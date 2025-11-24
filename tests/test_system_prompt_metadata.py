@@ -99,7 +99,7 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "phases" in metadata
 
             # Verify metadata version
-            assert metadata["metadata_version"] == "0.0.0-alpha"
+            assert metadata["metadata_version"] == "0.0"
 
             # Verify phase metadata
             assert len(metadata["phases"]) == 1
