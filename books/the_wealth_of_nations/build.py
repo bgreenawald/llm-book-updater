@@ -1,5 +1,5 @@
 """
-Build script for The Wealth of Nations (Modern AI Edition).
+Build script for The Wealth of Nations (Timeless Library Edition).
 
 This script uses the shared BaseBookBuilder to create consistent builds
 while allowing for book-specific customization.
@@ -66,7 +66,7 @@ def build(version: str, name: str):
     config = BookConfig(
         name=name,
         version=version,
-        title="The Wealth of Nations (Modern AI Edition)",
+        title="The Wealth of Nations (Timeless Libraryyy Edition)",
         author="Adam Smith",
     )
 
