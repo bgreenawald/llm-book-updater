@@ -66,7 +66,7 @@ def build(version: str, name: str):
     config = BookConfig(
         name=name,
         version=version,
-        title="The Wealth of Nations (Timeless Libraryyy Edition)",
+        title="The Wealth of Nations (Timeless Library Edition)",
         author="Adam Smith",
     )
 
