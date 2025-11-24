@@ -46,6 +46,3 @@ def consolidate_command(output_dir: Path, output_filename: str) -> None:
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
-    except Exception as e:
-        click.echo(f"Unexpected error: {e}", err=True)
-        sys.exit(1)
