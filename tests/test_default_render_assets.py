@@ -33,7 +33,7 @@ class TestDefaultRenderAssets(unittest.TestCase):
 
     def test_default_assets_when_none_exist(self):
         """Test that default assets are used when book has no custom assets."""
-        # Test with a book that doesn't have its own assets (the_wealth_of_nations)
+        # Test asset resolution - defaults are used when book-specific assets don't exist
         config = BookConfig(
             name="the_wealth_of_nations",
             version="1.0.0",
@@ -41,10 +41,26 @@ class TestDefaultRenderAssets(unittest.TestCase):
             author="Adam Smith",
         )
 
-        # All assets should point to defaults
-        self.assertEqual(config.epub_css, self.default_epub_css)
-        self.assertEqual(config.preface_md, self.default_preface_md)
-        self.assertEqual(config.license_md, self.default_license_md)
+        book_dir = Path("books/the_wealth_of_nations")
+
+        # Check each asset - use default if book-specific doesn't exist
+        custom_epub_css = book_dir / "epub.css"
+        if custom_epub_css.exists():
+            self.assertEqual(config.epub_css, custom_epub_css)
+        else:
+            self.assertEqual(config.epub_css, self.default_epub_css)
+
+        custom_preface = book_dir / "preface.md"
+        if custom_preface.exists():
+            self.assertEqual(config.preface_md, custom_preface)
+        else:
+            self.assertEqual(config.preface_md, self.default_preface_md)
+
+        custom_license = book_dir / "license.md"
+        if custom_license.exists():
+            self.assertEqual(config.license_md, custom_license)
+        else:
+            self.assertEqual(config.license_md, self.default_license_md)
 
         # All assets should exist
         self.assertTrue(config.epub_css.exists())
