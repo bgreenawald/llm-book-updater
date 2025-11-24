@@ -135,7 +135,9 @@ class Pipeline:
             logger.error(f"Failed to copy input file to output directory: {str(e)}")
             raise
 
-    def _collect_phase_metadata(self, phase: Optional[LlmPhase], phase_index: int, completed: bool = False) -> None:
+    def _collect_phase_metadata(
+        self, phase: Optional[LlmPhase], phase_index: int, completed: bool = False, skipped: bool = False
+    ) -> None:
         """
         Collect comprehensive metadata about a phase.
 
@@ -145,9 +147,10 @@ class Pipeline:
 
         Args:
             phase (Optional[LlmPhase]): The phase instance to collect metadata from,
-                or None for disabled/failed phases
+                or None for disabled/failed/skipped phases
             phase_index (int): The index of the phase in the pipeline sequence
             completed (bool): Whether the phase completed successfully
+            skipped (bool): Whether the phase was skipped due to start_from_phase
         """
         phase_config = self.config.phases[phase_index]
 
@@ -222,7 +225,9 @@ class Pipeline:
 
         # Add reason for non-completion if applicable
         if not completed:
-            if not phase_config.enabled:
+            if skipped:
+                metadata["reason"] = "skipped"
+            elif not phase_config.enabled:
                 metadata["reason"] = "disabled"
             else:
                 metadata["reason"] = "not_run"
@@ -521,17 +526,48 @@ class Pipeline:
 
         Args:
             **kwargs: Additional arguments to pass to the processing methods
+
+        Raises:
+            ValueError: If start_from_phase is invalid or required input files are missing
         """
         phase_order = self.config.get_phase_order()
         logger.info(f"Starting pipeline with phases: {[p.name for p in phase_order]}")
 
-        # Copy input file to output directory with index "00"
-        self._copy_input_file_to_output()
+        # Validate start_from_phase parameter
+        start_phase = self.config.start_from_phase
+        if len(self.config.phases) > 0 and (start_phase < 0 or start_phase >= len(self.config.phases)):
+            raise ValueError(
+                f"start_from_phase={start_phase} is out of range. Valid range is 0-{len(self.config.phases) - 1}"
+            )
+
+        # If starting from a phase other than 0, validate that the required input exists
+        if start_phase > 0:
+            required_input = self._get_phase_input_path(phase_index=start_phase)
+            if not required_input.exists():
+                raise ValueError(
+                    f"Cannot start from phase {start_phase}: required input file not found: {required_input}. "
+                    f"The previous phase (index {start_phase - 1}) must have completed successfully."
+                )
+            logger.info(f"Resuming pipeline from phase {start_phase}")
+            logger.info(f"Using input from previous phase: {required_input}")
+
+        # Copy input file to output directory with index "00" only if starting from phase 0
+        if start_phase == 0:
+            self._copy_input_file_to_output()
 
         completed_phases: List[LlmPhase] = []
 
         try:
             for i, phase_config in enumerate(self.config.phases):
+                # Skip phases before start_from_phase
+                if i < start_phase:
+                    logger.info(
+                        f"Skipping phase {i} (before start_from_phase={start_phase}): {phase_config.phase_type.name}"
+                    )
+                    # Collect metadata for skipped phases
+                    self._collect_phase_metadata(phase=None, phase_index=i, completed=False, skipped=True)
+                    continue
+
                 if not phase_config.enabled:
                     logger.info(f"Skipping disabled phase: {phase_config.phase_type.name}")
                     # Collect metadata for disabled phases
