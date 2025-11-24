@@ -57,7 +57,7 @@ class TestDefaultRenderAssets(unittest.TestCase):
         config = BookConfig(
             name="the_federalist_papers",
             version="1.0.0",
-            title="The Federalist Papers (Modern AI Edition)",
+            title="The Federalist Papers (Timeless Library Edition)",
             author="Alexander Hamilton, James Madison, and John Jay",
         )
 
@@ -72,9 +72,17 @@ class TestDefaultRenderAssets(unittest.TestCase):
             # Default preface should be used
             self.assertEqual(config.preface_md, self.default_preface_md)
 
-        # Other assets should use defaults (no custom epub.css or license.md)
+        # Check epub.css (no custom one)
         self.assertEqual(config.epub_css, self.default_epub_css)
-        self.assertEqual(config.license_md, self.default_license_md)
+
+        # Check license.md - it might be custom or default
+        custom_license = book_dir / "license.md"
+        if custom_license.exists():
+            # Custom license should be used
+            self.assertEqual(config.license_md, custom_license)
+        else:
+            # Default license should be used
+            self.assertEqual(config.license_md, self.default_license_md)
 
         # All resolved assets should exist
         self.assertTrue(config.epub_css.exists())

@@ -1,5 +1,5 @@
 """
-Build script for The Federalist Papers (Modern AI Edition).
+Build script for The Federalist Papers (Timeless Library Edition).
 
 This script uses the shared BaseBookBuilder to create consistent builds
 while allowing for book-specific customization.
@@ -32,8 +32,8 @@ class FederalistPapersBuilder(BaseBookBuilder):
             Dictionary mapping file types to their source paths
         """
         return {
-            "modernized": self.config.source_output_dir / "03-input_small Final_1.md",
-            "annotated": self.config.source_output_dir / "06-input_small Annotate_1.md",
+            "modernized": self.config.source_output_dir / "03-input_transformed Final_1.md",
+            "annotated": self.config.source_output_dir / "06-input_transformed Annotate_1.md",
         }
 
     def get_original_file(self) -> Optional[Path]:
@@ -66,7 +66,7 @@ def build(version: str, name: str):
     config = BookConfig(
         name=name,
         version=version,
-        title="The Federalist Papers (Modern AI Edition)",
+        title="The Federalist Papers (Timeless Library Edition)",
         author="Alexander Hamilton, James Madison, and John Jay",
     )
 

@@ -8,6 +8,7 @@ file organization patterns.
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ from typing import Dict, Optional
 
 import pypandoc
 from loguru import logger
+from PIL import Image
 
 
 class BookConfig:
@@ -77,7 +79,7 @@ class BookConfig:
         self.build_annotated_pdf = self.build_dir / f"{self.clean_title}-annotated.pdf"
 
         # Asset Paths
-        self.cover_image = self.base_dir / "cover.png"
+        self.cover_image = self._get_cover_image()
         self.epub_css = self._get_asset_path("epub.css")
         self.preface_md = self._get_asset_path("preface.md")
         self.license_md = self._get_asset_path("license.md")
@@ -102,6 +104,32 @@ class BookConfig:
         clean = re.sub(r"[^\w\s-]", "", title)
         clean = re.sub(r"[-\s]+", "-", clean)
         return clean.strip("-")
+
+    def _get_cover_image(self) -> Path:
+        """
+        Get the path for the cover image, supporting both PNG and WebP formats.
+        Checks book-specific directory first, then falls back to default render assets.
+
+        Returns:
+            Path to the cover image file (PNG or WebP)
+
+        Raises:
+            FileNotFoundError: If no cover image is found in either format
+        """
+        # Check for book-specific cover in both formats
+        for extension in ["webp", "png"]:
+            book_specific_path = self.base_dir / f"cover.{extension}"
+            if book_specific_path.exists():
+                return book_specific_path
+
+        # Check for default cover in both formats
+        for extension in ["webp", "png"]:
+            default_path = Path("books/default_render_assets") / f"cover.{extension}"
+            if default_path.exists():
+                return default_path
+
+        # If no cover found, return a default path (will be checked later)
+        return self.base_dir / "cover.webp"
 
     def _get_asset_path(self, filename: str) -> Path:
         """
@@ -391,6 +419,47 @@ class BaseBookBuilder(ABC):
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
 
+    def _ensure_compatible_cover_image(self) -> Optional[Path]:
+        """
+        Ensures the cover image is in a compatible format (JPEG) for PDF conversion.
+        Converts PNG/WebP to JPEG if necessary.
+
+        Returns:
+            Path to the compatible cover image, or None if no cover exists
+        """
+        if not self.config.cover_image.exists():
+            return None
+
+        # Check if it's already a JPEG
+        if self.config.cover_image.suffix.lower() in [".jpg", ".jpeg"]:
+            return self.config.cover_image
+
+        # Convert to JPEG in staging directory
+        converted_path = self.config.staging_dir / "cover.jpg"
+
+        try:
+            logger.info("Converting cover image to JPEG for compatibility...")
+            img = Image.open(self.config.cover_image)
+
+            # Convert RGBA to RGB if necessary (for PNG with transparency)
+            if img.mode in ("RGBA", "LA", "P"):
+                # Create a white background
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                if img.mode == "P":
+                    img = img.convert("RGBA")
+                background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Save as JPEG with good quality
+            img.save(converted_path, "JPEG", quality=95)
+            logger.success(f"Converted cover image to JPEG: {self.safe_relative_path(converted_path)}")
+            return converted_path
+        except Exception as e:
+            logger.error(f"Failed to convert cover image: {e}")
+            return None
+
     def build_epub_and_pdf(self) -> None:
         """
         Build EPUB and PDF files using Pandoc and Calibre.
@@ -413,15 +482,24 @@ class BaseBookBuilder(ABC):
             "--lua-filter=books/exclude_h1.lua",
         ]
 
+        # Ensure we have a compatible cover image
+        compatible_cover = self._ensure_compatible_cover_image()
+
         # Build Modernized Version
         logger.info(f"Building modernized version for '{self.config.title}'...")
+        cover_args = []
+        if compatible_cover:
+            cover_args.append(f"--epub-cover-image={self.safe_relative_path(compatible_cover)}")
+        else:
+            logger.warning("No cover image available for EPUB")
+
         pypandoc.convert_file(
             str(self.config.staged_modernized_md),
             "epub",
             outputfile=str(self.config.build_modernized_epub),
             extra_args=pandoc_args
+            + cover_args
             + [
-                f"--epub-cover-image={self.safe_relative_path(self.config.cover_image)}",
                 f'--metadata=title:"{self.config.title}"',
                 f'--metadata=author:"{self.config.author}"',
                 f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
@@ -450,10 +528,10 @@ class BaseBookBuilder(ABC):
             "epub",
             outputfile=str(self.config.build_annotated_epub),
             extra_args=pandoc_args
+            + cover_args
             + [
-                f"--epub-cover-image={self.safe_relative_path(self.config.cover_image)}",
-                f'--metadata=title:"{self.config.title}: AI Edit"',
-                f'--metadata=author:"{self.config.author}, LLM"',
+                f'--metadata=title:"{self.config.title}"',
+                f'--metadata=author:"{self.config.author}"',
                 f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
             ],
         )
@@ -464,8 +542,8 @@ class BaseBookBuilder(ABC):
         success = self._build_pdf_from_epub(
             epub_path=self.config.build_annotated_epub,
             pdf_path=self.config.build_annotated_pdf,
-            title=f"{self.config.title}: AI Edit",
-            author=f"{self.config.author}, LLM",
+            title=f"{self.config.title}",
+            author=f"{self.config.author}",
             version=metadata.get("book_version", self.config.version),
         )
         if success:
@@ -490,14 +568,49 @@ class BaseBookBuilder(ABC):
         try:
             logger.info("Converting EPUB to PDF using Calibre ebook-convert...")
 
-            # Use Calibre's ebook-convert for perfect EPUB to PDF conversion
-            subprocess.run(["ebook-convert", str(epub_path), str(pdf_path)], capture_output=True, text=True, check=True)
+            # Set environment variable to disable GUI components that might cause issues
+            env = os.environ.copy()
+            env["QT_QPA_PLATFORM"] = "offscreen"
 
-            logger.success("Successfully created PDF using Calibre")
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Calibre conversion failed: {e.stderr}")
-            return False
+            # Use Calibre's ebook-convert with minimal options to avoid image format issues
+            result = subprocess.run(
+                [
+                    "ebook-convert",
+                    str(epub_path),
+                    str(pdf_path),
+                    "--pdf-default-font-size",
+                    "12",
+                    "--pdf-mono-font-size",
+                    "10",
+                    "--paper-size",
+                    "letter",
+                    "--pdf-page-margin-left",
+                    "72",
+                    "--pdf-page-margin-right",
+                    "72",
+                    "--pdf-page-margin-top",
+                    "72",
+                    "--pdf-page-margin-bottom",
+                    "72",
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,  # Don't raise on non-zero exit
+            )
+
+            if result.returncode == 0:
+                logger.success("Successfully created PDF using Calibre")
+                return True
+            else:
+                # Check if the PDF was actually created despite the error
+                if pdf_path.exists() and pdf_path.stat().st_size > 0:
+                    logger.warning(f"PDF created with warnings: {result.stderr}")
+                    return True
+                else:
+                    logger.error(f"Calibre conversion failed: {result.stderr}")
+                    return False
+
         except FileNotFoundError:
             logger.error(
                 "Calibre ebook-convert not found. Please install Calibre and ensure ebook-convert is in your PATH."
@@ -560,7 +673,7 @@ class BaseBookBuilder(ABC):
         # Copy Final Artifacts
         self.copy_final_artifacts()
 
-        logger.success(f"\nBuild complete for {self.config.name} v{self.config.version}!")
+        logger.success(f"\nBuild complete for {self.config.name} {self.config.version}!")
 
 
 def create_build_parser() -> argparse.ArgumentParser:

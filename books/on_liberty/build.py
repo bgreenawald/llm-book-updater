@@ -1,5 +1,5 @@
 """
-Build script for On Liberty (Modern AI Edition).
+Build script for On Liberty (Timeless Library Edition).
 
 This script uses the shared BaseBookBuilder to create consistent builds
 while allowing for book-specific customization.
@@ -76,7 +76,7 @@ def build(version: str, name: str):
     config = BookConfig(
         name=name,
         version=version,
-        title="On Liberty (Modern AI Edition)",
+        title="On Liberty (Timeless Library Edition)",
         author="John Stuart Mill",
     )
 
