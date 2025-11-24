@@ -8,7 +8,7 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-# Use OpenRouter for all phases
+# Model configurations for pipeline phases
 GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
 CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
 CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
