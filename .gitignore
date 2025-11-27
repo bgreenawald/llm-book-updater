@@ -92,3 +92,6 @@ Thumbs.db
 
 # Ignore covers
 *.png
+
+# Claude
+.claude/
