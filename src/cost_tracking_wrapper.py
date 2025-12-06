@@ -212,18 +212,24 @@ class CostTrackingWrapper:
 
 # Global instance for easy access
 _cost_tracking_wrapper: Optional[CostTrackingWrapper] = None
+_cost_tracking_lock = threading.Lock()
 
 
 def get_cost_tracking_wrapper() -> Optional[CostTrackingWrapper]:
     """
-    Get the global cost tracking wrapper instance.
+    Get the global cost tracking wrapper instance (thread-safe).
 
     Returns:
         CostTrackingWrapper instance if available, None otherwise
     """
     global _cost_tracking_wrapper
+    # First check without lock for performance
     if _cost_tracking_wrapper is None:
-        _cost_tracking_wrapper = CostTrackingWrapper()
+        # Acquire lock for initialization
+        with _cost_tracking_lock:
+            # Double-check inside lock to prevent race condition
+            if _cost_tracking_wrapper is None:
+                _cost_tracking_wrapper = CostTrackingWrapper()
     return _cost_tracking_wrapper
 
 
