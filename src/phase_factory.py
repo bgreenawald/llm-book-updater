@@ -1,6 +1,8 @@
-from typing import Any, List, Optional, Union
+from pathlib import Path
+from typing import Any, List, Optional, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
+from src.llm_model import LlmModel
 from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
 from src.post_processors import (
     EnsureBlankLineProcessor,
@@ -14,6 +16,18 @@ from src.post_processors import (
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
 )
+
+
+class ValidatedPhaseFields(TypedDict):
+    """Type-safe container for validated phase fields."""
+
+    name: str
+    input_file_path: Path
+    output_file_path: Path
+    original_file_path: Path
+    book_name: str
+    author_name: str
+    llm_model_instance: LlmModel
 
 
 class PhaseFactory:
@@ -80,6 +94,46 @@ class PhaseFactory:
     }
 
     @staticmethod
+    def _validate_required_phase_fields(config: PhaseConfig, phase_type: str) -> ValidatedPhaseFields:
+        """
+        Validate that all required fields are present in the config.
+
+        Args:
+            config (PhaseConfig): Configuration object to validate
+            phase_type (str): Name of the phase type for error messages
+
+        Returns:
+            ValidatedPhaseFields: Type-safe container with validated non-None fields
+
+        Raises:
+            ValueError: If any required field is None
+        """
+        if config.name is None:
+            raise ValueError(f"name is required for {phase_type}")
+        if config.input_file_path is None:
+            raise ValueError(f"input_file_path is required for {phase_type}")
+        if config.output_file_path is None:
+            raise ValueError(f"output_file_path is required for {phase_type}")
+        if config.original_file_path is None:
+            raise ValueError(f"original_file_path is required for {phase_type}")
+        if config.book_name is None:
+            raise ValueError(f"book_name is required for {phase_type}")
+        if config.author_name is None:
+            raise ValueError(f"author_name is required for {phase_type}")
+        if config.llm_model_instance is None:
+            raise ValueError(f"llm_model_instance is required for {phase_type}")
+
+        return ValidatedPhaseFields(
+            name=config.name,
+            input_file_path=config.input_file_path,
+            output_file_path=config.output_file_path,
+            original_file_path=config.original_file_path,
+            book_name=config.book_name,
+            author_name=config.author_name,
+            llm_model_instance=config.llm_model_instance,
+        )
+
+    @staticmethod
     def create_standard_phase(
         config: PhaseConfig,
         length_reduction: Optional[Any] = None,
@@ -102,30 +156,19 @@ class PhaseFactory:
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
-        # Validate required fields
-        if config.name is None:
-            raise ValueError("name is required for StandardLlmPhase")
-        if config.input_file_path is None:
-            raise ValueError("input_file_path is required for StandardLlmPhase")
-        if config.output_file_path is None:
-            raise ValueError("output_file_path is required for StandardLlmPhase")
-        if config.original_file_path is None:
-            raise ValueError("original_file_path is required for StandardLlmPhase")
-        if config.book_name is None:
-            raise ValueError("book_name is required for StandardLlmPhase")
-        if config.author_name is None:
-            raise ValueError("author_name is required for StandardLlmPhase")
+        # Validate required fields and get type-safe values
+        validated = PhaseFactory._validate_required_phase_fields(config=config, phase_type="StandardLlmPhase")
 
         return StandardLlmPhase(
-            name=config.name,
-            input_file_path=config.input_file_path,
-            output_file_path=config.output_file_path,
-            original_file_path=config.original_file_path,
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            original_file_path=validated["original_file_path"],
             system_prompt_path=config.system_prompt_path,
             user_prompt_path=config.user_prompt_path,
-            book_name=config.book_name,
-            author_name=config.author_name,
-            model=config.llm_model_instance,
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            model=validated["llm_model_instance"],
             temperature=config.temperature,
             max_workers=max_workers,
             reasoning=config.reasoning,
@@ -158,30 +201,21 @@ class PhaseFactory:
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
-        # Validate required fields
-        if config.name is None:
-            raise ValueError("name is required for IntroductionAnnotationPhase")
-        if config.input_file_path is None:
-            raise ValueError("input_file_path is required for IntroductionAnnotationPhase")
-        if config.output_file_path is None:
-            raise ValueError("output_file_path is required for IntroductionAnnotationPhase")
-        if config.original_file_path is None:
-            raise ValueError("original_file_path is required for IntroductionAnnotationPhase")
-        if config.book_name is None:
-            raise ValueError("book_name is required for IntroductionAnnotationPhase")
-        if config.author_name is None:
-            raise ValueError("author_name is required for IntroductionAnnotationPhase")
+        # Validate required fields and get type-safe values
+        validated = PhaseFactory._validate_required_phase_fields(
+            config=config, phase_type="IntroductionAnnotationPhase"
+        )
 
         return IntroductionAnnotationPhase(
-            name=config.name,
-            input_file_path=config.input_file_path,
-            output_file_path=config.output_file_path,
-            original_file_path=config.original_file_path,
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            original_file_path=validated["original_file_path"],
             system_prompt_path=config.system_prompt_path,
             user_prompt_path=config.user_prompt_path,
-            book_name=config.book_name,
-            author_name=config.author_name,
-            model=config.llm_model_instance,
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            model=validated["llm_model_instance"],
             temperature=config.temperature,
             max_workers=max_workers,
             reasoning=config.reasoning,
@@ -214,30 +248,19 @@ class PhaseFactory:
             post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
         )
 
-        # Validate required fields
-        if config.name is None:
-            raise ValueError("name is required for SummaryAnnotationPhase")
-        if config.input_file_path is None:
-            raise ValueError("input_file_path is required for SummaryAnnotationPhase")
-        if config.output_file_path is None:
-            raise ValueError("output_file_path is required for SummaryAnnotationPhase")
-        if config.original_file_path is None:
-            raise ValueError("original_file_path is required for SummaryAnnotationPhase")
-        if config.book_name is None:
-            raise ValueError("book_name is required for SummaryAnnotationPhase")
-        if config.author_name is None:
-            raise ValueError("author_name is required for SummaryAnnotationPhase")
+        # Validate required fields and get type-safe values
+        validated = PhaseFactory._validate_required_phase_fields(config=config, phase_type="SummaryAnnotationPhase")
 
         return SummaryAnnotationPhase(
-            name=config.name,
-            input_file_path=config.input_file_path,
-            output_file_path=config.output_file_path,
-            original_file_path=config.original_file_path,
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            original_file_path=validated["original_file_path"],
             system_prompt_path=config.system_prompt_path,
             user_prompt_path=config.user_prompt_path,
-            book_name=config.book_name,
-            author_name=config.author_name,
-            model=config.llm_model_instance,
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            model=validated["llm_model_instance"],
             temperature=config.temperature,
             max_workers=max_workers,
             reasoning=config.reasoning,
