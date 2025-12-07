@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Optional, TypedDict, Union
+from typing import List, Optional, Tuple, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_model import LlmModel
@@ -136,7 +136,7 @@ class PhaseFactory:
     @staticmethod
     def create_standard_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Any] = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> StandardLlmPhase:
@@ -181,7 +181,7 @@ class PhaseFactory:
     @staticmethod
     def create_introduction_annotation_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Any] = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> IntroductionAnnotationPhase:
@@ -228,7 +228,7 @@ class PhaseFactory:
     @staticmethod
     def create_summary_annotation_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Any] = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> SummaryAnnotationPhase:
