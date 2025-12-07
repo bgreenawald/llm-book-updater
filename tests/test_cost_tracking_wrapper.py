@@ -6,6 +6,7 @@ including thread-safe singleton initialization.
 """
 
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
@@ -20,10 +21,12 @@ from src.cost_tracking_wrapper import (
 
 @pytest.fixture(autouse=True)
 def reset_global_wrapper():
-    """Reset the global wrapper instance before each test."""
+    """Reset the global wrapper instance and lock before each test."""
     cost_tracking_wrapper._cost_tracking_wrapper = None
+    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
     yield
     cost_tracking_wrapper._cost_tracking_wrapper = None
+    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
 
 
 class TestCostTrackingWrapper:
