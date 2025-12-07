@@ -134,6 +134,57 @@ class PhaseFactory:
         )
 
     @staticmethod
+    def _prepare_phase_parameters(
+        config: PhaseConfig,
+        phase_type: str,
+        length_reduction: Optional[Any] = None,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """
+        Prepare common parameters for phase instantiation.
+
+        This method handles:
+        - Creating the post-processor chain
+        - Validating required fields
+        - Constructing the parameter dictionary
+
+        Args:
+            config (PhaseConfig): Configuration object containing all phase parameters
+            phase_type (str): Name of the phase type for error messages
+            length_reduction: Length reduction parameter for the phase
+            tags_to_preserve: Tags to preserve during processing
+            max_workers: Maximum number of workers for parallel processing
+
+        Returns:
+            dict[str, Any]: Dictionary of parameters ready for phase instantiation
+        """
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
+        )
+
+        validated = PhaseFactory._validate_required_phase_fields(config=config, phase_type=phase_type)
+
+        return {
+            "name": validated["name"],
+            "input_file_path": validated["input_file_path"],
+            "output_file_path": validated["output_file_path"],
+            "original_file_path": validated["original_file_path"],
+            "system_prompt_path": config.system_prompt_path,
+            "user_prompt_path": config.user_prompt_path,
+            "book_name": validated["book_name"],
+            "author_name": validated["author_name"],
+            "model": validated["llm_model_instance"],
+            "temperature": config.temperature,
+            "max_workers": max_workers,
+            "reasoning": config.reasoning,
+            "post_processor_chain": post_processor_chain,
+            "length_reduction": length_reduction,
+            "use_batch": config.use_batch,
+            "batch_size": config.batch_size,
+        }
+
+    @staticmethod
     def create_standard_phase(
         config: PhaseConfig,
         length_reduction: Optional[Any] = None,
@@ -152,31 +203,14 @@ class PhaseFactory:
         Returns:
             StandardLlmPhase: Configured standard phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
-        )
-
-        # Validate required fields and get type-safe values
-        validated = PhaseFactory._validate_required_phase_fields(config=config, phase_type="StandardLlmPhase")
-
-        return StandardLlmPhase(
-            name=validated["name"],
-            input_file_path=validated["input_file_path"],
-            output_file_path=validated["output_file_path"],
-            original_file_path=validated["original_file_path"],
-            system_prompt_path=config.system_prompt_path,
-            user_prompt_path=config.user_prompt_path,
-            book_name=validated["book_name"],
-            author_name=validated["author_name"],
-            model=validated["llm_model_instance"],
-            temperature=config.temperature,
-            max_workers=max_workers,
-            reasoning=config.reasoning,
-            post_processor_chain=post_processor_chain,
+        params = PhaseFactory._prepare_phase_parameters(
+            config=config,
+            phase_type="StandardLlmPhase",
             length_reduction=length_reduction,
-            use_batch=config.use_batch,
-            batch_size=config.batch_size,
+            tags_to_preserve=tags_to_preserve,
+            max_workers=max_workers,
         )
+        return StandardLlmPhase(**params)
 
     @staticmethod
     def create_introduction_annotation_phase(
@@ -197,33 +231,14 @@ class PhaseFactory:
         Returns:
             IntroductionAnnotationPhase: Configured introduction annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
-        )
-
-        # Validate required fields and get type-safe values
-        validated = PhaseFactory._validate_required_phase_fields(
-            config=config, phase_type="IntroductionAnnotationPhase"
-        )
-
-        return IntroductionAnnotationPhase(
-            name=validated["name"],
-            input_file_path=validated["input_file_path"],
-            output_file_path=validated["output_file_path"],
-            original_file_path=validated["original_file_path"],
-            system_prompt_path=config.system_prompt_path,
-            user_prompt_path=config.user_prompt_path,
-            book_name=validated["book_name"],
-            author_name=validated["author_name"],
-            model=validated["llm_model_instance"],
-            temperature=config.temperature,
-            max_workers=max_workers,
-            reasoning=config.reasoning,
-            post_processor_chain=post_processor_chain,
+        params = PhaseFactory._prepare_phase_parameters(
+            config=config,
+            phase_type="IntroductionAnnotationPhase",
             length_reduction=length_reduction,
-            use_batch=config.use_batch,
-            batch_size=config.batch_size,
+            tags_to_preserve=tags_to_preserve,
+            max_workers=max_workers,
         )
+        return IntroductionAnnotationPhase(**params)
 
     @staticmethod
     def create_summary_annotation_phase(
@@ -244,31 +259,14 @@ class PhaseFactory:
         Returns:
             SummaryAnnotationPhase: Configured summary annotation phase
         """
-        post_processor_chain = PhaseFactory._create_post_processor_chain(
-            post_processors=config.post_processors, phase_type=config.phase_type, tags_to_preserve=tags_to_preserve
-        )
-
-        # Validate required fields and get type-safe values
-        validated = PhaseFactory._validate_required_phase_fields(config=config, phase_type="SummaryAnnotationPhase")
-
-        return SummaryAnnotationPhase(
-            name=validated["name"],
-            input_file_path=validated["input_file_path"],
-            output_file_path=validated["output_file_path"],
-            original_file_path=validated["original_file_path"],
-            system_prompt_path=config.system_prompt_path,
-            user_prompt_path=config.user_prompt_path,
-            book_name=validated["book_name"],
-            author_name=validated["author_name"],
-            model=validated["llm_model_instance"],
-            temperature=config.temperature,
-            max_workers=max_workers,
-            reasoning=config.reasoning,
-            post_processor_chain=post_processor_chain,
+        params = PhaseFactory._prepare_phase_parameters(
+            config=config,
+            phase_type="SummaryAnnotationPhase",
             length_reduction=length_reduction,
-            use_batch=config.use_batch,
-            batch_size=config.batch_size,
+            tags_to_preserve=tags_to_preserve,
+            max_workers=max_workers,
         )
+        return SummaryAnnotationPhase(**params)
 
     @staticmethod
     def _create_built_in_processor(processor_name: str) -> Optional[PostProcessor]:
