@@ -495,7 +495,7 @@ class BaseBookBuilder(ABC):
 
         pypandoc.convert_file(
             str(self.config.staged_modernized_md),
-            "epub",
+            "epub2",
             outputfile=str(self.config.build_modernized_epub),
             extra_args=pandoc_args
             + cover_args
@@ -525,7 +525,7 @@ class BaseBookBuilder(ABC):
         logger.info(f"Building annotated version for '{self.config.title}'...")
         pypandoc.convert_file(
             str(self.config.staged_annotated_md),
-            "epub",
+            "epub2",
             outputfile=str(self.config.build_annotated_epub),
             extra_args=pandoc_args
             + cover_args
