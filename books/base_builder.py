@@ -16,9 +16,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Optional
 
-import pypandoc
+import pypandoc  # type: ignore[import-untyped]
 from loguru import logger
 from PIL import Image
+from PIL.Image import Image as PilImage
 
 
 class BookConfig:
@@ -419,6 +420,80 @@ class BaseBookBuilder(ABC):
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
 
+        logger.info("Loosening blockquote lists for EPUB/PDF rendering")
+        self.loosen_blockquote_lists(self.config.staged_modernized_md)
+        self.loosen_blockquote_lists(self.config.staged_annotated_md)
+        if self.config.staged_original_md.exists():
+            self.loosen_blockquote_lists(self.config.staged_original_md)
+
+    @staticmethod
+    def make_blockquote_lists_loose(markdown_text: str) -> str:
+        """Convert tight blockquote "list-like" blocks into loose blocks by inserting blank quote lines.
+
+        Pandoc/EPUB rendering often collapses visual spacing for "tight" Markdown lists,
+        especially when lists appear inside blockquotes.
+
+        This function targets two common patterns:
+        1) True Markdown list items inside blockquotes (e.g., `> - item`, `> * item`, `> 1. item`)
+        2) "Term-definition" lines commonly emitted by the LLM (e.g., `> *Akbar* - ...`)
+
+        It inserts `>` blank lines before these entries when the previous line is also
+        part of a blockquote but not already separated by a blank quote line.
+
+        Args:
+            markdown_text: Raw Markdown content.
+
+        Returns:
+            Updated Markdown content with loose blockquote lists.
+        """
+        blockquote_line_re = re.compile(r"^\s*>")
+        blockquote_list_item_start_re = re.compile(r"^\s*>\s*(?:[*+-]|\d+[.)])\s+")
+        blockquote_term_definition_re = re.compile(r"^\s*>\s*\*[^*].*?\*\s*-\s+")
+
+        def is_blockquote_line(line: str) -> bool:
+            return bool(blockquote_line_re.match(line))
+
+        def is_blank_blockquote_line(line: str) -> bool:
+            return line.strip() == ">"
+
+        def is_blockquote_list_item_start(line: str) -> bool:
+            return bool(blockquote_list_item_start_re.match(line))
+
+        def is_blockquote_term_definition(line: str) -> bool:
+            return bool(blockquote_term_definition_re.match(line))
+
+        def is_blockquote_entry(line: str) -> bool:
+            return is_blockquote_list_item_start(line) or is_blockquote_term_definition(line)
+
+        lines = markdown_text.splitlines()
+        out_lines: list[str] = []
+
+        for line in lines:
+            if is_blockquote_entry(line) and out_lines:
+                prev_line = out_lines[-1]
+                if is_blockquote_line(prev_line) and not is_blank_blockquote_line(prev_line) and prev_line.strip():
+                    out_lines.append(">")
+            out_lines.append(line)
+
+        out_text = "\n".join(out_lines)
+        if markdown_text.endswith("\n"):
+            out_text += "\n"
+        return out_text
+
+    def loosen_blockquote_lists(self, input_path: Path) -> None:
+        """Rewrite tight blockquote lists to loose lists to improve EPUB/PDF spacing.
+
+        Args:
+            input_path: Path to the markdown file to process.
+        """
+        content = input_path.read_text(encoding="utf-8")
+        updated = self.make_blockquote_lists_loose(content)
+        if updated == content:
+            return
+
+        input_path.write_text(updated, encoding="utf-8")
+        logger.info(f"Loosened blockquote lists in '{self.safe_relative_path(input_path)}'")
+
     def _ensure_compatible_cover_image(self) -> Optional[Path]:
         """
         Ensures the cover image is in a compatible format (JPEG) for PDF conversion.
@@ -439,12 +514,12 @@ class BaseBookBuilder(ABC):
 
         try:
             logger.info("Converting cover image to JPEG for compatibility...")
-            img = Image.open(self.config.cover_image)
+            img: PilImage = Image.open(self.config.cover_image)
 
             # Convert RGBA to RGB if necessary (for PNG with transparency)
             if img.mode in ("RGBA", "LA", "P"):
                 # Create a white background
-                background = Image.new("RGB", img.size, (255, 255, 255))
+                background: PilImage = Image.new("RGB", img.size, (255, 255, 255))
                 if img.mode == "P":
                     img = img.convert("RGBA")
                 background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
