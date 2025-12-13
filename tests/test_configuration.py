@@ -136,7 +136,7 @@ class TestConfigurationValidation:
             output_dir.mkdir()
 
             # Test invalid phase type
-            with pytest.raises((ValueError, AttributeError)):
+            with pytest.raises((TypeError, ValueError, AttributeError)):
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",
@@ -156,52 +156,20 @@ class TestConfigurationValidation:
 
     def test_invalid_temperature_values(self):
         """Test behavior with extreme temperature values."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            input_file = temp_path / "test_input.md"
-            input_file.write_text("# Test Content")
-            output_dir = temp_path / "output"
-            output_dir.mkdir()
-
-            # Test negative temperature - allowed at config level, may cause issues at runtime
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[
-                    PhaseConfig(
-                        phase_type=PhaseType.MODERNIZE,
-                        enabled=True,
-                        temperature=-0.1,  # Negative temperature
-                    )
-                ],
-                length_reduction=(35, 50),
+        # Temperature should be validated at config construction time
+        with pytest.raises(ValueError):
+            PhaseConfig(
+                phase_type=PhaseType.MODERNIZE,
+                enabled=True,
+                temperature=-0.1,  # Negative temperature
             )
-            # Verify extreme values are stored
-            assert config.phases[0].temperature == -0.1
 
-            # Test very high temperature
-            config2 = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[
-                    PhaseConfig(
-                        phase_type=PhaseType.MODERNIZE,
-                        enabled=True,
-                        temperature=3.0,  # High temperature
-                    )
-                ],
-                length_reduction=(35, 50),
+        with pytest.raises(ValueError):
+            PhaseConfig(
+                phase_type=PhaseType.MODERNIZE,
+                enabled=True,
+                temperature=3.0,  # High temperature
             )
-            assert config2.phases[0].temperature == 3.0
 
     def test_invalid_length_reduction_values(self):
         """Test behavior with extreme length reduction values."""
@@ -213,31 +181,30 @@ class TestConfigurationValidation:
             output_dir = temp_path / "output"
             output_dir.mkdir()
 
-            # Test negative length reduction - allowed at config level
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=(-10, 50),  # Negative value
-            )
-            assert config.length_reduction == (-10, 50)
+            # Length reduction should be validated at config construction time
+            with pytest.raises(ValueError):
+                RunConfig(
+                    book_id="test_book",
+                    book_name="Test Book",
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[],
+                    length_reduction=(-10, 50),  # Negative value
+                )
 
-            # Test length reduction > 100 - allowed at config level
-            config2 = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=(110, 120),  # Values > 100
-            )
-            assert config2.length_reduction == (110, 120)
+            with pytest.raises(ValueError):
+                RunConfig(
+                    book_id="test_book",
+                    book_name="Test Book",
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[],
+                    length_reduction=(110, 120),  # Values > 100
+                )
 
     def test_malformed_length_reduction_tuple(self):
         """Test behavior with different length reduction formats."""
@@ -262,18 +229,18 @@ class TestConfigurationValidation:
             )
             assert config.length_reduction == 50
 
-            # Test tuple with wrong order - allowed at config level
-            config2 = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=(70, 30),  # High before low
-            )
-            assert config2.length_reduction == (70, 30)
+            # Test tuple with wrong order - should fail at config construction time
+            with pytest.raises(ValueError):
+                RunConfig(
+                    book_id="test_book",
+                    book_name="Test Book",
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[],
+                    length_reduction=(70, 30),  # High before low
+                )
 
 
 class TestPostProcessorConfigurationEdgeCases:
