@@ -10,6 +10,7 @@ dependencies = [
     "loguru>=0.7.3",
     "marker-pdf[full]>=1.7.3",
     "openai>=1.82.0",
+    "pydantic>=2.7.0",
     "psutil>=7.0.0",
     "pypandoc>=1.15",
     "python-dotenv>=1.1.1",

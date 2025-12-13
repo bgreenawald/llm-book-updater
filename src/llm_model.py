@@ -2,12 +2,12 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
 from loguru import logger
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -34,8 +34,7 @@ load_dotenv(override=True)
 module_logger = logger
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseModel):
     """Configuration for a model, including provider and model identifier."""
 
     provider: Provider
@@ -43,35 +42,53 @@ class ModelConfig:
     # Provider-specific model name (for direct SDK calls)
     provider_model_name: Optional[str] = None
 
-    def __post_init__(self) -> None:
-        """Set provider_model_name if not specified."""
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    @field_validator("model_id", mode="before")
+    @classmethod
+    def _coerce_model_id(cls, v: Any) -> Any:
+        """Coerce model_id to a string where reasonable."""
+        if isinstance(v, (str, bytes)):
+            return v.decode() if isinstance(v, bytes) else v
+        return v
+
+    @model_validator(mode="after")
+    def _set_provider_model_name(self) -> "ModelConfig":
+        """Populate provider_model_name if not specified."""
         if self.provider_model_name is None:
-            if self.provider == Provider.OPENAI:
-                # Extract OpenAI model name from OpenRouter format
-                if "/" in self.model_id:
-                    self.provider_model_name = self.model_id.split("/", 1)[1]
-                else:
-                    self.provider_model_name = self.model_id
-            elif self.provider == Provider.GEMINI:
-                # Extract Gemini model name from OpenRouter format
-                if "/" in self.model_id:
-                    self.provider_model_name = self.model_id.split("/", 1)[1]
-                else:
-                    self.provider_model_name = self.model_id
+            if self.provider in (Provider.OPENAI, Provider.GEMINI):
+                # Extract provider model name from OpenRouter-style "org/name" format
+                self.provider_model_name = self.model_id.split("/", 1)[1] if "/" in self.model_id else self.model_id
             else:
                 # For OpenRouter, use the full model_id
                 self.provider_model_name = self.model_id
+        return self
 
 
 # Model constants with provider information
-GROK_3_MINI = ModelConfig(Provider.OPENROUTER, "x-ai/grok-3-mini")
-GEMINI_FLASH = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
-GEMINI_PRO = ModelConfig(Provider.GEMINI, "google/gemini-2.5-pro", "gemini-2.5-pro")
-DEEPSEEK = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1-0528")
-OPENAI_04_MINI = ModelConfig(Provider.OPENAI, "openai/o4-mini-high", "o4-mini")
-CLAUDE_4_SONNET = ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4")
-GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash-lite")
-KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2:free")
+GROK_3_MINI = ModelConfig(provider=Provider.OPENROUTER, model_id="x-ai/grok-3-mini")
+GEMINI_FLASH = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-flash",
+    provider_model_name="gemini-2.5-flash",
+)
+GEMINI_PRO = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-pro",
+    provider_model_name="gemini-2.5-pro",
+)
+DEEPSEEK = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-r1-0528")
+OPENAI_04_MINI = ModelConfig(provider=Provider.OPENAI, model_id="openai/o4-mini-high", provider_model_name="o4-mini")
+CLAUDE_4_SONNET = ModelConfig(provider=Provider.OPENROUTER, model_id="anthropic/claude-sonnet-4")
+GEMINI_FLASH_LITE = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-flash-lite-preview-06-17",
+    provider_model_name="gemini-2.5-flash-lite",
+)
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2:free")
 
 
 class LlmModelError(Exception):

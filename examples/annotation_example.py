@@ -41,7 +41,7 @@ def main():
     user_prompt = user_prompts_dir / "edit_user.md"  # Example user prompt
 
     # Define the model configuration
-    model = ModelConfig(Provider.OPENAI, "gpt-4")
+    model = ModelConfig(provider=Provider.OPENAI, model_id="gpt-4")
 
     # Example 1: Add introduction annotations to each section
     print("Running introduction annotation phase...")
