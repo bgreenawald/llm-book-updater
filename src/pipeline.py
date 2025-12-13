@@ -15,9 +15,6 @@ from src.llm_model import LlmModel, LlmModelError, ModelConfig
 from src.llm_phase import LlmPhase
 from src.phase_factory import PhaseFactory
 
-# Initialize module-level logger
-module_logger = logger
-
 # Metadata version for compatibility
 METADATA_VERSION = "0.0"
 

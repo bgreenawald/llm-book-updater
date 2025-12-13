@@ -13,9 +13,6 @@ from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import LlmModel
 from src.post_processors import PostProcessorChain
 
-# Initialize module-level logger
-module_logger = logger
-
 
 class LlmPhase(ABC):
     """
