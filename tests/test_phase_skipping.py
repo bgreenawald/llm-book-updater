@@ -71,7 +71,7 @@ class TestPhaseSkipping:
             assert config.start_from_phase == 2
 
     def test_start_from_phase_negative_raises_error(self):
-        """Test that negative start_from_phase raises an error during pipeline execution."""
+        """Test that negative start_from_phase raises an error during config creation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
@@ -80,28 +80,25 @@ class TestPhaseSkipping:
             output_dir = temp_path / "output"
             output_dir.mkdir()
 
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[
-                    PhaseConfig(phase_type=PhaseType.MODERNIZE),
-                    PhaseConfig(phase_type=PhaseType.EDIT),
-                ],
-                start_from_phase=-1,
-            )
-
-            pipeline = Pipeline(config=config)
             with pytest.raises(ValueError) as exc_info:
-                pipeline.run()
+                RunConfig(
+                    book_id="test_book",
+                    book_name="Test Book",
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[
+                        PhaseConfig(phase_type=PhaseType.MODERNIZE),
+                        PhaseConfig(phase_type=PhaseType.EDIT),
+                    ],
+                    start_from_phase=-1,
+                )
 
-            assert "out of range" in str(exc_info.value)
+            assert "start_from_phase" in str(exc_info.value)
 
     def test_start_from_phase_out_of_bounds_raises_error(self):
-        """Test that start_from_phase >= len(phases) raises an error."""
+        """Test that start_from_phase > len(phases) raises an error during config creation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
@@ -110,25 +107,22 @@ class TestPhaseSkipping:
             output_dir = temp_path / "output"
             output_dir.mkdir()
 
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[
-                    PhaseConfig(phase_type=PhaseType.MODERNIZE),
-                    PhaseConfig(phase_type=PhaseType.EDIT),
-                ],
-                start_from_phase=5,  # Out of bounds (only 2 phases)
-            )
-
-            pipeline = Pipeline(config=config)
             with pytest.raises(ValueError) as exc_info:
-                pipeline.run()
+                RunConfig(
+                    book_id="test_book",
+                    book_name="Test Book",
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[
+                        PhaseConfig(phase_type=PhaseType.MODERNIZE),
+                        PhaseConfig(phase_type=PhaseType.EDIT),
+                    ],
+                    start_from_phase=5,  # Out of bounds (only 2 phases)
+                )
 
-            assert "out of range" in str(exc_info.value)
+            assert "out of range" in str(exc_info.value) or "start_from_phase" in str(exc_info.value)
 
     def test_start_from_phase_without_previous_output_raises_error(self):
         """Test that starting from a phase without previous phase output raises an error."""
