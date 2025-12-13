@@ -3,10 +3,7 @@ import shutil
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from src.llm_model import ModelConfig
+from typing import Any, Dict, List, Optional
 
 import requests
 from loguru import logger
@@ -14,7 +11,7 @@ from loguru import logger
 from src.config import PhaseType, RunConfig
 from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
-from src.llm_model import LlmModel, LlmModelError
+from src.llm_model import LlmModel, LlmModelError, ModelConfig
 from src.llm_phase import LlmPhase
 from src.phase_factory import PhaseFactory
 
@@ -66,7 +63,7 @@ class Pipeline:
         """
         return f"Pipeline(config={self.config})"
 
-    def _get_or_create_model(self, model_config: "ModelConfig", temperature: float) -> LlmModel:
+    def _get_or_create_model(self, model_config: ModelConfig, temperature: float) -> LlmModel:
         """
         Get or create a cached LlmModel instance for connection pooling.
 
@@ -483,7 +480,7 @@ class Pipeline:
             logger.warning(f"Failed to fetch model info for {model_id}: {str(e)}")
             return None
 
-    def _get_model_metadata(self, model_type: "ModelConfig") -> Dict[str, Any]:
+    def _get_model_metadata(self, model_type: ModelConfig) -> Dict[str, Any]:
         """
         Get model metadata from ModelConfig object.
 
