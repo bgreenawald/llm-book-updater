@@ -1,5 +1,6 @@
 import json
 import shutil
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -45,6 +46,7 @@ class Pipeline:
         self._phase_metadata: List[Dict[str, Any]] = []  # Collect comprehensive metadata for all phases
         self._model_cache: Dict[str, Dict[str, str]] = {}  # Cache for model information
         self._llm_model_instances: Dict[str, LlmModel] = {}  # Cache for LlmModel instances (connection pooling)
+        self._model_cache_lock = threading.Lock()  # Lock for thread-safe model instance caching
 
     def __str__(self) -> str:
         """
@@ -83,19 +85,27 @@ class Pipeline:
         # Include temperature in key as it affects model behavior
         cache_key = f"{model_config.provider.value}:{model_config.model_id}:{temperature}"
 
-        # Return cached instance if available
+        # Use double-checked locking pattern for thread-safe caching
+        # First check without lock (fast path)
         if cache_key in self._llm_model_instances:
             logger.debug(f"Reusing cached LlmModel instance: {cache_key}")
             return self._llm_model_instances[cache_key]
 
-        # Create new instance and cache it
-        logger.debug(f"Creating new LlmModel instance: {cache_key}")
-        model = LlmModel.create(
-            model=model_config,
-            temperature=temperature,
-        )
-        self._llm_model_instances[cache_key] = model
-        return model
+        # Acquire lock for atomic check-and-create
+        with self._model_cache_lock:
+            # Double-check after acquiring lock (another thread may have created it)
+            if cache_key in self._llm_model_instances:
+                logger.debug(f"Reusing cached LlmModel instance (after lock): {cache_key}")
+                return self._llm_model_instances[cache_key]
+
+            # Create new instance and cache it atomically
+            logger.debug(f"Creating new LlmModel instance: {cache_key}")
+            model = LlmModel.create(
+                model=model_config,
+                temperature=temperature,
+            )
+            self._llm_model_instances[cache_key] = model
+            return model
 
     def _cleanup_model_instances(self) -> None:
         """

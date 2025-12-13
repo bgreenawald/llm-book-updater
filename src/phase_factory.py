@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, TypedDict, Union
+from typing import Any, List, Optional, Tuple, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_model import LlmModel
