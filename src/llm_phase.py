@@ -59,7 +59,7 @@ class LlmPhase(ABC):
             model (LlmModel): LLM model instance for making API calls
             temperature (float): Temperature setting for the LLM model
             max_workers (Optional[int]): Maximum number of worker threads for parallel processing
-            reasoning (Optional[Dict[str, Dict[str, str]]]): Reasoning configuration for the model
+            reasoning (Optional[Dict[str, str]]): Reasoning configuration for the model
             post_processor_chain (Optional[PostProcessorChain]): Chain of post-processors to apply
             length_reduction (Optional[Union[int, Tuple[int, int]]]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
