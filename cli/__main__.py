@@ -5,14 +5,25 @@ This allows the CLI to be executed with:
     python -m cli
 """
 
-import os
 import sys
 
-# Add the parent directory to the path so we can import the main cli module
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, parent_dir)
+
+def _main() -> None:
+    """Run the CLI."""
+    # Import lazily to avoid importing click/subcommands at module import time.
+    from . import main
+
+    main()
+
 
 if __name__ == "__main__":
-    import cli as main_cli
+    # This file is intended to be executed as a package via `python -m cli`.
+    # If executed directly (`python cli/__main__.py`), relative imports won't work.
+    if not __package__:
+        print(
+            "Error: run the CLI as `python -m cli` (or install the package and use an entry point).",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
-    main_cli.main()
+    _main()
