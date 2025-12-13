@@ -9,10 +9,10 @@ from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
 # Model configurations for pipeline phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
-CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
-GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
+GOOGLE_GEMINI_PRO = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-pro-preview")
+CHATGPT_GPT5_MINI = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5-mini")
+CHATGPT_GPT5 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5")
+GROK_41 = ModelConfig(provider=Provider.OPENROUTER, model_id="x-ai/grok-4.1-fast")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
