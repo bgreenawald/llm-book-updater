@@ -3,13 +3,15 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from loguru import logger
 from tqdm import tqdm
 
 from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
+from src.llm_model import LlmModel
+from src.post_processors import PostProcessorChain
 
 # Initialize module-level logger
 module_logger = logger
@@ -33,12 +35,12 @@ class LlmPhase(ABC):
         user_prompt_path: Optional[Path],
         book_name: str,
         author_name: str,
-        model: Any,
+        model: LlmModel,
         temperature: float = 0.2,
         max_workers: Optional[int] = None,
         reasoning: Optional[Dict[str, str]] = None,
-        post_processor_chain: Optional[Any] = None,
-        length_reduction: Optional[Any] = None,
+        post_processor_chain: Optional[PostProcessorChain] = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         use_batch: bool = False,
         batch_size: Optional[int] = None,
     ) -> None:
@@ -54,12 +56,12 @@ class LlmPhase(ABC):
             user_prompt_path (Optional[Path]): Path to the user prompt file
             book_name (str): Name of the book being processed
             author_name (str): Name of the book's author
-            model (Any): LLM model instance for making API calls
+            model (LlmModel): LLM model instance for making API calls
             temperature (float): Temperature setting for the LLM model
             max_workers (Optional[int]): Maximum number of worker threads for parallel processing
             reasoning (Optional[Dict[str, Dict[str, str]]]): Reasoning configuration for the model
-            post_processor_chain (Optional[Any]): Chain of post-processors to apply
-            length_reduction (Optional[Any]): Length reduction parameter for the phase
+            post_processor_chain (Optional[PostProcessorChain]): Chain of post-processors to apply
+            length_reduction (Optional[Union[int, Tuple[int, int]]]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
             batch_size (Optional[int]): Number of items to process in each batch (if None, processes all blocks at once)
         """

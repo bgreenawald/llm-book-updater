@@ -7,11 +7,12 @@ to existing LLM calls without modifying the core classes.
 
 import os
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
 
 from dotenv import load_dotenv
 from loguru import logger
 
+from src.common.provider import Provider
 from src.cost_tracker import CostTracker, RunCosts
 
 # Load environment variables from .env to ensure API keys are available
@@ -19,6 +20,16 @@ load_dotenv(override=True)
 
 # Initialize module-level logger
 module_logger = logger
+
+
+class ModelInfo(TypedDict, total=False):
+    """Type definition for model information stored with generation IDs."""
+
+    model: Optional[str]
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    is_batch: bool
+    provider: Optional[Provider]
 
 
 class CostTrackingWrapper:
@@ -52,7 +63,7 @@ class CostTrackingWrapper:
         # Store generation IDs by phase
         self.phase_generations: Dict[str, List[str]] = {}
         # Store model information for cost estimation
-        self.model_info: Dict[str, Dict[str, Any]] = {}
+        self.model_info: Dict[str, ModelInfo] = {}
         # Thread lock for synchronizing access to shared data structures
         self._lock = threading.Lock()
 

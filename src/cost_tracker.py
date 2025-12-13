@@ -25,7 +25,10 @@ pricing and may not reflect actual charges, especially for enterprise pricing.
 
 import json
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from src.cost_tracking_wrapper import ModelInfo
 
 import requests
 from dotenv import load_dotenv
@@ -594,7 +597,7 @@ class CostTracker:
         phase_name: str,
         phase_index: int,
         generation_ids: List[str],
-        model_info: Optional[Dict[str, Dict]] = None,
+        model_info: Optional[Dict[str, "ModelInfo"]] = None,
     ) -> PhaseCosts:
         """
         Calculate costs for a specific phase.
@@ -603,9 +606,9 @@ class CostTracker:
             phase_name: Name of the phase
             phase_index: Index of the phase in the pipeline
             generation_ids: List of generation IDs for this phase
-            model_info: Optional dictionary where each generation ID maps to a dictionary
-                       containing keys "model" (str), "prompt_tokens" (int),
-                       "completion_tokens" (int), and "provider" (Provider)
+            model_info: Optional dictionary where each generation ID maps to a ModelInfo
+                       dictionary containing keys "model" (Optional[str]), "prompt_tokens" (Optional[int]),
+                       "completion_tokens" (Optional[int]), and "is_batch" (bool)
 
         Returns:
             PhaseCosts object with aggregated statistics
@@ -622,12 +625,16 @@ class CostTracker:
             # Get model info for this generation if available
             gen_model_info = model_info.get(gen_id, {}) if model_info else {}
 
+            # Extract provider with proper type handling
+            provider_value = gen_model_info.get("provider")
+            provider: Optional[Provider] = provider_value if isinstance(provider_value, Provider) else None
+
             stats = self.get_generation_stats(
                 generation_id=gen_id,
                 model=gen_model_info.get("model"),
                 prompt_tokens=gen_model_info.get("prompt_tokens"),
                 completion_tokens=gen_model_info.get("completion_tokens"),
-                provider=gen_model_info.get("provider"),
+                provider=provider,
                 is_batch=gen_model_info.get("is_batch", False),
             )
 
