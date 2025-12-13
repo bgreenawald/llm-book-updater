@@ -239,7 +239,12 @@ class RunConfig:
             raise TypeError(f"start_from_phase must be an int, got {type(self.start_from_phase).__name__}")
         if self.start_from_phase < 0:
             raise ValueError(f"start_from_phase must be >= 0, got {self.start_from_phase}")
-        if self.start_from_phase > len(self.phases):
+        if len(self.phases) == 0:
+            if self.start_from_phase != 0:
+                raise ValueError(
+                    f"start_from_phase is out of range for {len(self.phases)} phases: got {self.start_from_phase}"
+                )
+        elif self.start_from_phase >= len(self.phases):
             raise ValueError(
                 f"start_from_phase is out of range for {len(self.phases)} phases: got {self.start_from_phase}"
             )
