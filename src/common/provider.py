@@ -9,3 +9,4 @@ class Provider(Enum):
     OPENROUTER = "openrouter"
     OPENAI = "openai"
     GEMINI = "gemini"
+    CLAUDE = "claude"
