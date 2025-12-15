@@ -72,6 +72,10 @@ OPENAI_04_MINI = ModelConfig(Provider.OPENAI, "openai/o4-mini-high", "o4-mini")
 CLAUDE_4_SONNET = ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4")
 GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash-lite")
 KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2:free")
+# Claude API models (direct Anthropic API)
+CLAUDE_OPUS_4_5 = ModelConfig(Provider.CLAUDE, "claude-opus-4-5")
+CLAUDE_SONNET_4_5 = ModelConfig(Provider.CLAUDE, "claude-sonnet-4-5")
+CLAUDE_HAIKU_4_5 = ModelConfig(Provider.CLAUDE, "claude-haiku-4-5")
 
 
 class LlmModelError(Exception):
@@ -467,7 +471,7 @@ class OpenAIClient(ProviderClient):
 
         return "\n".join(jsonl_lines)
 
-    def _poll_batch_job(self, client, job_id: str, timeout_seconds: int = 3600) -> bool:
+    def _poll_batch_job(self, client, job_id: str, timeout_seconds: int = 3600 * 24) -> bool:
         """
         Poll batch job until completion or timeout.
 
@@ -943,7 +947,7 @@ class GeminiClient(ProviderClient):
 
         return "\n".join(jsonl_lines)
 
-    def _poll_batch_job(self, client, job_name: str, timeout_seconds: int = 3600) -> bool:
+    def _poll_batch_job(self, client, job_name: str, timeout_seconds: int = 3600 * 24) -> bool:
         """
         Poll batch job until completion or timeout.
 
@@ -1068,7 +1072,7 @@ class GeminiClient(ProviderClient):
         requests: list[dict[str, Any]],
         model_name: str,
         temperature: float,
-        batch_timeout: int = 3600,
+        batch_timeout: int = 3600 * 24,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -1182,9 +1186,265 @@ class GeminiClient(ProviderClient):
             return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
 
 
+class ClaudeClient(ProviderClient):
+    """Client for Claude (Anthropic) SDK calls."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self._client = None
+
+    @property
+    def supports_batch(self) -> bool:
+        """Claude supports batch processing."""
+        return True
+
+    def _get_client(self):
+        """Lazy initialization of Anthropic client."""
+        if self._client is None:
+            try:
+                import anthropic
+
+                self._client = anthropic.Anthropic(api_key=self.api_key)
+            except ImportError as e:
+                raise LlmModelError(f"Anthropic SDK not available: {e}") from e
+        return self._client
+
+    def chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str,
+        temperature: float,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """Make a chat completion call using Anthropic SDK."""
+        client = self._get_client()
+
+        try:
+            # Build the request parameters
+            request_params: dict[str, Any] = {
+                "model": model_name,
+                "max_tokens": kwargs.pop("max_tokens", 65536),  # 64K for Claude 4.5 book chapters
+                "messages": [{"role": "user", "content": user_prompt}],
+                "temperature": temperature,
+            }
+
+            # Add system prompt if provided
+            if system_prompt:
+                request_params["system"] = system_prompt
+
+            # Pass through any additional kwargs
+            request_params.update(kwargs)
+
+            response = client.messages.create(**request_params)
+
+            # Extract content from response
+            if not response.content or not response.content[0].text:
+                raise ValueError("Empty response from Claude")
+
+            content = response.content[0].text
+
+            # Check stop reason for warnings
+            if response.stop_reason == "max_tokens":
+                module_logger.warning("Response truncated: consider increasing max_tokens")
+
+            # Register token usage for cost tracking if available
+            try:
+                usage = response.usage
+                if usage:
+                    register_generation_model_info(
+                        generation_id=response.id,
+                        model=model_name,
+                        prompt_tokens=usage.input_tokens,
+                        completion_tokens=usage.output_tokens,
+                    )
+            except (AttributeError, TypeError, ValueError) as e:
+                # Usage extraction is optional; log but don't fail the call
+                module_logger.debug(f"Failed to extract usage metadata for {model_name}: {e}")
+
+            return content, response.id
+
+        except Exception as e:
+            module_logger.error(f"Claude API call failed: {e}")
+            raise LlmModelError(f"Claude API call failed: {e}") from e
+
+    def batch_chat_completion(
+        self,
+        requests: list[dict[str, Any]],
+        model_name: str,
+        temperature: float,
+        batch_timeout: int = 3600 * 24,  # 24 hours default
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """
+        Process batch chat completion requests using Claude's Message Batches API.
+
+        This implementation creates a batch job with all requests, submits it to the
+        Anthropic API, polls for completion, and retrieves results. Batch processing
+        provides 50% cost savings compared to synchronous API calls.
+
+        Args:
+            requests: List of request dictionaries
+            model_name: Name of the model to use
+            temperature: Temperature setting for the model
+            batch_timeout: Maximum time to wait for batch job completion (seconds)
+            **kwargs: Additional arguments (e.g., max_tokens)
+
+        Returns:
+            List of response dictionaries
+        """
+        client = self._get_client()
+
+        try:
+            import time
+
+            module_logger.info(f"Starting Claude batch processing for {len(requests)} requests")
+
+            # Build batch requests
+            batch_requests = []
+            for i, request in enumerate(requests):
+                system_prompt = request.get("system_prompt", "")
+                user_prompt = request.get("user_prompt", "")
+                metadata = request.get("metadata", {})
+
+                # Build the params for this request
+                params: dict[str, Any] = {
+                    "model": model_name,
+                    "max_tokens": kwargs.get("max_tokens", 65536),  # 64K for Claude 4.5
+                    "messages": [{"role": "user", "content": user_prompt}],
+                    "temperature": temperature,
+                }
+
+                # Add system prompt if provided
+                if system_prompt:
+                    params["system"] = system_prompt
+
+                # Create batch request with custom_id
+                batch_request = {
+                    "custom_id": f"request_{i}_{metadata.get('id', '')}",
+                    "params": params,
+                }
+
+                batch_requests.append(batch_request)
+
+            # Create the batch
+            module_logger.info(f"Creating Claude batch job with model {model_name}...")
+            message_batch = client.messages.batches.create(requests=batch_requests)
+
+            module_logger.info(f"Created batch job: {message_batch.id}")
+
+            # Poll for batch completion
+            module_logger.info(f"Polling batch job for completion (timeout: {batch_timeout}s)...")
+            start_time = time.time()
+            poll_interval = 60  # Poll every 60 seconds
+
+            while time.time() - start_time < batch_timeout:
+                message_batch = client.messages.batches.retrieve(message_batch.id)
+
+                module_logger.info(f"Batch job {message_batch.id} status: {message_batch.processing_status}")
+
+                if message_batch.processing_status == "ended":
+                    break
+                elif message_batch.processing_status in ["canceling", "canceled"]:
+                    module_logger.error("Batch job was canceled")
+                    # Fall back to sequential processing
+                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+                time.sleep(poll_interval)
+            else:
+                # Timeout reached
+                module_logger.error(f"Batch job timed out after {batch_timeout} seconds")
+                # Fall back to sequential processing
+                return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+            # Retrieve and process results
+            module_logger.info("Downloading batch results...")
+
+            # Create mapping from custom IDs to original metadata
+            id_to_metadata = {}
+            for i, request in enumerate(requests):
+                metadata = request.get("metadata", {})
+                custom_id = f"request_{i}_{metadata.get('id', '')}"
+                id_to_metadata[custom_id] = metadata
+
+            # Stream results
+            responses = []
+            for result in client.messages.batches.results(message_batch.id):
+                custom_id = result.custom_id
+                metadata = id_to_metadata.get(custom_id, {})
+
+                if result.result.type == "succeeded":
+                    # Extract successful response
+                    message = result.result.message
+                    content = message.content[0].text if message.content else ""
+                    generation_id = message.id
+
+                    # Track token usage if available
+                    try:
+                        usage = message.usage
+                        if usage:
+                            register_generation_model_info(
+                                generation_id=generation_id,
+                                model=model_name,
+                                prompt_tokens=usage.input_tokens,
+                                completion_tokens=usage.output_tokens,
+                                is_batch=True,  # 50% discount for batch
+                            )
+                    except (AttributeError, TypeError, ValueError) as e:
+                        module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
+
+                    responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+
+                elif result.result.type == "errored":
+                    # Handle error result
+                    error = result.result.error
+                    error_message = error.message if hasattr(error, "message") else str(error)
+                    module_logger.error(f"Error in batch result {custom_id}: {error_message}")
+                    responses.append(
+                        {
+                            "content": f"Error: {error_message}",
+                            "generation_id": f"claude_batch_error_{custom_id}",
+                            "metadata": metadata,
+                        }
+                    )
+
+                elif result.result.type == "expired":
+                    module_logger.warning(f"Request expired: {custom_id}")
+                    responses.append(
+                        {
+                            "content": "Error: Request expired",
+                            "generation_id": f"claude_batch_expired_{custom_id}",
+                            "metadata": metadata,
+                        }
+                    )
+
+                elif result.result.type == "canceled":
+                    module_logger.warning(f"Request canceled: {custom_id}")
+                    responses.append(
+                        {
+                            "content": "Error: Request canceled",
+                            "generation_id": f"claude_batch_canceled_{custom_id}",
+                            "metadata": metadata,
+                        }
+                    )
+
+            module_logger.info(f"Successfully processed {len(responses)} batch responses")
+            return responses
+
+        except ImportError as e:
+            module_logger.error(f"Anthropic SDK not available for batch processing: {e}")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+        except Exception as e:
+            module_logger.error(f"Claude batch API call failed: {e}")
+            module_logger.exception("Batch processing error details:")
+            # Fall back to sequential processing
+            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+
+
 class LlmModel:
     """
-    Unified LLM client that supports multiple providers (OpenRouter, OpenAI, Gemini).
+    Unified LLM client that supports multiple providers (OpenRouter, OpenAI, Gemini, Claude).
     Routes requests to the appropriate provider based on model configuration.
     """
 
@@ -1192,6 +1452,7 @@ class LlmModel:
     DEFAULT_OPENROUTER_API_ENV = "OPENROUTER_API_KEY"
     DEFAULT_OPENAI_API_ENV = "OPENAI_API_KEY"
     DEFAULT_GEMINI_API_ENV = "GEMINI_API_KEY"
+    DEFAULT_CLAUDE_API_ENV = "ANTHROPIC_API_KEY"
     DEFAULT_MAX_RETRIES = 3
     DEFAULT_RETRY_DELAY = 1.0  # seconds
     DEFAULT_BACKOFF_FACTOR = 2.0
@@ -1209,6 +1470,7 @@ class LlmModel:
         # Provider-specific API key environments
         openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
         gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        claude_api_key_env: str = DEFAULT_CLAUDE_API_ENV,
         # Prompt logging control
         enable_prompt_logging: Optional[bool] = None,
     ) -> None:
@@ -1225,6 +1487,7 @@ class LlmModel:
             openrouter_backoff_factor: Backoff multiplier for OpenRouter.
             openai_api_key_env: Environment variable for OpenAI API key.
             gemini_api_key_env: Environment variable for Gemini API key.
+            claude_api_key_env: Environment variable for Claude (Anthropic) API key.
             enable_prompt_logging: Whether to enable prompt content logging (defaults to False).
                 If None, checks LLM_ENABLE_PROMPT_LOGGING environment variable.
         """
@@ -1254,6 +1517,7 @@ class LlmModel:
             },
             "openai": {"api_key_env": openai_api_key_env},
             "gemini": {"api_key_env": gemini_api_key_env},
+            "claude": {"api_key_env": claude_api_key_env},
         }
 
         module_logger.info(
@@ -1275,6 +1539,8 @@ class LlmModel:
             api_key_env = self._config["openai"]["api_key_env"]
         elif provider == Provider.GEMINI:
             api_key_env = self._config["gemini"]["api_key_env"]
+        elif provider == Provider.CLAUDE:
+            api_key_env = self._config["claude"]["api_key_env"]
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -1310,6 +1576,11 @@ class LlmModel:
                 if api_key is None:
                     raise ValueError(f"Missing environment variable: {self._config['gemini']['api_key_env']}")
                 self._clients[provider] = GeminiClient(api_key=api_key)
+            elif provider == Provider.CLAUDE:
+                api_key = os.getenv(self._config["claude"]["api_key_env"])
+                if api_key is None:
+                    raise ValueError(f"Missing environment variable: {self._config['claude']['api_key_env']}")
+                self._clients[provider] = ClaudeClient(api_key=api_key)
             else:
                 raise ValueError(f"Unsupported provider: {provider}")
 
@@ -1327,6 +1598,7 @@ class LlmModel:
         openrouter_backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         openai_api_key_env: str = DEFAULT_OPENAI_API_ENV,
         gemini_api_key_env: str = DEFAULT_GEMINI_API_ENV,
+        claude_api_key_env: str = DEFAULT_CLAUDE_API_ENV,
         enable_prompt_logging: Optional[bool] = None,
     ) -> "LlmModel":
         """Create a new LlmModel instance with the specified configuration."""
@@ -1340,6 +1612,7 @@ class LlmModel:
             openrouter_backoff_factor=openrouter_backoff_factor,
             openai_api_key_env=openai_api_key_env,
             gemini_api_key_env=gemini_api_key_env,
+            claude_api_key_env=claude_api_key_env,
             enable_prompt_logging=enable_prompt_logging,
         )
 
