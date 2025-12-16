@@ -192,6 +192,7 @@ class PhaseFactory:
             "temperature": config.temperature,
             "max_workers": max_workers,
             "reasoning": config.reasoning,
+            "llm_kwargs": config.llm_kwargs,
             "post_processor_chain": post_processor_chain,
             "length_reduction": length_reduction,
             "use_batch": config.use_batch,
