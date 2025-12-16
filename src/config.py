@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 from src.common.provider import Provider
 from src.constants import DEFAULT_LENGTH_REDUCTION_BOUNDS, DEFAULT_TAGS_TO_PRESERVE
@@ -113,6 +113,7 @@ class PhaseConfig:
     )
     temperature: float = 0.2
     reasoning: Optional[dict[str, str]] = None
+    llm_kwargs: Optional[dict[str, Any]] = None
     system_prompt_path: Optional[Path] = None
     user_prompt_path: Optional[Path] = None
     custom_output_path: Optional[Path] = None
@@ -153,6 +154,9 @@ class PhaseConfig:
                         "reasoning must be a dict[str, str]; "
                         f"found key/value types ({type(k).__name__}, {type(v).__name__})"
                     )
+
+        if self.llm_kwargs is not None and not isinstance(self.llm_kwargs, dict):
+            raise TypeError(f"llm_kwargs must be a dict or None, got {type(self.llm_kwargs).__name__}")
 
         if not isinstance(self.use_batch, bool):
             raise TypeError(f"use_batch must be a bool, got {type(self.use_batch).__name__}")

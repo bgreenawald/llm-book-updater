@@ -37,6 +37,7 @@ class LlmPhase(ABC):
         temperature: float = 0.2,
         max_workers: Optional[int] = None,
         reasoning: Optional[Dict[str, str]] = None,
+        llm_kwargs: Optional[Dict[str, Any]] = None,
         post_processor_chain: Optional[PostProcessorChain] = None,
         length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         use_batch: bool = False,
@@ -58,6 +59,8 @@ class LlmPhase(ABC):
             temperature (float): Temperature setting for the LLM model
             max_workers (Optional[int]): Maximum number of worker threads for parallel processing
             reasoning (Optional[Dict[str, str]]): Reasoning configuration for the model
+            llm_kwargs (Optional[Dict[str, Any]]): Additional kwargs to pass to LLM calls
+                (e.g., provider for OpenRouter)
             post_processor_chain (Optional[PostProcessorChain]): Chain of post-processors to apply
             length_reduction (Optional[Union[int, Tuple[int, int]]]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
@@ -75,6 +78,7 @@ class LlmPhase(ABC):
         self.temperature = temperature
         self.max_workers = max_workers or DEFAULT_MAX_WORKERS
         self.reasoning = reasoning or {}
+        self.llm_kwargs = llm_kwargs or {}
         self.post_processor_chain = post_processor_chain
         self.length_reduction = length_reduction
         self.use_batch = use_batch
@@ -569,8 +573,10 @@ class LlmPhase(ABC):
                 # Process non-None requests through batch API
                 valid_requests = [req for req in batch_requests if req is not None]
                 if valid_requests:
+                    # Merge reasoning and llm_kwargs
+                    call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
                     batch_responses = self.model.batch_chat_completion(
-                        requests=valid_requests, temperature=self.temperature, reasoning=self.reasoning, **kwargs
+                        requests=valid_requests, temperature=self.temperature, **call_kwargs
                     )
                 else:
                     batch_responses = []
@@ -851,9 +857,12 @@ class StandardLlmPhase(LlmPhase):
             )
 
             # Get LLM response
+            # Merge reasoning and llm_kwargs
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning}
             processed_body, generation_id = self.model.chat_completion(
                 system_prompt=self.system_prompt,
                 user_prompt=body,
+                **call_kwargs,
             )
 
             # Track generation ID for cost calculation
@@ -932,12 +941,13 @@ class IntroductionAnnotationPhase(LlmPhase):
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
+                # Merge reasoning and llm_kwargs
+                call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
                 introduction, generation_id = self.model.chat_completion(
                     system_prompt=self.system_prompt,
                     user_prompt=user_prompt,
                     temperature=self.temperature,
-                    reasoning=self.reasoning,
-                    **kwargs,
+                    **call_kwargs,
                 )
 
                 # Track generation ID for cost calculation
@@ -1016,12 +1026,13 @@ class SummaryAnnotationPhase(LlmPhase):
             user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
             if user_prompt:
+                # Merge reasoning and llm_kwargs
+                call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
                 summary, generation_id = self.model.chat_completion(
                     system_prompt=self.system_prompt,
                     user_prompt=user_prompt,
                     temperature=self.temperature,
-                    reasoning=self.reasoning,
-                    **kwargs,
+                    **call_kwargs,
                 )
 
                 # Track generation ID for cost calculation

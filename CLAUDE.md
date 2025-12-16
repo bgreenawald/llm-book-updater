@@ -140,7 +140,7 @@ Phases inherit from `LlmPhase` (abstract base class) and implement specific proc
 
 ### Configuration-Driven Design
 The system uses dataclasses (`PhaseConfig`, `RunConfig`) for type-safe configuration:
-- `PhaseConfig`: Per-phase settings including model, temperature, prompts, post-processors
+- `PhaseConfig`: Per-phase settings including model, temperature, prompts, post-processors, and `llm_kwargs` for provider-specific parameters
 - `RunConfig`: Pipeline-level settings including phases, length reduction, tags to preserve, `start_from_phase` for resuming
 
 **Important**: Phases are configured declaratively and instantiated through `PhaseFactory`.
@@ -163,6 +163,30 @@ The system supports multiple providers via direct SDK integration:
 - **OpenRouter**: API proxy for various models (set `OPENROUTER_API_KEY`)
 
 Predefined model constants in `src/llm_model.py`: `GEMINI_FLASH`, `GEMINI_PRO`, `OPENAI_04_MINI`, `GROK_3_MINI`, etc.
+
+**Provider-Specific Parameters**: Use the `llm_kwargs` field in `PhaseConfig` to pass additional parameters to LLM calls:
+- **OpenRouter `provider` parameter**: Control routing preferences across multiple model providers
+  - `order`: Prioritized list of provider slugs (e.g., `["openai", "anthropic"]`)
+  - `only`: Allowlist of specific providers to use
+  - `ignore`: Exclude particular providers
+  - `allow_fallbacks`: Enable backup providers if primary is unavailable
+  - `data_collection`: Filter by data privacy practices (`"allow"` or `"deny"`)
+  - `sort`: Order by `"price"`, `"throughput"`, or `"latency"`
+  - `max_price`: Set cost limits per million tokens
+  - `quantizations`: Filter by quantization levels
+
+Example:
+```python
+PhaseConfig(
+    phase_type=PhaseType.MODERNIZE,
+    llm_kwargs={
+        "provider": {
+            "order": ["openai", "anthropic"],
+            "allow_fallbacks": True
+        }
+    }
+)
+```
 
 ### Cost Tracking
 Optional cost tracking via `CostTrackingWrapper`:
