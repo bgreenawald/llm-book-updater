@@ -870,6 +870,10 @@ class StandardLlmPhase(LlmPhase):
             logger.debug("Empty block body, returning header only")
             return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             return current_block
@@ -948,6 +952,10 @@ class IntroductionAnnotationPhase(LlmPhase):
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
@@ -1028,6 +1036,10 @@ class SummaryAnnotationPhase(LlmPhase):
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
