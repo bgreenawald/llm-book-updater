@@ -12,7 +12,7 @@ from tqdm import tqdm
 from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import LlmModel
-from src.post_processors import PostProcessorChain
+from src.post_processors import EmptySectionError, PostProcessorChain
 
 
 class LlmPhase(ABC):
@@ -210,6 +210,10 @@ class LlmPhase(ABC):
             )
             logger.debug("Post-processing completed successfully")
             return processed_block
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in post-processing - propagating to stop pipeline")
+            raise
         except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Common post-processor errors are logged but non-fatal; return unprocessed block
             logger.error(f"Error during post-processing: {str(e)}")
