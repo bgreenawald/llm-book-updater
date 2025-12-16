@@ -6,6 +6,7 @@ from src.post_processors import (
     PostProcessor,
     PostProcessorChain,
     PreserveFStringTagsProcessor,
+    RemoveMarkdownBlocksProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
@@ -192,6 +193,330 @@ class TestNoNewHeadersPostProcessor:
         assert "  # Header with leading spaces" in result
         assert "\t# Header with leading tab" in result
         assert "Content here." in result
+
+
+# ============================================================================
+# RemoveMarkdownBlocksProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def remove_markdown_blocks_processor():
+    return RemoveMarkdownBlocksProcessor()
+
+
+class TestRemoveMarkdownBlocksProcessor:
+    """Test suite for RemoveMarkdownBlocksProcessor."""
+
+    def test_remove_single_markdown_block(self, remove_markdown_blocks_processor):
+        """Test removing a single markdown code block."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+This is markdown content
+that should be removed
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is markdown content" not in result
+        assert "Some content" in result
+        assert "More content" in result
+
+    def test_remove_multiple_markdown_blocks(self, remove_markdown_blocks_processor):
+        """Test removing multiple markdown code blocks."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+First markdown block
+```
+
+Middle content
+
+```markdown
+Second markdown block
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "First markdown block" not in result
+        assert "Second markdown block" not in result
+        assert "Some content" in result
+        assert "Middle content" in result
+        assert "End content" in result
+
+    def test_preserve_other_code_blocks(self, remove_markdown_blocks_processor):
+        """Test that other code blocks (python, bash, etc.) are preserved."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```python
+def hello():
+    print("world")
+```
+
+```bash
+echo "test"
+```
+
+```markdown
+This should be removed
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```python" in result
+        assert "def hello():" in result
+        assert "```bash" in result
+        assert 'echo "test"' in result
+        assert "```markdown" not in result
+        assert "This should be removed" not in result
+
+    def test_no_markdown_blocks(self, remove_markdown_blocks_processor):
+        """Test when there are no markdown blocks to remove."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```python
+code here
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result.strip() == llm_block.strip()
+
+    def test_empty_markdown_block(self, remove_markdown_blocks_processor):
+        """Test removing an empty markdown block."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Some content" in result
+        assert "More content" in result
+
+    def test_markdown_block_with_complex_content(self, remove_markdown_blocks_processor):
+        """Test removing markdown block with complex nested content."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+# Header
+
+This is **bold** and *italic*
+
+- List item 1
+- List item 2
+
+> A quote
+
+Another paragraph
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "# Header" not in result
+        assert "This is **bold**" not in result
+        assert "List item 1" not in result
+        assert "Some content" in result
+        assert "End content" in result
+
+    def test_markdown_block_at_start(self, remove_markdown_blocks_processor):
+        """Test removing markdown block at the beginning."""
+        original_block = "Content"
+        llm_block = """```markdown
+This is at the start
+```
+
+Content after"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is at the start" not in result
+        assert "Content after" in result
+
+    def test_markdown_block_at_end(self, remove_markdown_blocks_processor):
+        """Test removing markdown block at the end."""
+        original_block = "Content"
+        llm_block = """Content before
+
+```markdown
+This is at the end
+```"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is at the end" not in result
+        assert "Content before" in result
+
+    def test_only_markdown_block(self, remove_markdown_blocks_processor):
+        """Test when the entire content is just a markdown block."""
+        original_block = "Some content"
+        llm_block = """```markdown
+Only markdown content here
+```"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # After removing the block and stripping, should be empty
+        assert result.strip() == ""
+
+    def test_consecutive_blank_lines_cleanup(self, remove_markdown_blocks_processor):
+        """Test that multiple consecutive blank lines are cleaned up after removal."""
+        original_block = "Content"
+        llm_block = """Line 1
+
+
+```markdown
+Block to remove
+```
+
+
+Line 2"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Block to remove" not in result
+        # Should not have more than 2 consecutive newlines
+        assert "\n\n\n" not in result
+
+    def test_markdown_block_with_backticks_inside(self, remove_markdown_blocks_processor):
+        """Test markdown block containing inline code with backticks."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```markdown
+Use `code` for inline formatting
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Use `code` for inline formatting" not in result
+        assert "Some content" in result
+        assert "End content" in result
+
+    def test_case_sensitive_markdown_tag(self, remove_markdown_blocks_processor):
+        """Test that only lowercase 'markdown' tags are removed."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```MARKDOWN
+This should NOT be removed (uppercase)
+```
+
+```Markdown
+This should NOT be removed (title case)
+```
+
+```markdown
+This SHOULD be removed (lowercase)
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Only lowercase markdown should be removed
+        assert result.count("```MARKDOWN") == 1
+        assert result.count("```Markdown") == 1
+        assert "```markdown" not in result
+        assert "This SHOULD be removed (lowercase)" not in result
+
+    def test_markdown_with_extra_whitespace(self, remove_markdown_blocks_processor):
+        """Test markdown blocks with extra whitespace in the tag."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```markdown
+Content with trailing spaces in tag
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Should still be removed despite extra whitespace
+        assert "```markdown" not in result
+        assert "Content with trailing spaces" not in result
+
+    def test_processor_name(self, remove_markdown_blocks_processor):
+        """Test that processor has correct name."""
+        assert remove_markdown_blocks_processor.name == "remove_markdown_blocks"
+
+    def test_processor_string_representation(self, remove_markdown_blocks_processor):
+        """Test string representation of the processor."""
+        str_repr = str(remove_markdown_blocks_processor)
+        assert "RemoveMarkdownBlocksProcessor" in str_repr
+        assert "remove_markdown_blocks" in str_repr
+
+    def test_empty_input(self, remove_markdown_blocks_processor):
+        """Test with empty input."""
+        original_block = ""
+        llm_block = ""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_markdown_block_preserves_surrounding_structure(self, remove_markdown_blocks_processor):
+        """Test that removing markdown blocks preserves surrounding document structure."""
+        original_block = "Content"
+        llm_block = """# Header 1
+
+Some introductory text.
+
+```markdown
+Removed content
+```
+
+## Header 2
+
+More text here.
+
+```python
+kept_code()
+```
+
+Final paragraph."""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# Header 1" in result
+        assert "## Header 2" in result
+        assert "Some introductory text." in result
+        assert "More text here." in result
+        assert "```python" in result
+        assert "kept_code()" in result
+        assert "Final paragraph." in result
+        assert "```markdown" not in result
+        assert "Removed content" not in result
 
 
 # ============================================================================
