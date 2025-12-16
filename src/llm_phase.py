@@ -12,7 +12,7 @@ from tqdm import tqdm
 from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import LlmModel
-from src.post_processors import PostProcessorChain
+from src.post_processors import EmptySectionError, PostProcessorChain
 
 
 class LlmPhase(ABC):
@@ -210,6 +210,10 @@ class LlmPhase(ABC):
             )
             logger.debug("Post-processing completed successfully")
             return processed_block
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in post-processing - propagating to stop pipeline")
+            raise
         except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Common post-processor errors are logged but non-fatal; return unprocessed block
             logger.error(f"Error during post-processing: {str(e)}")
@@ -866,6 +870,10 @@ class StandardLlmPhase(LlmPhase):
             logger.debug("Empty block body, returning header only")
             return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             return current_block
@@ -944,6 +952,10 @@ class IntroductionAnnotationPhase(LlmPhase):
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
@@ -1024,6 +1036,10 @@ class SummaryAnnotationPhase(LlmPhase):
                 logger.debug("Empty block body, returning header only")
                 return f"{current_header}\n\n"
 
+        except EmptySectionError:
+            # EmptySectionError is a critical validation error that should stop the pipeline
+            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
+            raise
         except Exception as e:
             logger.error(f"Error processing block: {str(e)}")
             logger.exception("Stack trace for block processing error")
