@@ -290,6 +290,70 @@ class Pipeline:
             logger.error(f"Failed to save cost analysis: {str(e)}")
             logger.exception("Cost analysis save error details")
 
+    def _log_token_progression_table(self, completed_phases: List[LlmPhase]) -> None:
+        """
+        Log a table showing the token count progression through the pipeline.
+
+        This method creates and logs a formatted table showing how the document
+        length (in approximate tokens) changed through each phase of processing.
+
+        Args:
+            completed_phases (List[LlmPhase]): List of phases that were successfully completed
+        """
+        if not completed_phases:
+            logger.info("No phases completed - skipping token progression table")
+            return
+
+        logger.info("\n" + "=" * 80)
+        logger.info("TOKEN PROGRESSION TABLE")
+        logger.info("=" * 80)
+
+        # Create table header
+        header = f"{'Phase':<30} {'Start Tokens':>15} {'End Tokens':>15} {'Change':>15}"
+        logger.info(header)
+        logger.info("-" * 80)
+
+        # Track total change
+        first_start = None
+        last_end = None
+
+        # Log each phase's token counts
+        for phase in completed_phases:
+            # Check if token counts are valid integers (not None, not MagicMock, etc.)
+            start_is_valid = isinstance(phase.start_token_count, int)
+            end_is_valid = isinstance(phase.end_token_count, int)
+
+            if start_is_valid and end_is_valid:
+                # Type narrowing for mypy - assert that these are ints
+                assert isinstance(phase.start_token_count, int)
+                assert isinstance(phase.end_token_count, int)
+                start_count: int = phase.start_token_count
+                end_count: int = phase.end_token_count
+
+                # Track overall progression
+                if first_start is None:
+                    first_start = start_count
+                last_end = end_count
+
+                # Calculate change
+                change = end_count - start_count
+                change_str = f"{change:+,}" if change != 0 else "0"
+
+                # Format the row
+                row = f"{phase.name:<30} {start_count:>15,} {end_count:>15,} {change_str:>15}"
+                logger.info(row)
+            else:
+                # Phase didn't have valid token counts (shouldn't happen in production, but handle gracefully)
+                logger.info(f"{phase.name:<30} {'N/A':>15} {'N/A':>15} {'N/A':>15}")
+
+        # Log summary
+        logger.info("-" * 80)
+        if first_start is not None and last_end is not None:
+            total_change = last_end - first_start
+            change_pct = (total_change / first_start * 100) if first_start > 0 else 0
+            logger.info(f"{'TOTAL':<30} {first_start:>15,} {last_end:>15,} {total_change:+15,} ({change_pct:+.1f}%)")
+        logger.info("=" * 80 + "\n")
+
     def _get_phase_output_path(self, phase_index: int) -> Path:
         """
         Generate output path for a phase.
@@ -613,6 +677,9 @@ class Pipeline:
 
             logger.success("Pipeline completed successfully")
         finally:
+            # Log token progression table
+            self._log_token_progression_table(completed_phases=completed_phases)
+
             # Calculate and log costs at the end of the run
             cost_analysis = None
             phase_names = [phase.name for phase in completed_phases]

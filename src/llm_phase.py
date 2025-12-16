@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import tiktoken
 from loguru import logger
 from tqdm import tqdm
 
@@ -86,6 +87,11 @@ class LlmPhase(ABC):
         self.user_prompt = ""
         self.content = ""
 
+        # Initialize token counting
+        self.start_token_count: Optional[int] = None
+        self.end_token_count: Optional[int] = None
+        self._tokenizer = tiktoken.get_encoding("cl100k_base")  # Use GPT-4/GPT-3.5 encoding
+
         # Initialize logging
         logger.info(f"Initializing LlmPhase: {name}")
         logger.debug(f"Input file: {input_file_path}")
@@ -142,6 +148,23 @@ class LlmPhase(ABC):
             str: Detailed string representation of the phase
         """
         return self.__str__()
+
+    def _count_tokens(self, text: str) -> int:
+        """
+        Count the approximate number of tokens in a text using tiktoken.
+
+        Args:
+            text (str): The text to count tokens for
+
+        Returns:
+            int: The approximate number of tokens
+        """
+        try:
+            return len(self._tokenizer.encode(text))
+        except Exception as e:
+            logger.warning(f"Error counting tokens: {str(e)}, returning character count / 4 as fallback")
+            # Fallback: rough approximation of 1 token per 4 characters
+            return len(text) // 4
 
     @abstractmethod
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
@@ -734,8 +757,18 @@ class LlmPhase(ABC):
         """
         try:
             logger.info(f"Starting LLM phase: {self.name}")
+
+            # Count tokens at the start
+            self.start_token_count = self._count_tokens(self.input_text)
+            logger.info(f"Phase '{self.name}' starting with ~{self.start_token_count:,} tokens")
+
             logger.debug("Processing markdown blocks")
             self._process_markdown_blocks(**kwargs)
+
+            # Count tokens at the end
+            self.end_token_count = self._count_tokens(self.content)
+            logger.info(f"Phase '{self.name}' completed with ~{self.end_token_count:,} tokens")
+
             logger.debug("Writing output file")
             self._write_output_file(content=self.content)
             logger.success(f"Successfully completed LLM phase: {self.name}")
