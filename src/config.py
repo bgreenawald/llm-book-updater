@@ -31,6 +31,7 @@ class PostProcessorType(Enum):
     REMOVE_TRAILING_WHITESPACE = auto()
     REMOVE_XML_TAGS = auto()
     REMOVE_BLANK_LINES_IN_LIST = auto()
+    REMOVE_MARKDOWN_BLOCKS = auto()
 
     # Content preservation processors
     NO_NEW_HEADERS = auto()
