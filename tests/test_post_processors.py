@@ -1,6 +1,7 @@
 import pytest
 
 from src.post_processors import (
+    EmptySectionError,
     NoNewHeadersPostProcessor,
     PostProcessor,
     PostProcessorChain,
@@ -8,6 +9,7 @@ from src.post_processors import (
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
+    ValidateNonEmptySectionProcessor,
 )
 
 # ============================================================================
@@ -887,3 +889,224 @@ class TestPostProcessorChain:
 
         assert "{preface}" in result
         assert "{license}" in result
+
+
+# ============================================================================
+# ValidateNonEmptySectionProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def validate_non_empty_processor():
+    return ValidateNonEmptySectionProcessor()
+
+
+@pytest.fixture
+def validate_non_empty_processor_preserve_whitespace():
+    return ValidateNonEmptySectionProcessor(config={"preserve_whitespace_only": True})
+
+
+class TestValidateNonEmptySectionProcessor:
+    """Test suite for ValidateNonEmptySectionProcessor."""
+
+    def test_non_empty_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that non-empty to non-empty content passes validation."""
+        original_block = "This is the original content."
+        llm_block = "This is the processed content."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_empty_to_empty_passes(self, validate_non_empty_processor):
+        """Test that empty to empty content passes validation."""
+        original_block = ""
+        llm_block = ""
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_empty_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that empty to non-empty content passes validation."""
+        original_block = ""
+        llm_block = "New content added."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_non_empty_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that non-empty to empty content raises EmptySectionError."""
+        original_block = "This is the original content with meaningful text."
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+        assert exc_info.value.original_content == original_block
+        assert exc_info.value.processed_content == llm_block
+
+    def test_non_empty_to_whitespace_only_raises_error(self, validate_non_empty_processor):
+        """Test that non-empty to whitespace-only content raises EmptySectionError."""
+        original_block = "This is the original content."
+        llm_block = "   \n\t\n   "
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+
+    def test_whitespace_only_to_empty_passes(self, validate_non_empty_processor):
+        """Test that whitespace-only original to empty passes (original considered empty)."""
+        original_block = "   \n\t\n   "
+        llm_block = ""
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_whitespace_only_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that whitespace-only original to non-empty passes."""
+        original_block = "   \n\t\n   "
+        llm_block = "New content."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_preserve_whitespace_only_mode_empty_string(self, validate_non_empty_processor_preserve_whitespace):
+        """Test preserve_whitespace_only mode with empty string."""
+        original_block = "Content"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor_preserve_whitespace.process(original_block=original_block, llm_block=llm_block)
+
+    def test_preserve_whitespace_only_mode_whitespace_passes(self, validate_non_empty_processor_preserve_whitespace):
+        """Test preserve_whitespace_only mode allows whitespace-only output."""
+        original_block = "Content"
+        llm_block = "   \n\t\n   "
+
+        # In preserve_whitespace_only mode, whitespace is NOT considered empty
+        result = validate_non_empty_processor_preserve_whitespace.process(
+            original_block=original_block, llm_block=llm_block
+        )
+
+        assert result == llm_block
+
+    def test_multiline_content_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that multiline content becoming empty raises error."""
+        original_block = "Line 1\nLine 2\nLine 3\nLine 4"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Check that the preview contains first line content
+        assert "Line 1" in str(exc_info.value)
+
+    def test_error_contains_content_preview(self, validate_non_empty_processor):
+        """Test that error message contains a preview of original content."""
+        original_block = "This is the first line of important content.\nSecond line here."
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error_message = str(exc_info.value)
+        assert "Original content preview" in error_message
+        assert "This is the first line" in error_message
+
+    def test_error_truncates_long_preview(self, validate_non_empty_processor):
+        """Test that error preview truncates very long content."""
+        long_content = "x" * 200
+        original_block = long_content
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error_message = str(exc_info.value)
+        # Preview should be truncated with ellipsis
+        assert "..." in error_message
+
+    def test_blank_lines_only_considered_empty(self, validate_non_empty_processor):
+        """Test that content with only blank lines is considered empty."""
+        original_block = "Real content here."
+        llm_block = "\n\n\n\n"
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+    def test_processor_name(self, validate_non_empty_processor):
+        """Test that processor has correct name."""
+        assert validate_non_empty_processor.name == "validate_non_empty_section"
+
+    def test_processor_string_representation(self, validate_non_empty_processor):
+        """Test string representation of the processor."""
+        str_repr = str(validate_non_empty_processor)
+        assert "ValidateNonEmptySectionProcessor" in str_repr
+        assert "validate_non_empty_section" in str_repr
+
+    def test_complex_markdown_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that complex markdown content becoming empty raises error."""
+        original_block = """# Header
+
+This is a paragraph with **bold** and *italic* text.
+
+- List item 1
+- List item 2
+
+> A blockquote here.
+
+```python
+def hello():
+    print("world")
+```
+"""
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+    def test_unicode_content_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that unicode content becoming empty raises error."""
+        original_block = "中文内容 Русский текст العربية"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Preview should contain unicode content
+        assert "中文内容" in str(exc_info.value)
+
+    def test_empty_section_error_attributes(self, validate_non_empty_processor):
+        """Test EmptySectionError has correct attributes."""
+        original_block = "Original content"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error = exc_info.value
+        assert error.original_content == original_block
+        assert error.processed_content == llm_block
+        assert isinstance(error, Exception)
+
+    def test_chain_stops_on_empty_section_error(self):
+        """Test that PostProcessorChain propagates EmptySectionError and stops processing."""
+        chain = PostProcessorChain()
+        chain.add_processor(processor=ValidateNonEmptySectionProcessor())
+        chain.add_processor(processor=RemoveTrailingWhitespaceProcessor())
+
+        original_block = "Content here."
+        llm_block = ""
+
+        # EmptySectionError should propagate through the chain to stop the pipeline
+        with pytest.raises(EmptySectionError) as exc_info:
+            chain.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+        assert exc_info.value.original_content == original_block
