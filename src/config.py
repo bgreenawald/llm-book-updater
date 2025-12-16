@@ -40,6 +40,9 @@ class PostProcessorType(Enum):
     # Specialized processors
     ORDER_QUOTE_ANNOTATION = auto()
 
+    # Validation processors
+    VALIDATE_NON_EMPTY_SECTION = auto()
+
 
 def _validate_temperature(*, temperature: float) -> None:
     """Validate temperature configuration.

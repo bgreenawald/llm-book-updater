@@ -15,6 +15,7 @@ from src.post_processors import (
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
+    ValidateNonEmptySectionProcessor,
 )
 
 
@@ -41,6 +42,7 @@ class PhaseFactory:
 
     DEFAULT_POST_PROCESSORS: dict[PhaseType, list[PostProcessorType]] = {
         PhaseType.MODERNIZE: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
@@ -49,6 +51,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.EDIT: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
@@ -57,6 +60,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.FINAL: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
@@ -65,6 +69,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.INTRODUCTION: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
             PostProcessorType.REMOVE_XML_TAGS,
@@ -73,6 +78,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.SUMMARY: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
@@ -82,6 +88,7 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.ANNOTATE: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
             PostProcessorType.ORDER_QUOTE_ANNOTATION,
             PostProcessorType.NO_NEW_HEADERS,
@@ -322,6 +329,7 @@ class PhaseFactory:
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES: RevertRemovedBlockLines,
             PostProcessorType.PRESERVE_F_STRING_TAGS: PreserveFStringTagsProcessor,
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST: RemoveBlankLinesInListProcessor,
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION: ValidateNonEmptySectionProcessor,
         }
 
         processor_class = processor_mapping.get(processor_type)
