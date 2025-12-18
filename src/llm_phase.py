@@ -1,9 +1,12 @@
+import json
 import re
+import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import tiktoken
 from loguru import logger
@@ -1550,3 +1553,820 @@ class SummaryAnnotationPhase(LlmPhase):
         else:
             logger.debug("Empty block body, returning header only")
             return f"{current_header}\n\n"
+
+
+class TwoStageFinalPhase(LlmPhase):
+    """
+    Two-stage FINAL phase that decomposes complex editorial work into:
+    1. IDENTIFY: Analyze and list refinement opportunities (reasoning model)
+    2. IMPLEMENT: Apply identified changes (cheaper model)
+
+    To the end user, this behaves as a single phase. The two-stage
+    decomposition is an internal implementation detail.
+
+    Supports both batch and non-batch processing modes:
+    - Non-batch: Per-block IDENTIFY → IMPLEMENT via _process_block(), blocks processed in parallel
+    - Batch: Two-phase batching — batch all IDENTIFY calls first, then batch all IMPLEMENT calls
+    """
+
+    def __init__(
+        self,
+        name: str,
+        input_file_path: Path,
+        output_file_path: Path,
+        original_file_path: Path,
+        book_name: str,
+        author_name: str,
+        identify_model: LlmModel,
+        implement_model: LlmModel,
+        identify_system_prompt_path: Path,
+        identify_user_prompt_path: Path,
+        implement_system_prompt_path: Path,
+        implement_user_prompt_path: Path,
+        identify_temperature: float = 0.2,
+        implement_temperature: float = 0.2,
+        identify_reasoning: Optional[Dict[str, str]] = None,
+        max_workers: Optional[int] = None,
+        llm_kwargs: Optional[Dict[str, Any]] = None,
+        post_processor_chain: Optional[PostProcessorChain] = None,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
+        use_batch: bool = False,
+        batch_size: Optional[int] = None,
+        enable_retry: bool = False,
+        max_retries: int = DEFAULT_GENERATION_MAX_RETRIES,
+    ) -> None:
+        """
+        Initialize the two-stage FINAL phase.
+
+        Args:
+            name: Name of the phase for logging and identification.
+            input_file_path: Path to the input markdown file.
+            output_file_path: Path where the processed output will be written.
+            original_file_path: Path to the original markdown file for reference.
+            book_name: Name of the book being processed.
+            author_name: Name of the book's author.
+            identify_model: LLM model for the IDENTIFY stage (analysis).
+            implement_model: LLM model for the IMPLEMENT stage (application).
+            identify_system_prompt_path: Path to the IDENTIFY system prompt.
+            identify_user_prompt_path: Path to the IDENTIFY user prompt.
+            implement_system_prompt_path: Path to the IMPLEMENT system prompt.
+            implement_user_prompt_path: Path to the IMPLEMENT user prompt.
+            identify_temperature: Temperature for the IDENTIFY stage.
+            implement_temperature: Temperature for the IMPLEMENT stage.
+            identify_reasoning: Optional reasoning configuration for IDENTIFY stage.
+            max_workers: Maximum number of worker threads for parallel processing.
+            llm_kwargs: Additional kwargs to pass to LLM calls.
+            post_processor_chain: Chain of post-processors to apply to IMPLEMENT output.
+            length_reduction: Length reduction parameter for the phase.
+            use_batch: Whether to use batch processing for LLM calls.
+            batch_size: Number of items to process in each batch.
+            enable_retry: Whether to retry failed generations.
+            max_retries: Maximum number of retry attempts per generation.
+        """
+        # Store two-stage specific attributes before calling parent __init__
+        self.identify_model = identify_model
+        self.implement_model = implement_model
+        self.identify_system_prompt_path = identify_system_prompt_path
+        self.identify_user_prompt_path = identify_user_prompt_path
+        self.implement_system_prompt_path = implement_system_prompt_path
+        self.implement_user_prompt_path = implement_user_prompt_path
+        self.identify_temperature = identify_temperature
+        self.implement_temperature = implement_temperature
+        self.identify_reasoning = identify_reasoning or {}
+
+        # Debug data collection (thread-safe)
+        self._identify_debug_data: List[Dict[str, Any]] = []
+        self._debug_data_lock = threading.Lock()
+
+        # Store output directory for debug file
+        self.output_dir = output_file_path.parent
+
+        # Initialize content storage for prompts (will be loaded below)
+        self.identify_system_prompt = ""
+        self.identify_user_prompt = ""
+        self.implement_system_prompt = ""
+        self.implement_user_prompt = ""
+
+        # Call parent __init__ with implement_model as primary (for compatibility)
+        # We pass None for system_prompt_path and user_prompt_path since we handle prompts ourselves
+        super().__init__(
+            name=name,
+            input_file_path=input_file_path,
+            output_file_path=output_file_path,
+            original_file_path=original_file_path,
+            system_prompt_path=None,
+            user_prompt_path=None,
+            book_name=book_name,
+            author_name=author_name,
+            model=implement_model,  # Primary model for base class compatibility
+            temperature=implement_temperature,
+            max_workers=max_workers,
+            reasoning=None,  # Reasoning is stage-specific
+            llm_kwargs=llm_kwargs,
+            post_processor_chain=post_processor_chain,
+            length_reduction=length_reduction,
+            use_batch=use_batch,
+            batch_size=batch_size,
+            enable_retry=enable_retry,
+            max_retries=max_retries,
+        )
+
+        # Load stage-specific prompts
+        self._load_stage_prompts()
+
+        logger.info(
+            f"TwoStageFinalPhase initialized with identify_model={identify_model}, implement_model={implement_model}"
+        )
+
+    def _load_stage_prompts(self) -> None:
+        """Load and format prompts for both IDENTIFY and IMPLEMENT stages."""
+        # Load IDENTIFY prompts
+        self.identify_system_prompt = self._load_and_format_prompt(self.identify_system_prompt_path)
+        self.identify_user_prompt = self._load_prompt_template(self.identify_user_prompt_path)
+
+        # Load IMPLEMENT prompts
+        self.implement_system_prompt = self._load_and_format_prompt(self.implement_system_prompt_path)
+        self.implement_user_prompt = self._load_prompt_template(self.implement_user_prompt_path)
+
+        logger.debug("Loaded all stage-specific prompts")
+
+    def _load_and_format_prompt(self, prompt_path: Path) -> str:
+        """Load a prompt file and format it with length_reduction if needed."""
+        if not prompt_path.exists():
+            raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
+
+        with prompt_path.open(mode="r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Format with length_reduction if present
+        if self.length_reduction is not None:
+            format_params = {}
+            if isinstance(self.length_reduction, int):
+                format_params["length_reduction"] = f"{self.length_reduction}%"
+            elif isinstance(self.length_reduction, tuple) and len(self.length_reduction) == 2:
+                format_params["length_reduction"] = f"{self.length_reduction[0]}%-{self.length_reduction[1]}%"
+            else:
+                format_params["length_reduction"] = str(self.length_reduction)
+
+            # Add tags_to_preserve as format parameters
+            tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
+            if self.post_processor_chain:
+                for processor in self.post_processor_chain.processors:
+                    if hasattr(processor, "tags_to_preserve"):
+                        tags_to_preserve = processor.tags_to_preserve
+                        break
+
+            for tag in tags_to_preserve:
+                tag_name = tag.strip("{}")
+                format_params[tag_name] = tag
+
+            try:
+                content = content.format(**format_params)
+            except KeyError as e:
+                logger.warning(f"Prompt contains undefined parameter: {e}")
+
+        return content
+
+    def _load_prompt_template(self, prompt_path: Path) -> str:
+        """Load a prompt template file (without formatting)."""
+        if not prompt_path.exists():
+            raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
+
+        with prompt_path.open(mode="r", encoding="utf-8") as f:
+            return f.read()
+
+    def _read_system_prompt(self) -> str:
+        """Override to return empty string (we handle prompts ourselves)."""
+        return ""
+
+    def _read_user_prompt(self) -> str:
+        """Override to return empty string (we handle prompts ourselves)."""
+        return ""
+
+    def _format_identify_user_message(
+        self,
+        current_body: str,
+        original_body: str,
+        current_header: str,
+    ) -> str:
+        """Format the user message for the IDENTIFY stage."""
+        context = {
+            "current_body": current_body,
+            "original_body": original_body,
+            "current_header": current_header,
+            "book_name": self.book_name,
+            "author_name": self.author_name,
+        }
+        try:
+            return self.identify_user_prompt.format(**context)
+        except KeyError as e:
+            logger.warning(f"IDENTIFY user prompt contains undefined parameter: {e}")
+            return self.identify_user_prompt
+
+    def _format_implement_user_message(
+        self,
+        current_body: str,
+        current_header: str,
+        changes: str,
+    ) -> str:
+        """Format the user message for the IMPLEMENT stage, including the changes list."""
+        context = {
+            "current_body": current_body,
+            "current_header": current_header,
+            "changes": changes,
+            "book_name": self.book_name,
+            "author_name": self.author_name,
+        }
+        try:
+            return self.implement_user_prompt.format(**context)
+        except KeyError as e:
+            logger.warning(f"IMPLEMENT user prompt contains undefined parameter: {e}")
+            return self.implement_user_prompt
+
+    def _should_skip_block(self, current_body: str, original_body: str) -> bool:
+        """Check if a block should be skipped (empty or only special tags)."""
+        if not current_body.strip() and not original_body.strip():
+            return True
+        if self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body):
+            return True
+        return False
+
+    def _make_llm_call_with_model(
+        self,
+        model: LlmModel,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        reasoning: Optional[Dict[str, str]] = None,
+        block_info: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        """
+        Make an LLM call with a specific model (for stage-specific calls).
+
+        Args:
+            model: The LLM model to use for this call.
+            system_prompt: The system prompt.
+            user_prompt: The user prompt.
+            temperature: Temperature setting for this call.
+            reasoning: Optional reasoning configuration.
+            block_info: Optional identifier for error messages.
+
+        Returns:
+            Tuple of (response_content, generation_id).
+        """
+        last_error: Optional[Exception] = None
+        last_content: str = ""
+        max_attempts = (self.max_retries + 1) if self.enable_retry else 1
+
+        call_kwargs = {**self.llm_kwargs}
+        if reasoning:
+            call_kwargs["reasoning"] = reasoning
+
+        for attempt in range(max_attempts):
+            try:
+                content, generation_id = model.chat_completion(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=temperature,
+                    **call_kwargs,
+                )
+
+                if is_failed_response(content):
+                    last_content = content
+                    error_msg = f"LLM returned failed response: {content[:100]}..."
+                    if self.enable_retry and attempt < self.max_retries:
+                        logger.warning(
+                            f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                        )
+                        continue
+                    else:
+                        if self.enable_retry:
+                            raise MaxRetriesExceededError(
+                                message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                                attempts=max_attempts,
+                                block_info=block_info,
+                            )
+                        else:
+                            raise GenerationFailedError(message=error_msg, block_info=block_info)
+
+                return content, generation_id
+
+            except (GenerationFailedError, MaxRetriesExceededError):
+                raise
+            except ResponseTruncatedError as e:
+                last_error = e
+                error_msg = f"Response truncated: {str(e)}"
+                if self.enable_retry and attempt < self.max_retries:
+                    logger.warning(f"Response truncated (attempt {attempt + 1}/{max_attempts}). Retrying...")
+                    continue
+                else:
+                    if self.enable_retry:
+                        raise MaxRetriesExceededError(
+                            message=f"Response truncated after {max_attempts} attempts",
+                            attempts=max_attempts,
+                            block_info=block_info,
+                        ) from e
+                    else:
+                        raise GenerationFailedError(message=error_msg, block_info=block_info) from e
+            except Exception as e:
+                last_error = e
+                error_msg = f"LLM call failed: {str(e)}"
+                if self.enable_retry and attempt < self.max_retries:
+                    logger.warning(
+                        f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                    )
+                    continue
+                else:
+                    if self.enable_retry:
+                        raise MaxRetriesExceededError(
+                            message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                            attempts=max_attempts,
+                            block_info=block_info,
+                        ) from e
+                    else:
+                        raise GenerationFailedError(message=error_msg, block_info=block_info) from e
+
+        # Fallback (should not reach here)
+        if last_error:
+            raise GenerationFailedError(
+                message=f"LLM call failed: {str(last_error)}", block_info=block_info
+            ) from last_error
+        else:
+            raise GenerationFailedError(
+                message=f"LLM returned failed response: {last_content[:100]}...", block_info=block_info
+            )
+
+    def _add_debug_data(
+        self,
+        block_index: int,
+        block_header: str,
+        identify_response: str,
+        generation_id: Optional[str],
+    ) -> None:
+        """Thread-safe addition of debug data."""
+        with self._debug_data_lock:
+            self._identify_debug_data.append(
+                {
+                    "block_index": block_index,
+                    "block_header": block_header,
+                    "identify_response": identify_response,
+                    "generation_id": generation_id,
+                }
+            )
+
+    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
+        """
+        Process a single markdown block through both IDENTIFY and IMPLEMENT stages.
+
+        This method is used in non-batch mode for parallel processing.
+
+        Args:
+            current_block: The current markdown block to process.
+            original_block: The original markdown block for reference.
+            **kwargs: Additional context or parameters.
+
+        Returns:
+            The processed block content.
+        """
+        current_header, current_body = self._get_header_and_body(block=current_block)
+        original_header, original_body = self._get_header_and_body(block=original_block)
+
+        # Skip empty/special-tag-only blocks
+        if self._should_skip_block(current_body, original_body):
+            logger.debug(f"Skipping block (empty or special tags only): {current_header[:50]}")
+            return f"{current_header}\n\n{current_body}\n\n"
+
+        # Get block index from kwargs if available
+        block_index = kwargs.get("block_index", len(self._identify_debug_data))
+
+        # Stage 1: IDENTIFY - Analyze and produce change list
+        identify_user_message = self._format_identify_user_message(
+            current_body=current_body,
+            original_body=original_body,
+            current_header=current_header,
+        )
+
+        changes_list, identify_gen_id = self._make_llm_call_with_model(
+            model=self.identify_model,
+            system_prompt=self.identify_system_prompt,
+            user_prompt=identify_user_message,
+            temperature=self.identify_temperature,
+            reasoning=self.identify_reasoning,
+            block_info=f"identify: {current_header[:50]}",
+        )
+
+        # Track generation ID for cost calculation
+        add_generation_id(phase_name=f"{self.name}_identify", generation_id=identify_gen_id)
+
+        # Store debug data (thread-safe)
+        self._add_debug_data(
+            block_index=block_index,
+            block_header=current_header,
+            identify_response=changes_list,
+            generation_id=identify_gen_id,
+        )
+
+        # Stage 2: IMPLEMENT - Apply the identified changes
+        implement_user_message = self._format_implement_user_message(
+            current_body=current_body,
+            current_header=current_header,
+            changes=changes_list,
+        )
+
+        processed_body, implement_gen_id = self._make_llm_call_with_model(
+            model=self.implement_model,
+            system_prompt=self.implement_system_prompt,
+            user_prompt=implement_user_message,
+            temperature=self.implement_temperature,
+            block_info=f"implement: {current_header[:50]}",
+        )
+
+        # Track generation ID for cost calculation
+        add_generation_id(phase_name=f"{self.name}_implement", generation_id=implement_gen_id)
+
+        # Apply post-processing to final output
+        processed_body = self._apply_post_processing(
+            original_block=current_body,
+            llm_block=processed_body,
+            **kwargs,
+        )
+
+        # Assemble final block
+        if processed_body.strip():
+            return f"{current_header}\n\n{processed_body}\n\n"
+        return f"{current_header}\n\n"
+
+    def _process_markdown_blocks(self, **kwargs) -> None:
+        """
+        Process all markdown blocks with two-phase batching when batch mode is enabled.
+
+        This method overrides the base class to support the two-stage processing flow.
+        """
+        try:
+            logger.info(f"Starting to process markdown blocks with {self.max_workers} workers")
+
+            current_blocks = self._extract_blocks(self.input_text)
+            original_blocks = self._extract_blocks(self.original_text)
+            logger.info(f"Found {len(current_blocks)} current markdown blocks to process")
+            logger.info(f"Found {len(original_blocks)} original markdown blocks")
+
+            if not current_blocks:
+                logger.warning("No markdown blocks found in the input text")
+                self.content = self.input_text
+                return
+
+            if len(current_blocks) != len(original_blocks):
+                msg = f"Block length mismatch: {len(current_blocks)} != {len(original_blocks)}"
+                raise ValueError(msg)
+
+            blocks = list(zip(current_blocks, original_blocks))
+
+            # Check if batch mode is enabled and supported by BOTH models
+            use_batch = (
+                self.use_batch
+                and hasattr(self.identify_model, "supports_batch")
+                and self.identify_model.supports_batch()
+                and hasattr(self.implement_model, "supports_batch")
+                and self.implement_model.supports_batch()
+            )
+
+            logger.info(f"Two-stage FINAL: use_batch={use_batch}")
+
+            if use_batch:
+                # Two-phase batch processing
+                if self.batch_size:
+                    logger.info(f"Using batch processing with batch_size={self.batch_size}")
+                    processed_blocks = []
+                    for i in tqdm(range(0, len(blocks), self.batch_size), desc=f"Processing {self.name} (batches)"):
+                        chunk = blocks[i : i + self.batch_size]
+                        chunk_start_index = i
+                        chunk_results = self._process_blocks_batch_mode(chunk, chunk_start_index, **kwargs)
+                        processed_blocks.extend(chunk_results)
+                else:
+                    logger.info("Using batch processing for all blocks at once")
+                    processed_blocks = self._process_blocks_batch_mode(blocks, 0, **kwargs)
+            else:
+                # Non-batch: parallel processing via _process_block()
+                logger.debug("Starting parallel block processing (non-batch mode)")
+                processed_blocks = self._process_blocks_parallel_mode(blocks, **kwargs)
+
+            logger.debug(f"Successfully processed {len(processed_blocks)} blocks")
+            self.content = "".join(processed_blocks)
+            logger.info(f"Completed processing all blocks. Total output length: {len(self.content)} characters")
+
+        except Exception as e:
+            logger.error(f"Error during markdown block processing: {str(e)}")
+            logger.exception("Stack trace for markdown block processing error")
+            raise
+
+    def _process_blocks_parallel_mode(self, blocks: List[Tuple[str, str]], **kwargs) -> List[str]:
+        """Process blocks in parallel using ThreadPoolExecutor (non-batch mode)."""
+
+        def process_with_index(args: Tuple[int, Tuple[str, str]]) -> str:
+            idx, (current_block, original_block) = args
+            return self._process_block(current_block, original_block, block_index=idx, **kwargs)
+
+        indexed_blocks = list(enumerate(blocks))
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            processed_blocks = list(
+                tqdm(
+                    iterable=executor.map(process_with_index, indexed_blocks),
+                    total=len(blocks),
+                    desc=f"Processing {self.name}",
+                )
+            )
+
+        return processed_blocks
+
+    def _process_blocks_batch_mode(
+        self,
+        blocks: List[Tuple[str, str]],
+        start_index: int,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Process all blocks using two-phase batch API calls.
+
+        Phase 1: Batch all IDENTIFY calls → collect all change lists
+        Phase 2: Batch all IMPLEMENT calls with respective change lists
+
+        Args:
+            blocks: List of (current_block, original_block) tuples.
+            start_index: Starting index for block numbering (for batch_size chunking).
+            **kwargs: Additional context.
+
+        Returns:
+            List of processed block strings.
+        """
+        # Prepare block data
+        block_data = []
+        for i, (current_block, original_block) in enumerate(blocks):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            original_header, original_body = self._get_header_and_body(block=original_block)
+            block_data.append(
+                {
+                    "index": start_index + i,
+                    "current_header": current_header,
+                    "current_body": current_body,
+                    "original_body": original_body,
+                    "skip": self._should_skip_block(current_body, original_body),
+                }
+            )
+
+        # Phase 1: Batch IDENTIFY
+        logger.info(f"Phase 1: Running IDENTIFY batch for {len(block_data)} blocks")
+        identify_results = self._run_identify_batch(block_data, **kwargs)
+
+        # Store debug data for non-skipped blocks
+        for bd, id_result in zip(block_data, identify_results):
+            if not bd["skip"] and not id_result.get("skipped"):
+                block_index: int = cast(int, bd["index"])
+                self._add_debug_data(
+                    block_index=block_index,
+                    block_header=str(bd["current_header"]),
+                    identify_response=id_result.get("content", ""),
+                    generation_id=id_result.get("generation_id"),
+                )
+
+        # Phase 2: Batch IMPLEMENT (with change lists from Phase 1)
+        logger.info(f"Phase 2: Running IMPLEMENT batch for {len(block_data)} blocks")
+        implement_results = self._run_implement_batch(block_data, identify_results, **kwargs)
+
+        # Assemble final blocks
+        processed_blocks = []
+        for bd, impl_result in zip(block_data, implement_results):
+            if bd["skip"] or impl_result.get("skipped"):
+                processed_blocks.append(f"{bd['current_header']}\n\n{bd['current_body']}\n\n")
+            else:
+                processed_body = self._apply_post_processing(
+                    original_block=str(bd["current_body"]),
+                    llm_block=impl_result.get("content", ""),
+                    **kwargs,
+                )
+                if processed_body.strip():
+                    processed_blocks.append(f"{bd['current_header']}\n\n{processed_body}\n\n")
+                else:
+                    processed_blocks.append(f"{bd['current_header']}\n\n")
+
+        return processed_blocks
+
+    def _run_identify_batch(self, block_data: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+        """Run IDENTIFY stage as a batch API call."""
+        requests: List[Optional[Dict[str, Any]]] = []
+        for bd in block_data:
+            if bd["skip"]:
+                requests.append(None)  # Placeholder for skipped blocks
+            else:
+                user_message = self._format_identify_user_message(
+                    current_body=bd["current_body"],
+                    original_body=bd["original_body"],
+                    current_header=bd["current_header"],
+                )
+                requests.append(
+                    {
+                        "system_prompt": self.identify_system_prompt,
+                        "user_prompt": user_message,
+                        "metadata": {"index": bd["index"]},
+                    }
+                )
+
+        # Filter non-None requests and call batch API
+        valid_requests = [r for r in requests if r is not None]
+        if valid_requests:
+            call_kwargs = {**self.llm_kwargs}
+            if self.identify_reasoning:
+                call_kwargs["reasoning"] = self.identify_reasoning
+            batch_responses = self.identify_model.batch_chat_completion(
+                requests=valid_requests,
+                temperature=self.identify_temperature,
+                **call_kwargs,
+            )
+
+            # Track generation IDs
+            for response in batch_responses:
+                gen_id = response.get("generation_id")
+                if gen_id:
+                    add_generation_id(phase_name=f"{self.name}_identify", generation_id=gen_id)
+        else:
+            batch_responses = []
+
+        # Handle failed responses
+        self._handle_failed_batch_responses(batch_responses, valid_requests, "identify")
+
+        # Reconstruct results with placeholders for skipped blocks
+        results: List[Dict[str, Any]] = []
+        response_idx = 0
+        for req in requests:
+            if req is None:
+                results.append({"content": "", "skipped": True})
+            else:
+                results.append(batch_responses[response_idx])
+                response_idx += 1
+
+        return results
+
+    def _run_implement_batch(
+        self,
+        block_data: List[Dict[str, Any]],
+        identify_results: List[Dict[str, Any]],
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
+        """Run IMPLEMENT stage as a batch API call with IDENTIFY results."""
+        requests: List[Optional[Dict[str, Any]]] = []
+        for bd, id_result in zip(block_data, identify_results):
+            if bd["skip"] or id_result.get("skipped"):
+                requests.append(None)
+            else:
+                user_message = self._format_implement_user_message(
+                    current_body=bd["current_body"],
+                    current_header=bd["current_header"],
+                    changes=id_result.get("content", ""),
+                )
+                requests.append(
+                    {
+                        "system_prompt": self.implement_system_prompt,
+                        "user_prompt": user_message,
+                        "metadata": {"index": bd["index"]},
+                    }
+                )
+
+        # Filter and call batch API
+        valid_requests = [r for r in requests if r is not None]
+        if valid_requests:
+            batch_responses = self.implement_model.batch_chat_completion(
+                requests=valid_requests,
+                temperature=self.implement_temperature,
+                **self.llm_kwargs,
+            )
+
+            # Track generation IDs
+            for response in batch_responses:
+                gen_id = response.get("generation_id")
+                if gen_id:
+                    add_generation_id(phase_name=f"{self.name}_implement", generation_id=gen_id)
+        else:
+            batch_responses = []
+
+        # Handle failed responses
+        self._handle_failed_batch_responses(batch_responses, valid_requests, "implement")
+
+        # Reconstruct results
+        results: List[Dict[str, Any]] = []
+        response_idx = 0
+        for req in requests:
+            if req is None:
+                results.append({"content": "", "skipped": True})
+            else:
+                results.append(batch_responses[response_idx])
+                response_idx += 1
+
+        return results
+
+    def _handle_failed_batch_responses(
+        self,
+        batch_responses: List[Dict[str, Any]],
+        valid_requests: List[Dict[str, Any]],
+        stage: str,
+    ) -> None:
+        """Handle failed responses in batch processing."""
+        failed_indices = [idx for idx, response in enumerate(batch_responses) if response.get("failed", False)]
+
+        if not failed_indices:
+            return
+
+        logger.warning(
+            f"{stage.upper()} batch had {len(failed_indices)} failed responses out of {len(batch_responses)}"
+        )
+
+        if not self.enable_retry:
+            first_failed = batch_responses[failed_indices[0]]
+            failed_content = first_failed.get("content", "Unknown error")
+            raise GenerationFailedError(
+                message=f"{stage.upper()} batch generation failed (retry disabled): {failed_content[:200]}",
+                block_info=f"batch index {failed_indices[0]}",
+            )
+
+        # Retry failed responses individually
+        logger.info(f"Retrying {len(failed_indices)} failed {stage} responses individually")
+        model = self.identify_model if stage == "identify" else self.implement_model
+        temperature = self.identify_temperature if stage == "identify" else self.implement_temperature
+        reasoning = self.identify_reasoning if stage == "identify" else None
+
+        for failed_idx in failed_indices:
+            original_request = valid_requests[failed_idx]
+            block_info = f"{stage} batch index {failed_idx}"
+
+            retried_content, retried_gen_id = self._make_llm_call_with_model(
+                model=model,
+                system_prompt=original_request["system_prompt"],
+                user_prompt=original_request["user_prompt"],
+                temperature=temperature,
+                reasoning=reasoning,
+                block_info=block_info,
+            )
+
+            # Update the response
+            batch_responses[failed_idx] = {
+                "content": retried_content,
+                "generation_id": retried_gen_id,
+                "metadata": original_request.get("metadata"),
+                "failed": False,
+            }
+
+    def _write_identify_debug_file(self) -> None:
+        """Write IDENTIFY stage responses to a debug JSON file."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        debug_file = self.output_dir / f"final_identify_debug_{timestamp}.json"
+
+        # Sort debug data by block index
+        sorted_debug_data = sorted(self._identify_debug_data, key=lambda x: x.get("block_index", 0))
+
+        debug_data = {
+            "timestamp": datetime.now().isoformat(),
+            "phase_name": self.name,
+            "book_name": self.book_name,
+            "author_name": self.author_name,
+            "identify_model": str(self.identify_model),
+            "implement_model": str(self.implement_model),
+            "blocks": sorted_debug_data,
+        }
+
+        try:
+            with open(debug_file, "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"IDENTIFY debug output written to: {debug_file}")
+        except Exception as e:
+            logger.error(f"Failed to write IDENTIFY debug file: {e}")
+
+    def run(self, **kwargs) -> None:
+        """
+        Execute the two-stage FINAL phase.
+
+        Overrides base class to write debug JSON file after processing.
+        """
+        try:
+            logger.info(f"Starting two-stage FINAL phase: {self.name}")
+
+            # Count tokens at the start
+            self.start_token_count = self._count_tokens(self.input_text)
+            logger.info(f"Phase '{self.name}' starting with ~{self.start_token_count:,} tokens")
+
+            # Process markdown blocks
+            self._process_markdown_blocks(**kwargs)
+
+            # Count tokens at the end
+            self.end_token_count = self._count_tokens(self.content)
+            logger.info(f"Phase '{self.name}' completed with ~{self.end_token_count:,} tokens")
+
+            # Write output file
+            self._write_output_file(content=self.content)
+
+            # Write debug file with IDENTIFY outputs
+            self._write_identify_debug_file()
+
+            logger.success(f"Successfully completed two-stage FINAL phase: {self.name}")
+        except Exception as e:
+            logger.error(f"Failed to complete two-stage FINAL phase {self.name}: {str(e)}")
+            logger.exception("Stack trace for phase error")
+            raise

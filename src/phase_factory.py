@@ -3,7 +3,12 @@ from typing import Any, List, Optional, Tuple, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_model import LlmModel
-from src.llm_phase import IntroductionAnnotationPhase, StandardLlmPhase, SummaryAnnotationPhase
+from src.llm_phase import (
+    IntroductionAnnotationPhase,
+    StandardLlmPhase,
+    SummaryAnnotationPhase,
+    TwoStageFinalPhase,
+)
 from src.post_processors import (
     EnsureBlankLineProcessor,
     NoNewHeadersPostProcessor,
@@ -63,6 +68,17 @@ class PhaseFactory:
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
         ],
         PhaseType.FINAL: [
+            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
+            PostProcessorType.NO_NEW_HEADERS,
+            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+            PostProcessorType.REMOVE_XML_TAGS,
+            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
+            PostProcessorType.PRESERVE_F_STRING_TAGS,
+            PostProcessorType.ENSURE_BLANK_LINE,
+            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
+        ],
+        PhaseType.FINAL_TWO_STAGE: [
+            # Same as FINAL - post-processing applies to IMPLEMENT output only
             PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
             PostProcessorType.NO_NEW_HEADERS,
             PostProcessorType.REMOVE_TRAILING_WHITESPACE,
@@ -287,6 +303,86 @@ class PhaseFactory:
             max_workers=max_workers,
         )
         return SummaryAnnotationPhase(**params)
+
+    @staticmethod
+    def create_two_stage_final_phase(
+        config: PhaseConfig,
+        identify_model: LlmModel,
+        implement_model: LlmModel,
+        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> TwoStageFinalPhase:
+        """
+        Create a two-stage FINAL phase with separate models for identify/implement.
+
+        This phase runs two internal stages:
+        1. IDENTIFY: Analyzes the passage and identifies refinement opportunities
+        2. IMPLEMENT: Applies the identified changes
+
+        Args:
+            config: Configuration object. Must have two_stage_config set.
+            identify_model: LLM model instance for the IDENTIFY stage.
+            implement_model: LLM model instance for the IMPLEMENT stage.
+            length_reduction: Length reduction parameter for the phase.
+            tags_to_preserve: Tags to preserve during processing.
+            max_workers: Maximum number of workers for parallel processing.
+
+        Returns:
+            TwoStageFinalPhase: Configured two-stage phase.
+
+        Raises:
+            ValueError: If required configuration fields are missing.
+        """
+        if config.two_stage_config is None:
+            raise ValueError("two_stage_config is required for FINAL_TWO_STAGE phase")
+
+        # Validate required fields (but don't use llm_model_instance since we have separate models)
+        if config.name is None:
+            raise ValueError("name is required for TwoStageFinalPhase")
+        if config.input_file_path is None:
+            raise ValueError("input_file_path is required for TwoStageFinalPhase")
+        if config.output_file_path is None:
+            raise ValueError("output_file_path is required for TwoStageFinalPhase")
+        if config.original_file_path is None:
+            raise ValueError("original_file_path is required for TwoStageFinalPhase")
+        if config.book_name is None:
+            raise ValueError("book_name is required for TwoStageFinalPhase")
+        if config.author_name is None:
+            raise ValueError("author_name is required for TwoStageFinalPhase")
+
+        # Create post-processor chain (applies to IMPLEMENT output only)
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors,
+            phase_type=config.phase_type,
+            tags_to_preserve=tags_to_preserve,
+        )
+
+        return TwoStageFinalPhase(
+            name=config.name,
+            input_file_path=config.input_file_path,
+            output_file_path=config.output_file_path,
+            original_file_path=config.original_file_path,
+            book_name=config.book_name,
+            author_name=config.author_name,
+            identify_model=identify_model,
+            implement_model=implement_model,
+            identify_system_prompt_path=Path("./prompts/final_identify_system.md"),
+            identify_user_prompt_path=Path("./prompts/final_identify_user.md"),
+            implement_system_prompt_path=Path("./prompts/final_implement_system.md"),
+            implement_user_prompt_path=Path("./prompts/final_implement_user.md"),
+            identify_temperature=config.two_stage_config.identify_temperature,
+            implement_temperature=config.two_stage_config.implement_temperature,
+            identify_reasoning=config.two_stage_config.identify_reasoning,
+            max_workers=max_workers,
+            llm_kwargs=config.llm_kwargs,
+            post_processor_chain=post_processor_chain,
+            length_reduction=length_reduction,
+            use_batch=config.use_batch,
+            batch_size=config.batch_size,
+            enable_retry=config.enable_retry,
+            max_retries=config.max_retries,
+        )
 
     @staticmethod
     def _create_built_in_processor(processor_name: str) -> Optional[PostProcessor]:

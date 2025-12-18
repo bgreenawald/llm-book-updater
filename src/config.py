@@ -27,6 +27,7 @@ class PhaseType(Enum):
     EDIT = auto()
     ANNOTATE = auto()
     FINAL = auto()
+    FINAL_TWO_STAGE = auto()  # Two-stage FINAL with identify + implement
     INTRODUCTION = auto()
     SUMMARY = auto()
 
@@ -111,6 +112,55 @@ def _validate_length_reduction(*, length_reduction: Optional[Union[int, Tuple[in
 
 
 @dataclass
+class TwoStageModelConfig:
+    """Configuration for two-stage phases requiring different models per stage.
+
+    This is used by FINAL_TWO_STAGE to specify separate models for the
+    IDENTIFY (analysis) and IMPLEMENT (application) stages.
+
+    Attributes:
+        identify_model: Model configuration for the IDENTIFY stage (analysis).
+        implement_model: Model configuration for the IMPLEMENT stage (application).
+        identify_temperature: Temperature for the IDENTIFY stage.
+        implement_temperature: Temperature for the IMPLEMENT stage.
+        identify_reasoning: Optional reasoning configuration for the IDENTIFY stage.
+    """
+
+    identify_model: ModelConfig
+    implement_model: ModelConfig
+    identify_temperature: float = 0.2
+    implement_temperature: float = 0.2
+    identify_reasoning: Optional[dict[str, str]] = None
+
+    def __post_init__(self) -> None:
+        """Validate two-stage model configuration.
+
+        Raises:
+            TypeError: If a field has an invalid type.
+            ValueError: If a field has an invalid value.
+        """
+        if not isinstance(self.identify_model, ModelConfig):
+            raise TypeError(f"identify_model must be a ModelConfig, got {type(self.identify_model).__name__}")
+        if not isinstance(self.implement_model, ModelConfig):
+            raise TypeError(f"implement_model must be a ModelConfig, got {type(self.implement_model).__name__}")
+
+        _validate_temperature(temperature=self.identify_temperature)
+        _validate_temperature(temperature=self.implement_temperature)
+
+        if self.identify_reasoning is not None:
+            if not isinstance(self.identify_reasoning, dict):
+                raise TypeError(
+                    f"identify_reasoning must be a dict[str, str] or None, got {type(self.identify_reasoning).__name__}"
+                )
+            for k, v in self.identify_reasoning.items():
+                if not isinstance(k, str) or not isinstance(v, str):
+                    raise TypeError(
+                        "identify_reasoning must be a dict[str, str]; "
+                        f"found key/value types ({type(k).__name__}, {type(v).__name__})"
+                    )
+
+
+@dataclass
 class PhaseConfig:
     """Configuration for a single phase in the pipeline."""
 
@@ -149,6 +199,8 @@ class PhaseConfig:
     use_subblocks: bool = False
     max_subblock_tokens: int = DEFAULT_MAX_SUBBLOCK_TOKENS
     min_subblock_tokens: int = DEFAULT_MIN_SUBBLOCK_TOKENS
+    # Two-stage phase configuration (required for FINAL_TWO_STAGE)
+    two_stage_config: Optional[TwoStageModelConfig] = None
 
     def __post_init__(self) -> None:
         """
@@ -224,10 +276,23 @@ class PhaseConfig:
                 f"got max={self.max_subblock_tokens}, min={self.min_subblock_tokens}"
             )
 
-        if self.system_prompt_path is None:
-            self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
-        if self.user_prompt_path is None:
-            self.user_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_user.md")
+        # Validate two-stage configuration
+        if self.phase_type == PhaseType.FINAL_TWO_STAGE:
+            if self.two_stage_config is None:
+                raise ValueError("two_stage_config is required for FINAL_TWO_STAGE phase")
+            if not isinstance(self.two_stage_config, TwoStageModelConfig):
+                raise TypeError(
+                    f"two_stage_config must be a TwoStageModelConfig, got {type(self.two_stage_config).__name__}"
+                )
+        elif self.two_stage_config is not None:
+            raise ValueError(f"two_stage_config is only valid for FINAL_TWO_STAGE phase, not {self.phase_type.name}")
+
+        # Set default prompt paths (two-stage phases handle prompts internally)
+        if self.phase_type != PhaseType.FINAL_TWO_STAGE:
+            if self.system_prompt_path is None:
+                self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
+            if self.user_prompt_path is None:
+                self.user_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_user.md")
         if self.name is None:
             self.name = self.phase_type.name.lower()
 
