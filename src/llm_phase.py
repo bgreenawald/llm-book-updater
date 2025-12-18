@@ -721,7 +721,8 @@ class LlmPhase(ABC):
                     for failed_idx in failed_indices:
                         # Find the corresponding request
                         original_request = valid_requests[failed_idx]
-                        block_info = f"batch index {failed_idx}, header: {original_request['metadata'].get('current_header', 'unknown')[:50]}"
+                        header = original_request["metadata"].get("current_header", "unknown")[:50]
+                        block_info = f"batch index {failed_idx}, header: {header}"
 
                         # Retry using the retry method
                         call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
