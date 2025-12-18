@@ -84,6 +84,63 @@ class LlmModelError(Exception):
     pass
 
 
+class GenerationFailedError(LlmModelError):
+    """Exception raised when an LLM generation fails and cannot be retried.
+
+    This is raised when:
+    - Retry is disabled and a generation fails
+    - A generation produces an empty or error response
+
+    Attributes:
+        message: Description of the failure
+        block_info: Optional information about the block that failed
+    """
+
+    def __init__(self, message: str, block_info: Optional[str] = None):
+        self.message = message
+        self.block_info = block_info
+        super().__init__(self.message)
+
+
+class MaxRetriesExceededError(LlmModelError):
+    """Exception raised when maximum retries are exhausted for a generation.
+
+    This signals that the pipeline should stop because a generation could not
+    succeed after the configured number of retry attempts.
+
+    Attributes:
+        message: Description of the failure
+        attempts: Number of attempts made
+        block_info: Optional information about the block that failed
+    """
+
+    def __init__(self, message: str, attempts: int, block_info: Optional[str] = None):
+        self.message = message
+        self.attempts = attempts
+        self.block_info = block_info
+        super().__init__(self.message)
+
+
+def is_failed_response(content: str) -> bool:
+    """Check if an LLM response indicates a failure.
+
+    A response is considered failed if:
+    - It is empty or contains only whitespace
+    - It starts with "Error:" (batch error marker)
+
+    Args:
+        content: The response content to check
+
+    Returns:
+        bool: True if the response indicates a failure, False otherwise
+    """
+    if not content or not content.strip():
+        return True
+    if content.strip().startswith("Error:"):
+        return True
+    return False
+
+
 class ProviderClient(ABC):
     """Abstract base class for provider-specific LLM clients."""
 
@@ -596,6 +653,7 @@ class OpenAIClient(ProviderClient):
                             "content": f"Error: {error_message}",
                             "generation_id": f"openai_batch_error_{custom_id}",
                             "metadata": id_to_metadata.get(custom_id, {}),
+                            "failed": True,
                         }
                     )
                     continue
@@ -653,7 +711,16 @@ class OpenAIClient(ProviderClient):
                     # Usage tracking is optional for batch; log but don't fail
                     module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
 
-                responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+                # Check if response is a failure (empty content)
+                response_failed = is_failed_response(content)
+                responses.append(
+                    {
+                        "content": content,
+                        "generation_id": generation_id,
+                        "metadata": metadata,
+                        "failed": response_failed,
+                    }
+                )
 
             except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
@@ -662,6 +729,7 @@ class OpenAIClient(ProviderClient):
                         "content": f"Error parsing result: {str(e)}",
                         "generation_id": f"openai_batch_parse_error_{int(time.time())}",
                         "metadata": {},
+                        "failed": True,
                     }
                 )
 
@@ -1052,7 +1120,16 @@ class GeminiClient(ProviderClient):
                     # Usage tracking is optional for batch; log but don't fail
                     module_logger.debug(f"Failed to track Gemini batch usage for {generation_id}: {e}")
 
-                responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+                # Check if response is a failure (empty content)
+                response_failed = is_failed_response(content)
+                responses.append(
+                    {
+                        "content": content,
+                        "generation_id": generation_id,
+                        "metadata": metadata,
+                        "failed": response_failed,
+                    }
+                )
 
             except (json.JSONDecodeError, KeyError, ValueError, IndexError, AttributeError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
@@ -1062,6 +1139,7 @@ class GeminiClient(ProviderClient):
                         "content": f"Error parsing result: {str(e)}",
                         "generation_id": f"gemini_batch_parse_error_{int(time.time())}",
                         "metadata": {},
+                        "failed": True,
                     }
                 )
 
@@ -1393,7 +1471,16 @@ class ClaudeClient(ProviderClient):
                     except (AttributeError, TypeError, ValueError) as e:
                         module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
 
-                    responses.append({"content": content, "generation_id": generation_id, "metadata": metadata})
+                    # Check if response is a failure (empty content)
+                    response_failed = is_failed_response(content)
+                    responses.append(
+                        {
+                            "content": content,
+                            "generation_id": generation_id,
+                            "metadata": metadata,
+                            "failed": response_failed,
+                        }
+                    )
 
                 elif result.result.type == "errored":
                     # Handle error result
@@ -1405,6 +1492,7 @@ class ClaudeClient(ProviderClient):
                             "content": f"Error: {error_message}",
                             "generation_id": f"claude_batch_error_{custom_id}",
                             "metadata": metadata,
+                            "failed": True,
                         }
                     )
 
@@ -1415,6 +1503,7 @@ class ClaudeClient(ProviderClient):
                             "content": "Error: Request expired",
                             "generation_id": f"claude_batch_expired_{custom_id}",
                             "metadata": metadata,
+                            "failed": True,
                         }
                     )
 
@@ -1425,6 +1514,7 @@ class ClaudeClient(ProviderClient):
                             "content": "Error: Request canceled",
                             "generation_id": f"claude_batch_canceled_{custom_id}",
                             "metadata": metadata,
+                            "failed": True,
                         }
                     )
 

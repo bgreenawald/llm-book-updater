@@ -8,29 +8,28 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-# Use OpenRouter for all phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
-CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
+CHATGPT_GPT52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
 GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
+GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GROK_41,
+        model=GEMINI_PRO,
         reasoning={"effort": "medium"},
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GOOGLE_GEMINI_PRO,
-        use_batch=True,
+        model=CHATGPT_GPT52,
         reasoning={"effort": "medium"},
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT5,
-        use_batch=True,
+        model=CHATGPT_GPT52,
         reasoning={"effort": "medium"},
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
@@ -58,7 +57,7 @@ config = RunConfig(
     output_dir=Path(r"books/the_federalist_papers/output"),
     original_file=Path(r"books/the_federalist_papers/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(35, 50),
+    length_reduction=(45, 60),
     max_workers=10,
 )
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 from src.common.provider import Provider
-from src.constants import DEFAULT_LENGTH_REDUCTION_BOUNDS, DEFAULT_TAGS_TO_PRESERVE
+from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_LENGTH_REDUCTION_BOUNDS, DEFAULT_TAGS_TO_PRESERVE
 from src.llm_model import ModelConfig
 
 if TYPE_CHECKING:
@@ -131,6 +131,11 @@ class PhaseConfig:
     # Batch processing parameters
     use_batch: bool = False
     batch_size: Optional[int] = None
+    # Retry configuration for failed generations
+    # When False (default), any generation failure immediately stops the pipeline
+    # When True, failed generations are retried up to max_retries times
+    enable_retry: bool = False
+    max_retries: int = DEFAULT_GENERATION_MAX_RETRIES
 
     def __post_init__(self) -> None:
         """
@@ -170,6 +175,15 @@ class PhaseConfig:
                 raise ValueError(
                     "batch_size was set but use_batch is False; either enable use_batch or set batch_size=None"
                 )
+
+        # Validate retry configuration
+        if not isinstance(self.enable_retry, bool):
+            raise TypeError(f"enable_retry must be a bool, got {type(self.enable_retry).__name__}")
+
+        if not isinstance(self.max_retries, int):
+            raise TypeError(f"max_retries must be an int, got {type(self.max_retries).__name__}")
+        if self.max_retries < 0:
+            raise ValueError(f"max_retries must be >= 0, got {self.max_retries}")
 
         if self.system_prompt_path is None:
             self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
