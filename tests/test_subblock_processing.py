@@ -500,4 +500,3 @@ class TestPhaseFactorySubblockParams:
             assert phase.use_subblocks is True
             assert phase.max_subblock_tokens == 8000
             assert phase.min_subblock_tokens == 2000
-
