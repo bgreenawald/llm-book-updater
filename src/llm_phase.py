@@ -9,7 +9,13 @@ import tiktoken
 from loguru import logger
 from tqdm import tqdm
 
-from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
+from src.constants import (
+    DEFAULT_GENERATION_MAX_RETRIES,
+    DEFAULT_MAX_SUBBLOCK_TOKENS,
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_MIN_SUBBLOCK_TOKENS,
+    DEFAULT_TAGS_TO_PRESERVE,
+)
 from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import (
     GenerationFailedError,
@@ -50,6 +56,9 @@ class LlmPhase(ABC):
         batch_size: Optional[int] = None,
         enable_retry: bool = False,
         max_retries: int = DEFAULT_GENERATION_MAX_RETRIES,
+        use_subblocks: bool = False,
+        max_subblock_tokens: int = DEFAULT_MAX_SUBBLOCK_TOKENS,
+        min_subblock_tokens: int = DEFAULT_MIN_SUBBLOCK_TOKENS,
     ) -> None:
         """
         Initialize the LLM phase with all necessary parameters.
@@ -76,6 +85,9 @@ class LlmPhase(ABC):
             enable_retry (bool): Whether to retry failed generations. When False (default),
                 any generation failure immediately stops the pipeline.
             max_retries (int): Maximum number of retry attempts per generation (default: 2)
+            use_subblocks (bool): Whether to split large blocks into smaller sub-blocks for processing
+            max_subblock_tokens (int): Maximum tokens per sub-block when use_subblocks is enabled
+            min_subblock_tokens (int): Minimum tokens per sub-block when grouping paragraphs
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -96,6 +108,9 @@ class LlmPhase(ABC):
         self.batch_size = batch_size
         self.enable_retry = enable_retry
         self.max_retries = max_retries
+        self.use_subblocks = use_subblocks
+        self.max_subblock_tokens = max_subblock_tokens
+        self.min_subblock_tokens = min_subblock_tokens
 
         # Initialize content storage
         self.input_text = ""
@@ -119,6 +134,8 @@ class LlmPhase(ABC):
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
         logger.debug(f"Length reduction: {length_reduction}")
+        if use_subblocks:
+            logger.debug(f"Sub-block processing enabled: min={min_subblock_tokens}, max={max_subblock_tokens} tokens")
 
         try:
             # Load all necessary files
@@ -635,6 +652,143 @@ class LlmPhase(ABC):
 
         return len(lines) > 0  # Must have at least one tag to be considered "only tags"
 
+    def _split_body_into_paragraphs(self, body: str) -> List[str]:
+        """
+        Split a body text into paragraphs on single newlines.
+
+        Each line in the content represents a separate paragraph.
+        Empty lines are filtered out.
+
+        Args:
+            body: The body text to split (header should already be removed)
+
+        Returns:
+            List of paragraph strings, with empty lines filtered out
+        """
+        if not body.strip():
+            return []
+
+        # Split on single newlines - each line is a paragraph
+        lines = body.split("\n")
+
+        # Filter out empty lines and strip whitespace
+        paragraphs = [line.strip() for line in lines if line.strip()]
+
+        return paragraphs
+
+    def _group_paragraphs_into_subblocks(self, paragraphs: List[str]) -> List[str]:
+        """
+        Group paragraphs into sub-blocks based on token bounds.
+
+        Groups consecutive paragraphs until min_subblock_tokens is reached.
+        Large paragraphs exceeding max_subblock_tokens are kept as lone sub-blocks
+        (never split a paragraph). If the final group is below min_subblock_tokens,
+        it is combined with the second-to-last group and redistributed evenly.
+
+        Args:
+            paragraphs: List of paragraph strings to group
+
+        Returns:
+            List of sub-block strings (concatenated paragraphs with single newline separators)
+        """
+        if not paragraphs:
+            return []
+
+        if len(paragraphs) == 1:
+            return [paragraphs[0]]
+
+        # Calculate token count for each paragraph
+        paragraph_tokens = [self._count_tokens(p) for p in paragraphs]
+
+        # Group paragraphs into sub-blocks
+        groups: List[List[int]] = []  # List of paragraph indices for each group
+        current_group: List[int] = []
+        current_tokens = 0
+
+        for i, (para, tokens) in enumerate(zip(paragraphs, paragraph_tokens)):
+            # If single paragraph exceeds max, keep it as its own group
+            if tokens >= self.max_subblock_tokens:
+                # Finish current group first if it has content
+                if current_group:
+                    groups.append(current_group)
+                    current_group = []
+                    current_tokens = 0
+                # Add large paragraph as its own group
+                groups.append([i])
+                continue
+
+            # Add to current group
+            current_group.append(i)
+            current_tokens += tokens
+
+            # If we've reached min_subblock_tokens, start a new group
+            if current_tokens >= self.min_subblock_tokens:
+                groups.append(current_group)
+                current_group = []
+                current_tokens = 0
+
+        # Handle any remaining paragraphs
+        if current_group:
+            groups.append(current_group)
+
+        # Handle small trailing chunk: redistribute with second-to-last group
+        if len(groups) >= 2:
+            last_group = groups[-1]
+            last_group_tokens = sum(paragraph_tokens[i] for i in last_group)
+
+            if last_group_tokens < self.min_subblock_tokens:
+                # Combine last two groups and redistribute
+                second_last_group = groups[-2]
+
+                # Check if second-to-last group is a single large paragraph
+                # In that case, we can't redistribute
+                second_last_tokens = sum(paragraph_tokens[i] for i in second_last_group)
+                if len(second_last_group) == 1 and second_last_tokens >= self.max_subblock_tokens:
+                    # Can't redistribute with oversized paragraph, leave as is
+                    pass
+                else:
+                    # Merge and redistribute
+                    combined_indices = second_last_group + last_group
+                    combined_tokens = second_last_tokens + last_group_tokens
+
+                    # Find optimal split point for even distribution
+                    target_tokens = combined_tokens // 2
+                    running_tokens = 0
+                    split_point = 0
+
+                    for j, idx in enumerate(combined_indices):
+                        running_tokens += paragraph_tokens[idx]
+                        if running_tokens >= target_tokens:
+                            # Check which is closer to target: before or after this paragraph
+                            before = running_tokens - paragraph_tokens[idx]
+                            after = running_tokens
+                            if abs(target_tokens - before) < abs(target_tokens - after) and j > 0:
+                                split_point = j
+                            else:
+                                split_point = j + 1
+                            break
+                    else:
+                        split_point = len(combined_indices)
+
+                    # Ensure we have at least one paragraph in each group
+                    if split_point == 0:
+                        split_point = 1
+                    elif split_point >= len(combined_indices):
+                        split_point = len(combined_indices) - 1
+
+                    # Replace last two groups with redistributed groups
+                    groups = groups[:-2]
+                    groups.append(combined_indices[:split_point])
+                    groups.append(combined_indices[split_point:])
+
+        # Convert groups to sub-block strings
+        subblocks = []
+        for group in groups:
+            subblock_paragraphs = [paragraphs[i] for i in group]
+            subblocks.append("\n".join(subblock_paragraphs))
+
+        return subblocks
+
     def _assemble_processed_block(
         self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
     ) -> str:
@@ -1009,6 +1163,161 @@ class StandardLlmPhase(LlmPhase):
         else:
             return f"{current_header}\n\n"
 
+    def _process_subblock(
+        self,
+        current_subblock: str,
+        original_subblock: str,
+        current_header: str,
+        original_header: str,
+        subblock_index: int,
+        **kwargs,
+    ) -> str:
+        """
+        Process a single sub-block using the LLM model.
+
+        Args:
+            current_subblock: The current sub-block text to process
+            original_subblock: The original sub-block text for reference
+            current_header: The header of the block (for context in prompts)
+            original_header: The original header (for context in prompts)
+            subblock_index: Index of the sub-block for logging
+            **kwargs: Additional context or parameters
+
+        Returns:
+            str: The processed sub-block content
+        """
+        # Format the user message using sub-block content
+        user_message = self._format_user_message(
+            current_body=current_subblock,
+            original_body=original_subblock,
+            current_header=current_header,
+            original_header=original_header,
+        )
+
+        # Get LLM response with retry logic
+        call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning}
+        block_info = f"header: {current_header[:50]}, subblock: {subblock_index}"
+        processed_subblock, generation_id = self._make_llm_call_with_retry(
+            system_prompt=self.system_prompt,
+            user_prompt=user_message,
+            block_info=block_info,
+            **call_kwargs,
+        )
+
+        # Track generation ID for cost calculation
+        add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+        return processed_subblock
+
+    def _process_block_with_subblocks(self, current_block: str, original_block: str, **kwargs) -> str:
+        """
+        Process a markdown block by splitting it into sub-blocks and processing each.
+
+        This method:
+        1. Extracts the header and body
+        2. Splits the body into paragraphs
+        3. Groups paragraphs into token-bounded sub-blocks
+        4. Processes each sub-block with the LLM (in parallel if max_workers > 1)
+        5. Concatenates results and applies post-processing to the full body
+        6. Reassembles the block with header
+
+        Args:
+            current_block (str): The current markdown block to process
+            original_block (str): The original markdown block for reference
+            **kwargs: Additional context or parameters
+
+        Returns:
+            str: The processed block content
+        """
+        # Extract header and body from both blocks
+        current_header, current_body = self._get_header_and_body(block=current_block)
+        original_header, original_body = self._get_header_and_body(block=original_block)
+
+        # Check if there's any content to process (not empty and not just special tags)
+        if (not current_body.strip() and not original_body.strip()) or (
+            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+        ):
+            logger.debug("Empty block content or content with only special tags, returning block as-is")
+            return f"{current_header}\n\n{current_body}\n\n"
+
+        # Split bodies into paragraphs
+        current_paragraphs = self._split_body_into_paragraphs(current_body)
+        original_paragraphs = self._split_body_into_paragraphs(original_body)
+
+        # If no paragraphs, return as-is
+        if not current_paragraphs:
+            logger.debug("No paragraphs found in body, returning block as-is")
+            return f"{current_header}\n\n{current_body}\n\n"
+
+        # Group paragraphs into sub-blocks
+        current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
+        original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
+
+        logger.debug(f"Split block '{current_header[:30]}...' into {len(current_subblocks)} sub-blocks")
+
+        # Ensure same number of sub-blocks (use original grouping if counts differ)
+        if len(current_subblocks) != len(original_subblocks):
+            logger.warning(
+                f"Sub-block count mismatch: current={len(current_subblocks)}, original={len(original_subblocks)}. "
+                "Using current body grouping for original as well."
+            )
+            # Re-group original using same number of paragraphs per group
+            # This is a fallback - ideally counts should match
+            original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
+            if len(current_subblocks) != len(original_subblocks):
+                # Last resort: pair by position, padding with empty strings
+                while len(original_subblocks) < len(current_subblocks):
+                    original_subblocks.append("")
+                original_subblocks = original_subblocks[: len(current_subblocks)]
+
+        # Process sub-blocks
+        if self.max_workers > 1 and len(current_subblocks) > 1:
+            # Parallel processing
+            logger.debug(f"Processing {len(current_subblocks)} sub-blocks in parallel with {self.max_workers} workers")
+
+            def process_subblock_wrapper(args: Tuple[int, str, str]) -> str:
+                idx, curr_sb, orig_sb = args
+                return self._process_subblock(
+                    current_subblock=curr_sb,
+                    original_subblock=orig_sb,
+                    current_header=current_header,
+                    original_header=original_header,
+                    subblock_index=idx,
+                    **kwargs,
+                )
+
+            subblock_args = [
+                (i, curr_sb, orig_sb) for i, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks))
+            ]
+
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                processed_subblocks = list(executor.map(process_subblock_wrapper, subblock_args))
+        else:
+            # Sequential processing
+            processed_subblocks = []
+            for i, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks)):
+                processed_sb = self._process_subblock(
+                    current_subblock=curr_sb,
+                    original_subblock=orig_sb,
+                    current_header=current_header,
+                    original_header=original_header,
+                    subblock_index=i,
+                    **kwargs,
+                )
+                processed_subblocks.append(processed_sb)
+
+        # Concatenate sub-block results with single newlines (matching input format)
+        processed_body = "\n".join(processed_subblocks)
+
+        # Apply post-processing to the full reassembled body
+        processed_body = self._apply_post_processing(original_block=current_body, llm_block=processed_body, **kwargs)
+
+        # Reconstruct the block
+        if processed_body.strip():
+            return f"{current_header}\n\n{processed_body}\n\n"
+        logger.debug("Empty block body after sub-block processing, returning header only")
+        return f"{current_header}\n\n"
+
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
         Process a single markdown block using the LLM model.
@@ -1018,6 +1327,8 @@ class StandardLlmPhase(LlmPhase):
         2. Formatting a user message using the prompt template
         3. Sending the message to the LLM model (with retry if enabled)
         4. Applying post-processing to clean up the result
+
+        If use_subblocks is enabled, delegates to _process_block_with_subblocks instead.
 
         Args:
             current_block (str): The current markdown block to process
@@ -1032,6 +1343,10 @@ class StandardLlmPhase(LlmPhase):
             MaxRetriesExceededError: If all retry attempts are exhausted
             EmptySectionError: If post-processing detects an invalid empty section
         """
+        # Check if sub-block processing is enabled
+        if self.use_subblocks:
+            return self._process_block_with_subblocks(current_block, original_block, **kwargs)
+
         # Extract header and body from both blocks
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)

@@ -10,37 +10,35 @@ from src.pipeline import run_pipeline
 
 DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
 GEMINI_3_FLASH = ModelConfig(Provider.OPENROUTER, "google/gemini-3-flash-preview")
+KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GEMINI_3_FLASH,
+        model=KIMI_K2,
         reasoning={"effort": "high"},
+        enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
         model=GEMINI_3_FLASH,
         reasoning={"effort": "high"},
-    ),
-    PhaseConfig(
-        phase_type=PhaseType.FINAL,
-        model=GEMINI_3_FLASH,
-        reasoning={"effort": "high"},
+        enable_retry=True,
+        enabled=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
+        enable_retry=True,
+        enabled=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
-    ),
-    PhaseConfig(
-        phase_type=PhaseType.ANNOTATE,
-        model=GEMINI_3_FLASH,
-        reasoning={"effort": "high"},
+        enable_retry=True,
+        enabled=False,
     ),
 ]
 
