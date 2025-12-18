@@ -456,7 +456,7 @@ class LlmPhase(ABC):
                 if isinstance(self.length_reduction, int):
                     format_params["length_reduction"] = f"{self.length_reduction}%"
                 elif isinstance(self.length_reduction, tuple) and len(self.length_reduction) == 2:
-                    format_params["length_reduction"] = f"{self.length_reduction[0]}-{self.length_reduction[1]}%"
+                    format_params["length_reduction"] = f"{self.length_reduction[0]}%-{self.length_reduction[1]}%"
                 else:
                     format_params["length_reduction"] = str(self.length_reduction)
 
