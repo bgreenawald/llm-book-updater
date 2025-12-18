@@ -197,6 +197,8 @@ class PhaseFactory:
             "length_reduction": length_reduction,
             "use_batch": config.use_batch,
             "batch_size": config.batch_size,
+            "enable_retry": config.enable_retry,
+            "max_retries": config.max_retries,
         }
 
     @staticmethod

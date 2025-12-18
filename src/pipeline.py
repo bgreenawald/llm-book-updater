@@ -11,7 +11,7 @@ from loguru import logger
 from src.config import PhaseType, RunConfig
 from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
-from src.llm_model import LlmModel, LlmModelError, ModelConfig
+from src.llm_model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
 from src.llm_phase import LlmPhase
 from src.phase_factory import PhaseFactory
 
@@ -664,9 +664,25 @@ class Pipeline:
                     completed_phases.append(phase)
                     # Collect metadata for completed phases
                     self._collect_phase_metadata(phase=phase, phase_index=i, completed=True)
+                except GenerationFailedError as e:
+                    logger.error(f"Generation failed in phase {phase.name}: {e.message}")
+                    if e.block_info:
+                        logger.error(f"Failed block: {e.block_info}")
+                    logger.error("Pipeline stopped due to generation failure (retry disabled or not available)")
+                    # Collect metadata for failed phases
+                    self._collect_phase_metadata(phase=phase, phase_index=i, completed=False)
+                    raise
+                except MaxRetriesExceededError as e:
+                    logger.error(f"Max retries exceeded in phase {phase.name}: {e.message}")
+                    if e.block_info:
+                        logger.error(f"Failed block: {e.block_info}")
+                    logger.error(f"Pipeline stopped after {e.attempts} retry attempts")
+                    # Collect metadata for failed phases
+                    self._collect_phase_metadata(phase=phase, phase_index=i, completed=False)
+                    raise
                 except LlmModelError as e:
                     logger.error(f"LLM model error in phase {phase.name}: {str(e)}")
-                    logger.error("Pipeline stopped due to LLM model failure after max retries")
+                    logger.error("Pipeline stopped due to LLM model failure")
                     # Collect metadata for failed phases
                     self._collect_phase_metadata(phase=phase, phase_index=i, completed=False)
                     raise

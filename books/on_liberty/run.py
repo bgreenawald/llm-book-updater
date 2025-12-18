@@ -8,44 +8,39 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-# Use OpenRouter for all phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
-CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
-GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
+DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
+GEMINI_3_FLASH = ModelConfig(Provider.OPENROUTER, "google/gemini-3-flash-preview")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GOOGLE_GEMINI_PRO,
-        use_batch=True,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT5,
-        use_batch=True,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
     ),
 ]
 
@@ -58,7 +53,7 @@ config = RunConfig(
     output_dir=Path(r"books/on_liberty/output"),
     original_file=Path(r"books/on_liberty/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(35, 50),
+    length_reduction=(20, 30),
     max_workers=10,
 )
 
