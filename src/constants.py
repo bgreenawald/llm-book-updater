@@ -59,8 +59,8 @@ MAX_SUBBLOCK_TOKEN_BOUND = 32000
 # =============================================================================
 
 # Default temperature for LLM requests
-LLM_DEFAULT_TEMPERATURE = 0.2
-GEMINI_DEFAULT_TEMPERATURE = 0.2
+LLM_DEFAULT_TEMPERATURE = 1
+GEMINI_DEFAULT_TEMPERATURE = 1
 
 
 # =============================================================================
