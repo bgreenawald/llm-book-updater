@@ -172,8 +172,19 @@ class Pipeline:
                 else:
                     post_processors_info.append(str(processor))
 
-        # Get model metadata
-        model_metadata = self._get_model_metadata(model_type=phase_config.model)
+        # Get model metadata (handles two-stage phases differently)
+        if phase_config.phase_type == PhaseType.FINAL_TWO_STAGE and phase_config.two_stage_config:
+            identify_model_metadata = self._get_model_metadata(model_type=phase_config.two_stage_config.identify_model)
+            implement_model_metadata = self._get_model_metadata(
+                model_type=phase_config.two_stage_config.implement_model
+            )
+            # Prefix model metadata keys for two-stage
+            model_metadata = {"identify_" + k: v for k, v in identify_model_metadata.items()}
+            model_metadata.update({"implement_" + k: v for k, v in implement_model_metadata.items()})
+            model_metadata["identify_temperature"] = phase_config.two_stage_config.identify_temperature
+            model_metadata["implement_temperature"] = phase_config.two_stage_config.implement_temperature
+        else:
+            model_metadata = self._get_model_metadata(model_type=phase_config.model)
 
         # Base metadata that's always available
         metadata = {
@@ -437,57 +448,100 @@ class Pipeline:
 
         logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
-        # Get or create the model (uses caching for connection pool reuse)
-        model = self._get_or_create_model(
-            model_config=phase_config.model,
-            temperature=phase_config.temperature,
-        )
-
-        # Create PhaseConfig for the factory (do NOT include length_reduction)
-        factory_config = type(phase_config)(
-            phase_type=phase_config.phase_type,
-            name=phase_config.phase_type.name.lower(),
-            input_file_path=input_path,
-            output_file_path=output_path,
-            original_file_path=self.config.original_file,
-            system_prompt_path=phase_config.system_prompt_path,
-            user_prompt_path=phase_config.user_prompt_path,
-            book_name=self.config.book_name,
-            author_name=self.config.author_name,
-            llm_model_instance=model,
-            temperature=phase_config.temperature,
-            reasoning=phase_config.reasoning,
-            llm_kwargs=phase_config.llm_kwargs,
-            post_processors=phase_config.post_processors,
-            use_batch=phase_config.use_batch,
-            batch_size=phase_config.batch_size,
-        )
-
-        # Create the phase instance using the factory with explicit arguments
+        # Handle FINAL_TWO_STAGE specially - it needs two models
         phase: LlmPhase
-        if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
-            phase = PhaseFactory.create_standard_phase(
-                config=factory_config,
-                length_reduction=self.config.length_reduction,
-                tags_to_preserve=self.config.tags_to_preserve,
-                max_workers=self.config.max_workers,
+        if phase_config.phase_type == PhaseType.FINAL_TWO_STAGE:
+            if phase_config.two_stage_config is None:
+                raise ValueError("two_stage_config is required for FINAL_TWO_STAGE phase")
+
+            # Create both model instances
+            identify_model = self._get_or_create_model(
+                model_config=phase_config.two_stage_config.identify_model,
+                temperature=phase_config.two_stage_config.identify_temperature,
             )
-        elif phase_config.phase_type == PhaseType.INTRODUCTION:
-            phase = PhaseFactory.create_introduction_annotation_phase(
-                config=factory_config,
-                length_reduction=self.config.length_reduction,
-                tags_to_preserve=self.config.tags_to_preserve,
-                max_workers=self.config.max_workers,
+            implement_model = self._get_or_create_model(
+                model_config=phase_config.two_stage_config.implement_model,
+                temperature=phase_config.two_stage_config.implement_temperature,
             )
-        elif phase_config.phase_type == PhaseType.SUMMARY:
-            phase = PhaseFactory.create_summary_annotation_phase(
+
+            # Create PhaseConfig for the factory
+            factory_config = type(phase_config)(
+                phase_type=phase_config.phase_type,
+                name=phase_config.phase_type.name.lower(),
+                input_file_path=input_path,
+                output_file_path=output_path,
+                original_file_path=self.config.original_file,
+                book_name=self.config.book_name,
+                author_name=self.config.author_name,
+                llm_kwargs=phase_config.llm_kwargs,
+                post_processors=phase_config.post_processors,
+                use_batch=phase_config.use_batch,
+                batch_size=phase_config.batch_size,
+                enable_retry=phase_config.enable_retry,
+                max_retries=phase_config.max_retries,
+                two_stage_config=phase_config.two_stage_config,
+            )
+
+            phase = PhaseFactory.create_two_stage_final_phase(
                 config=factory_config,
+                identify_model=identify_model,
+                implement_model=implement_model,
                 length_reduction=self.config.length_reduction,
                 tags_to_preserve=self.config.tags_to_preserve,
                 max_workers=self.config.max_workers,
             )
         else:
-            raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
+            # Standard phase handling (single model)
+            # Get or create the model (uses caching for connection pool reuse)
+            model = self._get_or_create_model(
+                model_config=phase_config.model,
+                temperature=phase_config.temperature,
+            )
+
+            # Create PhaseConfig for the factory (do NOT include length_reduction)
+            factory_config = type(phase_config)(
+                phase_type=phase_config.phase_type,
+                name=phase_config.phase_type.name.lower(),
+                input_file_path=input_path,
+                output_file_path=output_path,
+                original_file_path=self.config.original_file,
+                system_prompt_path=phase_config.system_prompt_path,
+                user_prompt_path=phase_config.user_prompt_path,
+                book_name=self.config.book_name,
+                author_name=self.config.author_name,
+                llm_model_instance=model,
+                temperature=phase_config.temperature,
+                reasoning=phase_config.reasoning,
+                llm_kwargs=phase_config.llm_kwargs,
+                post_processors=phase_config.post_processors,
+                use_batch=phase_config.use_batch,
+                batch_size=phase_config.batch_size,
+            )
+
+            # Create the phase instance using the factory with explicit arguments
+            if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
+                phase = PhaseFactory.create_standard_phase(
+                    config=factory_config,
+                    length_reduction=self.config.length_reduction,
+                    tags_to_preserve=self.config.tags_to_preserve,
+                    max_workers=self.config.max_workers,
+                )
+            elif phase_config.phase_type == PhaseType.INTRODUCTION:
+                phase = PhaseFactory.create_introduction_annotation_phase(
+                    config=factory_config,
+                    length_reduction=self.config.length_reduction,
+                    tags_to_preserve=self.config.tags_to_preserve,
+                    max_workers=self.config.max_workers,
+                )
+            elif phase_config.phase_type == PhaseType.SUMMARY:
+                phase = PhaseFactory.create_summary_annotation_phase(
+                    config=factory_config,
+                    length_reduction=self.config.length_reduction,
+                    tags_to_preserve=self.config.tags_to_preserve,
+                    max_workers=self.config.max_workers,
+                )
+            else:
+                raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
 
         # Log post-processor information
         if phase.post_processor_chain:
