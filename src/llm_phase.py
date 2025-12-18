@@ -115,6 +115,12 @@ class LlmPhase(ABC):
         self.max_subblock_tokens = max_subblock_tokens
         self.min_subblock_tokens = min_subblock_tokens
 
+        # Sub-block processing stats (only used when self.use_subblocks is True)
+        self._subblock_stats_lock = threading.Lock()
+        self._subblocks_processed_total: int = 0
+        self._subblock_blocks_processed_total: int = 0
+        self._max_subblocks_in_single_block: int = 0
+
         # Initialize content storage
         self.input_text = ""
         self.original_text = ""
@@ -139,6 +145,10 @@ class LlmPhase(ABC):
         logger.debug(f"Length reduction: {length_reduction}")
         if use_subblocks:
             logger.debug(f"Sub-block processing enabled: min={min_subblock_tokens}, max={max_subblock_tokens} tokens")
+            logger.info(
+                "Sub-block processing enabled for phase "
+                f"'{self.name}': min_subblock_tokens={min_subblock_tokens}, max_subblock_tokens={max_subblock_tokens}"
+            )
 
         try:
             # Load all necessary files
@@ -1127,6 +1137,19 @@ class LlmPhase(ABC):
             self.end_token_count = self._count_tokens(self.content)
             logger.info(f"Phase '{self.name}' completed with ~{self.end_token_count:,} tokens")
 
+            if self.use_subblocks:
+                with self._subblock_stats_lock:
+                    subblocks_processed_total = self._subblocks_processed_total
+                    subblock_blocks_processed_total = self._subblock_blocks_processed_total
+                    max_subblocks_in_single_block = self._max_subblocks_in_single_block
+
+                logger.info(
+                    "Sub-block processing summary for phase "
+                    f"'{self.name}': processed {subblocks_processed_total} sub-blocks across "
+                    f"{subblock_blocks_processed_total} blocks (max sub-blocks in a single block: "
+                    f"{max_subblocks_in_single_block})"
+                )
+
             logger.debug("Writing output file")
             self._write_output_file(content=self.content)
             logger.success(f"Successfully completed LLM phase: {self.name}")
@@ -1255,6 +1278,12 @@ class StandardLlmPhase(LlmPhase):
         # Group paragraphs into sub-blocks
         current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
         original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
+
+        with self._subblock_stats_lock:
+            self._subblock_blocks_processed_total += 1
+            self._subblocks_processed_total += len(current_subblocks)
+            if len(current_subblocks) > self._max_subblocks_in_single_block:
+                self._max_subblocks_in_single_block = len(current_subblocks)
 
         logger.debug(f"Split block '{current_header[:30]}...' into {len(current_subblocks)} sub-blocks")
 

@@ -516,6 +516,11 @@ class Pipeline:
                 post_processors=phase_config.post_processors,
                 use_batch=phase_config.use_batch,
                 batch_size=phase_config.batch_size,
+                enable_retry=phase_config.enable_retry,
+                max_retries=phase_config.max_retries,
+                use_subblocks=phase_config.use_subblocks,
+                max_subblock_tokens=phase_config.max_subblock_tokens,
+                min_subblock_tokens=phase_config.min_subblock_tokens,
             )
 
             # Create the phase instance using the factory with explicit arguments
