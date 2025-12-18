@@ -25,7 +25,7 @@ You should consider making an edit when you spot one of these opportunities. The
 2. **Opportunity for Richer Voice:** The `Transformed` text is clear, but a more precise or evocative word choice, inspired by the spirit of the `Original`, could more perfectly capture the author's unique tone (e.g., its passion, irony, or formality).
 3. **Opportunity for Superior Flow:** A sentence or paragraph could be slightly restructured to improve its rhythm, logical flow, or impact for a modern reader, making the argument more compelling.
 4. **Important Section Context:** Sometimes, sections will contain important metadata (like author, place of publication, etc.) either at the beginning or end that gets removed during the process. This should be restored.
-5. **Additional Quotes:**: The `Trasformed Passage` would benefit from additional quotes. These can be added as new `> **Quote:** ... **End quote.` blocks.
+5. **Additional Quotes:**: The `Trasformed Passage` would benefit from additional quotes. These can be added as new `> **Quote:** ... **End quote.**` blocks.
 
 ## Step-by-Step Workflow
 
