@@ -38,6 +38,9 @@ BATCH_PROCESSING_DISCOUNT_RATE = 0.5
 # Default number of parallel workers for concurrent processing
 DEFAULT_MAX_WORKERS = 1
 
+# Default maximum retries for failed LLM generations (when retry is enabled)
+DEFAULT_GENERATION_MAX_RETRIES = 2
+
 # Default length reduction bounds (percentage) for text compression
 DEFAULT_LENGTH_REDUCTION_BOUNDS = (35, 50)
 

@@ -8,34 +8,33 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-# Model configurations for pipeline phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
-CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
+CHATGPT_GPT52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
 GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
+GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_PRO,
+        reasoning={"effort": "high"},
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GOOGLE_GEMINI_PRO,
+        model=CHATGPT_GPT52,
+        reasoning={"effort": "high"},
         use_batch=True,
-        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT5,
+        model=CHATGPT_GPT52,
+        reasoning={"effort": "high"},
         use_batch=True,
-        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
         model=GROK_41,
-        reasoning={"effort": "medium"},
+        reasoning={"effort": "high"},
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
@@ -45,7 +44,7 @@ run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
         model=GROK_41,
-        reasoning={"effort": "medium"},
+        reasoning={"effort": "high"},
     ),
 ]
 

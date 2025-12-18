@@ -9,9 +9,9 @@ import tiktoken
 from loguru import logger
 from tqdm import tqdm
 
-from src.constants import DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
+from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
-from src.llm_model import LlmModel
+from src.llm_model import GenerationFailedError, LlmModel, MaxRetriesExceededError, is_failed_response
 from src.post_processors import EmptySectionError, PostProcessorChain
 
 
@@ -42,6 +42,8 @@ class LlmPhase(ABC):
         length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         use_batch: bool = False,
         batch_size: Optional[int] = None,
+        enable_retry: bool = False,
+        max_retries: int = DEFAULT_GENERATION_MAX_RETRIES,
     ) -> None:
         """
         Initialize the LLM phase with all necessary parameters.
@@ -65,6 +67,9 @@ class LlmPhase(ABC):
             length_reduction (Optional[Union[int, Tuple[int, int]]]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
             batch_size (Optional[int]): Number of items to process in each batch (if None, processes all blocks at once)
+            enable_retry (bool): Whether to retry failed generations. When False (default),
+                any generation failure immediately stops the pipeline.
+            max_retries (int): Maximum number of retry attempts per generation (default: 2)
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -83,6 +88,8 @@ class LlmPhase(ABC):
         self.length_reduction = length_reduction
         self.use_batch = use_batch
         self.batch_size = batch_size
+        self.enable_retry = enable_retry
+        self.max_retries = max_retries
 
         # Initialize content storage
         self.input_text = ""
@@ -228,6 +235,113 @@ class LlmPhase(ABC):
             logger.error(f"Unexpected error during post-processing: {str(e)}")
             logger.exception("Unexpected post-processing error stack trace")
             return llm_block
+
+    def _make_llm_call_with_retry(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        block_info: Optional[str] = None,
+        **kwargs,
+    ) -> Tuple[str, str]:
+        """
+        Make an LLM call with retry logic based on phase configuration.
+
+        If enable_retry is False (default), any failure immediately raises
+        GenerationFailedError to stop the pipeline.
+
+        If enable_retry is True, failures are retried up to max_retries times
+        before raising MaxRetriesExceededError.
+
+        Args:
+            system_prompt: The system prompt for the LLM call
+            user_prompt: The user prompt for the LLM call
+            block_info: Optional identifier for the block being processed (for error messages)
+            **kwargs: Additional arguments to pass to the LLM call
+
+        Returns:
+            Tuple[str, str]: (response_content, generation_id)
+
+        Raises:
+            GenerationFailedError: If retry is disabled and the call fails
+            MaxRetriesExceededError: If all retry attempts are exhausted
+        """
+        last_error: Optional[Exception] = None
+        last_content: str = ""
+
+        # Determine number of attempts: 1 if no retry, else max_retries + 1 (initial + retries)
+        max_attempts = (self.max_retries + 1) if self.enable_retry else 1
+
+        for attempt in range(max_attempts):
+            try:
+                # Make the LLM call
+                content, generation_id = self.model.chat_completion(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    **kwargs,
+                )
+
+                # Check if the response indicates a failure
+                if is_failed_response(content):
+                    last_content = content
+                    error_msg = f"LLM returned failed response: {content[:100]}..."
+                    if self.enable_retry and attempt < self.max_retries:
+                        logger.warning(
+                            f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                        )
+                        continue
+                    else:
+                        # No retry or retries exhausted
+                        if self.enable_retry:
+                            raise MaxRetriesExceededError(
+                                message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                                attempts=max_attempts,
+                                block_info=block_info,
+                            )
+                        else:
+                            raise GenerationFailedError(
+                                message=error_msg,
+                                block_info=block_info,
+                            )
+
+                # Success!
+                return content, generation_id
+
+            except (GenerationFailedError, MaxRetriesExceededError):
+                # Re-raise our custom exceptions
+                raise
+            except Exception as e:
+                last_error = e
+                error_msg = f"LLM call failed: {str(e)}"
+                if self.enable_retry and attempt < self.max_retries:
+                    logger.warning(
+                        f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                    )
+                    continue
+                else:
+                    # No retry or retries exhausted
+                    if self.enable_retry:
+                        raise MaxRetriesExceededError(
+                            message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                            attempts=max_attempts,
+                            block_info=block_info,
+                        ) from e
+                    else:
+                        raise GenerationFailedError(
+                            message=error_msg,
+                            block_info=block_info,
+                        ) from e
+
+        # This should never be reached, but just in case
+        if last_error:
+            raise GenerationFailedError(
+                message=f"LLM call failed: {str(last_error)}",
+                block_info=block_info,
+            ) from last_error
+        else:
+            raise GenerationFailedError(
+                message=f"LLM returned failed response: {last_content[:100]}...",
+                block_info=block_info,
+            )
 
     def _read_input_file(self) -> str:
         """
@@ -581,6 +695,51 @@ class LlmPhase(ABC):
                 else:
                     batch_responses = []
 
+                # Check for failed responses and handle according to retry configuration
+                failed_indices: List[int] = []
+                for idx, response in enumerate(batch_responses):
+                    if response.get("failed", False):
+                        failed_indices.append(idx)
+
+                if failed_indices:
+                    logger.warning(
+                        f"Batch processing had {len(failed_indices)} failed responses out of {len(batch_responses)}"
+                    )
+
+                    if not self.enable_retry:
+                        # No retry allowed - fail immediately
+                        first_failed = batch_responses[failed_indices[0]]
+                        failed_content = first_failed.get("content", "Unknown error")
+                        block_info = f"batch index {failed_indices[0]}"
+                        raise GenerationFailedError(
+                            message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
+                            block_info=block_info,
+                        )
+
+                    # Retry failed responses individually
+                    logger.info(f"Retrying {len(failed_indices)} failed batch responses individually")
+                    for failed_idx in failed_indices:
+                        # Find the corresponding request
+                        original_request = valid_requests[failed_idx]
+                        block_info = f"batch index {failed_idx}, header: {original_request['metadata'].get('current_header', 'unknown')[:50]}"
+
+                        # Retry using the retry method
+                        call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+                        retried_content, retried_gen_id = self._make_llm_call_with_retry(
+                            system_prompt=original_request["system_prompt"],
+                            user_prompt=original_request["user_prompt"],
+                            block_info=block_info,
+                            **call_kwargs_retry,
+                        )
+
+                        # Update the response with the retried result
+                        batch_responses[failed_idx] = {
+                            "content": retried_content,
+                            "generation_id": retried_gen_id,
+                            "metadata": original_request["metadata"],
+                            "failed": False,
+                        }
+
                 # Reconstruct results maintaining original order
                 processed_blocks = []
                 response_idx = 0
@@ -626,6 +785,9 @@ class LlmPhase(ABC):
                 logger.debug("Model does not support batch processing, falling back to sequential processing")
                 return self._process_batch_sequential(batch, **kwargs)
 
+        except (GenerationFailedError, MaxRetriesExceededError):
+            # Let our retry-related exceptions propagate to stop the pipeline
+            raise
         except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Batch processing errors trigger fallback to sequential processing
             logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
@@ -825,7 +987,7 @@ class StandardLlmPhase(LlmPhase):
         This method processes a markdown block by:
         1. Extracting the header and body
         2. Formatting a user message using the prompt template
-        3. Sending the message to the LLM model
+        3. Sending the message to the LLM model (with retry if enabled)
         4. Applying post-processing to clean up the result
 
         Args:
@@ -835,57 +997,53 @@ class StandardLlmPhase(LlmPhase):
 
         Returns:
             str: The processed block content
+
+        Raises:
+            GenerationFailedError: If generation fails and retry is disabled
+            MaxRetriesExceededError: If all retry attempts are exhausted
+            EmptySectionError: If post-processing detects an invalid empty section
         """
-        try:
-            # Extract header and body from both blocks
-            current_header, current_body = self._get_header_and_body(block=current_block)
-            original_header, original_body = self._get_header_and_body(block=original_block)
+        # Extract header and body from both blocks
+        current_header, current_body = self._get_header_and_body(block=current_block)
+        original_header, original_body = self._get_header_and_body(block=original_block)
 
-            # Check if there's any content to process (not empty and not just special tags)
-            if (not current_body.strip() and not original_body.strip()) or (
-                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
-            ):
-                logger.debug("Empty block content or content with only special tags, returning block as-is")
-                return f"{current_header}\n\n{current_body}\n\n"
+        # Check if there's any content to process (not empty and not just special tags)
+        if (not current_body.strip() and not original_body.strip()) or (
+            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+        ):
+            logger.debug("Empty block content or content with only special tags, returning block as-is")
+            return f"{current_header}\n\n{current_body}\n\n"
 
-            # Format the user message
-            body = self._format_user_message(
-                current_body=current_body,
-                original_body=original_body,
-                current_header=current_header,
-                original_header=original_header,
-            )
+        # Format the user message
+        body = self._format_user_message(
+            current_body=current_body,
+            original_body=original_body,
+            current_header=current_header,
+            original_header=original_header,
+        )
 
-            # Get LLM response
-            # Merge reasoning and llm_kwargs
-            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning}
-            processed_body, generation_id = self.model.chat_completion(
-                system_prompt=self.system_prompt,
-                user_prompt=body,
-                **call_kwargs,
-            )
+        # Get LLM response with retry logic
+        # Merge reasoning and llm_kwargs
+        call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning}
+        block_info = f"header: {current_header[:50]}"
+        processed_body, generation_id = self._make_llm_call_with_retry(
+            system_prompt=self.system_prompt,
+            user_prompt=body,
+            block_info=block_info,
+            **call_kwargs,
+        )
 
-            # Track generation ID for cost calculation
-            add_generation_id(phase_name=self.name, generation_id=generation_id)
+        # Track generation ID for cost calculation
+        add_generation_id(phase_name=self.name, generation_id=generation_id)
 
-            # Apply post-processing
-            processed_body = self._apply_post_processing(
-                original_block=current_body, llm_block=processed_body, **kwargs
-            )
+        # Apply post-processing
+        processed_body = self._apply_post_processing(original_block=current_body, llm_block=processed_body, **kwargs)
 
-            # Reconstruct the block
-            if processed_body.strip():
-                return f"{current_header}\n\n{processed_body}\n\n"
-            logger.debug("Empty block body, returning header only")
-            return f"{current_header}\n\n"
-
-        except EmptySectionError:
-            # EmptySectionError is a critical validation error that should stop the pipeline
-            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing block: {str(e)}")
-            return current_block
+        # Reconstruct the block
+        if processed_body.strip():
+            return f"{current_header}\n\n{processed_body}\n\n"
+        logger.debug("Empty block body, returning header only")
+        return f"{current_header}\n\n"
 
 
 class IntroductionAnnotationPhase(LlmPhase):
@@ -925,52 +1083,48 @@ class IntroductionAnnotationPhase(LlmPhase):
 
         Returns:
             str: The processed markdown block with introduction annotation
+
+        Raises:
+            GenerationFailedError: If generation fails and retry is disabled
+            MaxRetriesExceededError: If all retry attempts are exhausted
+            EmptySectionError: If post-processing detects an invalid empty section
         """
-        try:
-            current_header, current_body = self._get_header_and_body(current_block)
-            original_header, original_body = self._get_header_and_body(original_block)
+        current_header, current_body = self._get_header_and_body(current_block)
+        original_header, original_body = self._get_header_and_body(original_block)
 
-            # Check if there's any content to process (not empty and not just special tags)
-            if (not current_body.strip() and not original_body.strip()) or (
-                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
-            ):
-                logger.debug("Empty block content or content with only special tags, returning block as-is")
-                return f"{current_header}\n\n{current_body}\n\n"
+        # Check if there's any content to process (not empty and not just special tags)
+        if (not current_body.strip() and not original_body.strip()) or (
+            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+        ):
+            logger.debug("Empty block content or content with only special tags, returning block as-is")
+            return f"{current_header}\n\n{current_body}\n\n"
 
-            # Use the block content as the user prompt for generating the introduction
-            user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
+        # Use the block content as the user prompt for generating the introduction
+        user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
-            if user_prompt:
-                # Merge reasoning and llm_kwargs
-                call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                introduction, generation_id = self.model.chat_completion(
-                    system_prompt=self.system_prompt,
-                    user_prompt=user_prompt,
-                    temperature=self.temperature,
-                    **call_kwargs,
-                )
+        if user_prompt:
+            # Merge reasoning and llm_kwargs
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            block_info = f"header: {current_header[:50]}"
+            introduction, generation_id = self._make_llm_call_with_retry(
+                system_prompt=self.system_prompt,
+                user_prompt=user_prompt,
+                block_info=block_info,
+                temperature=self.temperature,
+                **call_kwargs,
+            )
 
-                # Track generation ID for cost calculation
-                add_generation_id(phase_name=self.name, generation_id=generation_id)
+            # Track generation ID for cost calculation
+            add_generation_id(phase_name=self.name, generation_id=generation_id)
 
-                # Apply post-processing to the introduction
-                introduction = self._apply_post_processing(current_body, introduction, **kwargs)
+            # Apply post-processing to the introduction
+            introduction = self._apply_post_processing(current_body, introduction, **kwargs)
 
-                # Combine the introduction with the original block
-                return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
-            else:
-                logger.debug("Empty block body, returning header only")
-                return f"{current_header}\n\n"
-
-        except EmptySectionError:
-            # EmptySectionError is a critical validation error that should stop the pipeline
-            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing block: {str(e)}")
-            logger.exception("Stack trace for block processing error")
-            # Return the original block to allow processing to continue
-            return f"{current_header}\n\n{current_body if current_body else original_body}\n\n"
+            # Combine the introduction with the original block
+            return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
+        else:
+            logger.debug("Empty block body, returning header only")
+            return f"{current_header}\n\n"
 
 
 class SummaryAnnotationPhase(LlmPhase):
@@ -1010,49 +1164,45 @@ class SummaryAnnotationPhase(LlmPhase):
 
         Returns:
             str: The processed markdown block with summary annotation
+
+        Raises:
+            GenerationFailedError: If generation fails and retry is disabled
+            MaxRetriesExceededError: If all retry attempts are exhausted
+            EmptySectionError: If post-processing detects an invalid empty section
         """
-        try:
-            current_header, current_body = self._get_header_and_body(current_block)
-            original_header, original_body = self._get_header_and_body(original_block)
+        current_header, current_body = self._get_header_and_body(current_block)
+        original_header, original_body = self._get_header_and_body(original_block)
 
-            # Check if there's any content to process (not empty and not just special tags)
-            if (not current_body.strip() and not original_body.strip()) or (
-                self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
-            ):
-                logger.debug("Empty block content or content with only special tags, returning block as-is")
-                return f"{current_header}\n\n{current_body}\n\n"
+        # Check if there's any content to process (not empty and not just special tags)
+        if (not current_body.strip() and not original_body.strip()) or (
+            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+        ):
+            logger.debug("Empty block content or content with only special tags, returning block as-is")
+            return f"{current_header}\n\n{current_body}\n\n"
 
-            # Use the block content as the user prompt for generating the summary
-            user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
+        # Use the block content as the user prompt for generating the summary
+        user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
-            if user_prompt:
-                # Merge reasoning and llm_kwargs
-                call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                summary, generation_id = self.model.chat_completion(
-                    system_prompt=self.system_prompt,
-                    user_prompt=user_prompt,
-                    temperature=self.temperature,
-                    **call_kwargs,
-                )
+        if user_prompt:
+            # Merge reasoning and llm_kwargs
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            block_info = f"header: {current_header[:50]}"
+            summary, generation_id = self._make_llm_call_with_retry(
+                system_prompt=self.system_prompt,
+                user_prompt=user_prompt,
+                block_info=block_info,
+                temperature=self.temperature,
+                **call_kwargs,
+            )
 
-                # Track generation ID for cost calculation
-                add_generation_id(phase_name=self.name, generation_id=generation_id)
+            # Track generation ID for cost calculation
+            add_generation_id(phase_name=self.name, generation_id=generation_id)
 
-                # Apply post-processing to the summary
-                summary = self._apply_post_processing(current_body, summary, **kwargs)
+            # Apply post-processing to the summary
+            summary = self._apply_post_processing(current_body, summary, **kwargs)
 
-                # Combine the original block with the summary
-                return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
-            else:
-                logger.debug("Empty block body, returning header only")
-                return f"{current_header}\n\n"
-
-        except EmptySectionError:
-            # EmptySectionError is a critical validation error that should stop the pipeline
-            logger.error("EmptySectionError in block processing - propagating to stop pipeline")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing block: {str(e)}")
-            logger.exception("Stack trace for block processing error")
-            # Return the original block to allow processing to continue
-            return f"{current_header}\n\n{current_body if current_body else original_body}\n\n"
+            # Combine the original block with the summary
+            return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
+        else:
+            logger.debug("Empty block body, returning header only")
+            return f"{current_header}\n\n"
