@@ -369,6 +369,10 @@ class OpenRouterClient(ProviderClient):
 
         if finish_reason == "length":
             module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
+            raise GenerationFailedError(
+                message="Response truncated due to max_tokens limit",
+                block_info=f"model: {model_name}",
+            )
 
         generation_id = resp_data.get("id", "unknown")
         return content, generation_id
@@ -451,6 +455,10 @@ class OpenAIClient(ProviderClient):
                 or getattr(response, "status", None) == "incomplete"
             ):
                 module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
+                raise GenerationFailedError(
+                    message="Response truncated due to max_tokens limit",
+                    block_info=f"model: {model_name}",
+                )
 
             # Register token usage for cost tracking if available
             try:
@@ -1325,6 +1333,10 @@ class ClaudeClient(ProviderClient):
             # Check stop reason for warnings
             if response.stop_reason == "max_tokens":
                 module_logger.warning("Response truncated: consider increasing max_tokens")
+                raise GenerationFailedError(
+                    message="Response truncated due to max_tokens limit",
+                    block_info=f"model: {model_name}",
+                )
 
             # Register token usage for cost tracking if available
             try:
