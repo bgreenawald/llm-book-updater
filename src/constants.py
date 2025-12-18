@@ -47,6 +47,12 @@ DEFAULT_LENGTH_REDUCTION_BOUNDS = (35, 50)
 # Input file index prefix in output directory
 INPUT_FILE_INDEX_PREFIX = "00"
 
+# Sub-block processing defaults
+DEFAULT_MAX_SUBBLOCK_TOKENS = 4096
+DEFAULT_MIN_SUBBLOCK_TOKENS = 1024
+MIN_SUBBLOCK_TOKEN_BOUND = 256
+MAX_SUBBLOCK_TOKEN_BOUND = 32000
+
 
 # =============================================================================
 # LLM Model Defaults

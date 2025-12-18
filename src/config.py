@@ -4,7 +4,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 from src.common.provider import Provider
-from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_LENGTH_REDUCTION_BOUNDS, DEFAULT_TAGS_TO_PRESERVE
+from src.constants import (
+    DEFAULT_GENERATION_MAX_RETRIES,
+    DEFAULT_LENGTH_REDUCTION_BOUNDS,
+    DEFAULT_MAX_SUBBLOCK_TOKENS,
+    DEFAULT_MIN_SUBBLOCK_TOKENS,
+    DEFAULT_TAGS_TO_PRESERVE,
+    MAX_SUBBLOCK_TOKEN_BOUND,
+    MIN_SUBBLOCK_TOKEN_BOUND,
+)
 from src.llm_model import ModelConfig
 
 if TYPE_CHECKING:
@@ -136,6 +144,11 @@ class PhaseConfig:
     # When True, failed generations are retried up to max_retries times
     enable_retry: bool = False
     max_retries: int = DEFAULT_GENERATION_MAX_RETRIES
+    # Sub-block processing parameters
+    # When enabled, large chapter bodies are split into smaller sub-blocks for processing
+    use_subblocks: bool = False
+    max_subblock_tokens: int = DEFAULT_MAX_SUBBLOCK_TOKENS
+    min_subblock_tokens: int = DEFAULT_MIN_SUBBLOCK_TOKENS
 
     def __post_init__(self) -> None:
         """
@@ -184,6 +197,32 @@ class PhaseConfig:
             raise TypeError(f"max_retries must be an int, got {type(self.max_retries).__name__}")
         if self.max_retries < 0:
             raise ValueError(f"max_retries must be >= 0, got {self.max_retries}")
+
+        # Validate sub-block configuration
+        if not isinstance(self.use_subblocks, bool):
+            raise TypeError(f"use_subblocks must be a bool, got {type(self.use_subblocks).__name__}")
+
+        if not isinstance(self.max_subblock_tokens, int):
+            raise TypeError(f"max_subblock_tokens must be an int, got {type(self.max_subblock_tokens).__name__}")
+        if self.max_subblock_tokens < MIN_SUBBLOCK_TOKEN_BOUND or self.max_subblock_tokens > MAX_SUBBLOCK_TOKEN_BOUND:
+            raise ValueError(
+                f"max_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND} and {MAX_SUBBLOCK_TOKEN_BOUND}, "
+                f"got {self.max_subblock_tokens}"
+            )
+
+        if not isinstance(self.min_subblock_tokens, int):
+            raise TypeError(f"min_subblock_tokens must be an int, got {type(self.min_subblock_tokens).__name__}")
+        if self.min_subblock_tokens < MIN_SUBBLOCK_TOKEN_BOUND or self.min_subblock_tokens > MAX_SUBBLOCK_TOKEN_BOUND:
+            raise ValueError(
+                f"min_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND} and {MAX_SUBBLOCK_TOKEN_BOUND}, "
+                f"got {self.min_subblock_tokens}"
+            )
+
+        if self.max_subblock_tokens <= self.min_subblock_tokens:
+            raise ValueError(
+                f"max_subblock_tokens must be greater than min_subblock_tokens, "
+                f"got max={self.max_subblock_tokens}, min={self.min_subblock_tokens}"
+            )
 
         if self.system_prompt_path is None:
             self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
