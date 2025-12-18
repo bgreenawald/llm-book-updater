@@ -121,6 +121,23 @@ class MaxRetriesExceededError(LlmModelError):
         super().__init__(self.message)
 
 
+class ResponseTruncatedError(LlmModelError):
+    """Exception raised when an LLM response is truncated due to max_tokens limit.
+
+    This is a retryable error - the generation may succeed on retry if the model
+    uses less reasoning tokens or produces a shorter response.
+
+    Attributes:
+        message: Description of the truncation
+        model_name: The model that produced the truncated response
+    """
+
+    def __init__(self, message: str, model_name: Optional[str] = None):
+        self.message = message
+        self.model_name = model_name
+        super().__init__(self.message)
+
+
 def is_failed_response(content: str) -> bool:
     """Check if an LLM response indicates a failure.
 
@@ -369,9 +386,9 @@ class OpenRouterClient(ProviderClient):
 
         if finish_reason == "length":
             module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
-            raise GenerationFailedError(
+            raise ResponseTruncatedError(
                 message="Response truncated due to max_tokens limit",
-                block_info=f"model: {model_name}",
+                model_name=model_name,
             )
 
         generation_id = resp_data.get("id", "unknown")
@@ -455,9 +472,9 @@ class OpenAIClient(ProviderClient):
                 or getattr(response, "status", None) == "incomplete"
             ):
                 module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
-                raise GenerationFailedError(
+                raise ResponseTruncatedError(
                     message="Response truncated due to max_tokens limit",
-                    block_info=f"model: {model_name}",
+                    model_name=model_name,
                 )
 
             # Register token usage for cost tracking if available
@@ -1333,9 +1350,9 @@ class ClaudeClient(ProviderClient):
             # Check stop reason for warnings
             if response.stop_reason == "max_tokens":
                 module_logger.warning("Response truncated: consider increasing max_tokens")
-                raise GenerationFailedError(
+                raise ResponseTruncatedError(
                     message="Response truncated due to max_tokens limit",
-                    block_info=f"model: {model_name}",
+                    model_name=model_name,
                 )
 
             # Register token usage for cost tracking if available

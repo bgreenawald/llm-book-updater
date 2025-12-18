@@ -11,7 +11,13 @@ from tqdm import tqdm
 
 from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_MAX_WORKERS, DEFAULT_TAGS_TO_PRESERVE
 from src.cost_tracking_wrapper import add_generation_id
-from src.llm_model import GenerationFailedError, LlmModel, MaxRetriesExceededError, is_failed_response
+from src.llm_model import (
+    GenerationFailedError,
+    LlmModel,
+    MaxRetriesExceededError,
+    ResponseTruncatedError,
+    is_failed_response,
+)
 from src.post_processors import EmptySectionError, PostProcessorChain
 
 
@@ -307,8 +313,30 @@ class LlmPhase(ABC):
                 return content, generation_id
 
             except (GenerationFailedError, MaxRetriesExceededError):
-                # Re-raise our custom exceptions
+                # Re-raise our custom exceptions (these are terminal failures)
                 raise
+            except ResponseTruncatedError as e:
+                # Truncation is retryable - model may use fewer reasoning tokens on retry
+                last_error = e
+                error_msg = f"Response truncated: {str(e)}"
+                if self.enable_retry and attempt < self.max_retries:
+                    logger.warning(
+                        f"Response truncated (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                    )
+                    continue
+                else:
+                    # No retry or retries exhausted
+                    if self.enable_retry:
+                        raise MaxRetriesExceededError(
+                            message=f"Response truncated after {max_attempts} attempts: {error_msg}",
+                            attempts=max_attempts,
+                            block_info=block_info,
+                        ) from e
+                    else:
+                        raise GenerationFailedError(
+                            message=error_msg,
+                            block_info=block_info,
+                        ) from e
             except Exception as e:
                 last_error = e
                 error_msg = f"LLM call failed: {str(e)}"
