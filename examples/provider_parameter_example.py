@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import GROK_3_MINI, ModelConfig
 from src.pipeline import run_pipeline
 
@@ -40,7 +41,7 @@ def main():
     provider_privacy_focused = PhaseConfig(
         phase_type=PhaseType.EDIT,
         model=ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4"),
-        temperature=0.2,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         llm_kwargs={
             "provider": {
                 "data_collection": "deny",  # Only use providers that don't collect data
@@ -52,7 +53,7 @@ def main():
     provider_cost_optimized = PhaseConfig(
         phase_type=PhaseType.FINAL,
         model=GROK_3_MINI,
-        temperature=0.3,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         llm_kwargs={
             "provider": {
                 "sort": "price",  # Sort by price (cheapest first)
@@ -65,7 +66,7 @@ def main():
     provider_budget_limited = PhaseConfig(
         phase_type=PhaseType.SUMMARY,
         model=ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4"),
-        temperature=0.3,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         llm_kwargs={
             "provider": {
                 "max_price": {
@@ -80,7 +81,7 @@ def main():
     provider_with_exclusions = PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
         model=GROK_3_MINI,
-        temperature=0.3,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         llm_kwargs={
             "provider": {
                 "ignore": ["provider-a", "provider-b"],  # Exclude specific providers
