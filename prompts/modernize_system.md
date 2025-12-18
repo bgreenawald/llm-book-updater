@@ -30,6 +30,7 @@ Your sole objective is to **modernize** the provided passage. This means updatin
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Preserve Core Content**: You must not omit important ideas, arguments, or concepts. This is a modern translation, not a summary. The intellectual rigor of the original must be maintained.
+* **Length preservation**: During this process, the length should change very little. Reduction of length means that important information is being cut.
 * **Information Maintenance**: If the passage contains lines or information that appear to be metadata (author name, place of publication, etc.), make sure those are preserved. These will usually appear at the beginning or end of a section.
 * **Markdown Structure**:
   * Preserve all Markdown headers (`#`, `##`, etc.) exactly as they are. Do **not** add, remove, or change header levels.
