@@ -18,6 +18,7 @@ from src.constants import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
+    LLM_DEFAULT_TEMPERATURE,
 )
 from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import (
@@ -49,7 +50,7 @@ class LlmPhase(ABC):
         book_name: str,
         author_name: str,
         model: LlmModel,
-        temperature: float = 0.2,
+        temperature: float = LLM_DEFAULT_TEMPERATURE,
         max_workers: Optional[int] = None,
         reasoning: Optional[Dict[str, str]] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,
@@ -1612,8 +1613,8 @@ class TwoStageFinalPhase(LlmPhase):
         identify_user_prompt_path: Path,
         implement_system_prompt_path: Path,
         implement_user_prompt_path: Path,
-        identify_temperature: float = 0.2,
-        implement_temperature: float = 0.2,
+        identify_temperature: float = LLM_DEFAULT_TEMPERATURE,
+        implement_temperature: float = LLM_DEFAULT_TEMPERATURE,
         identify_reasoning: Optional[Dict[str, str]] = None,
         max_workers: Optional[int] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,

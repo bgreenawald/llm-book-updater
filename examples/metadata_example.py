@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, RunConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.pipeline import Pipeline
 
 
@@ -26,13 +27,13 @@ def main():
         output_dir=Path("examples/output"),
         original_file=Path("examples/original.txt"),
         phases=[
-            PhaseConfig(phase_type=PhaseType.MODERNIZE, enabled=True, temperature=0.2),
+            PhaseConfig(phase_type=PhaseType.MODERNIZE, enabled=True, temperature=LLM_DEFAULT_TEMPERATURE),
             PhaseConfig(
                 phase_type=PhaseType.EDIT,
                 enabled=False,  # This phase will be skipped
-                temperature=0.3,
+                temperature=LLM_DEFAULT_TEMPERATURE,
             ),
-            PhaseConfig(phase_type=PhaseType.ANNOTATE, enabled=True, temperature=0.1),
+            PhaseConfig(phase_type=PhaseType.ANNOTATE, enabled=True, temperature=LLM_DEFAULT_TEMPERATURE),
         ],
     )
 
