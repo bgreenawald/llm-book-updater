@@ -20,10 +20,6 @@ Your primary objective is to perform a developmental edit on the provided Markdo
 ## Calibration for Length Reduction
 * **Target**: Aim for ~{length_reduction} reduction.
 * **The "Weight" Test**: Imagine the original text has a certain "intellectual weight." Your edited version should have the same "weight" but take up less space.
-* **Prohibited Actions**:
-    * DO NOT remove specific examples used to illustrate a point.
-    * DO NOT remove the author's nuanced "asides" that contribute to their voice.
-    * DO NOT turn a nuanced argument into a generic statement.
 * **Failure State**: If your output is so short that it reads like a summary or an abstract, you have failed the task. It must remain a full-bodied narrative/essay.
 
 ## Critical Constraints (Non-Negotiable Rules)
