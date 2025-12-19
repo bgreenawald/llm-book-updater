@@ -9,6 +9,8 @@ processor names (strings) and custom processor instances.
 import sys
 from pathlib import Path
 
+from src.constants import LLM_DEFAULT_TEMPERATURE
+
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -45,7 +47,7 @@ def main():
         input_file_path=Path("input/intro.md"),
         output_file_path=Path("output/intro.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.2,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         # Only built-in processors
         post_processors=[PostProcessorType.REMOVE_XML_TAGS],
     )

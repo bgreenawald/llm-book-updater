@@ -13,6 +13,7 @@ from pathlib import Path
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.pipeline import Pipeline
 
@@ -25,7 +26,7 @@ def main():
     author_name = "F. Scott Fitzgerald"
     input_file = Path("examples/annotation_input.md")
     output_dir = Path("examples/annotation_output")
-    temperature = 0.2
+    temperature = LLM_DEFAULT_TEMPERATURE
 
     # File paths
     original_file = Path("original.md")

@@ -10,6 +10,7 @@ from src.constants import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
+    LLM_DEFAULT_TEMPERATURE,
     MAX_SUBBLOCK_TOKEN_BOUND,
     MIN_SUBBLOCK_TOKEN_BOUND,
 )
@@ -61,13 +62,14 @@ def _validate_temperature(*, temperature: float) -> None:
         temperature: Sampling temperature. Must be between 0 and 2 (inclusive).
 
     Raises:
-        TypeError: If temperature is not a number.
+        TypeError: If temperature cannot be compared as a number.
         ValueError: If temperature is out of range.
     """
-    if not isinstance(temperature, (int, float)):
-        raise TypeError(f"Temperature must be a number, got {type(temperature).__name__}")
-    if temperature < 0 or temperature > 2:
-        raise ValueError(f"Temperature must be between 0 and 2, got {temperature}")
+    try:
+        if temperature < 0 or temperature > 2:
+            raise ValueError(f"Temperature must be between 0 and 2, got {temperature}")
+    except TypeError as e:
+        raise TypeError(f"Temperature must be a number, got {type(temperature).__name__}") from e
 
 
 def _validate_length_reduction(*, length_reduction: Optional[Union[int, Tuple[int, int]]]) -> None:
@@ -128,8 +130,8 @@ class TwoStageModelConfig:
 
     identify_model: ModelConfig
     implement_model: ModelConfig
-    identify_temperature: float = 0.2
-    implement_temperature: float = 0.2
+    identify_temperature: float = LLM_DEFAULT_TEMPERATURE
+    implement_temperature: float = LLM_DEFAULT_TEMPERATURE
     identify_reasoning: Optional[dict[str, str]] = None
 
     def __post_init__(self) -> None:
@@ -169,7 +171,7 @@ class PhaseConfig:
     model: ModelConfig = field(
         default_factory=lambda: ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
     )
-    temperature: float = 0.2
+    temperature: float = LLM_DEFAULT_TEMPERATURE
     reasoning: Optional[dict[str, str]] = None
     llm_kwargs: Optional[dict[str, Any]] = None
     system_prompt_path: Optional[Path] = None

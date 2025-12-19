@@ -13,6 +13,7 @@ from typing import List
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, RunConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
 
 
@@ -81,17 +82,17 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model=OPENAI_04_MINI,
-            temperature=0.3,
+            temperature=LLM_DEFAULT_TEMPERATURE,
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
             model=GEMINI_PRO,
-            temperature=0.2,
+            temperature=LLM_DEFAULT_TEMPERATURE,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
             model=OPENAI_04_MINI,
-            temperature=0.1,
+            temperature=LLM_DEFAULT_TEMPERATURE,
         ),
     ]
 

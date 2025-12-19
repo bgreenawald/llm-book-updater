@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.phase_factory import PhaseFactory
 
 
@@ -31,7 +32,7 @@ def main():
             input_file_path=Path(f"input/{phase_type.name.lower()}.md"),
             output_file_path=Path(f"output/{phase_type.name.lower()}.md"),
             original_file_path=Path("original/gatsby.md"),
-            temperature=0.2,
+            temperature=LLM_DEFAULT_TEMPERATURE,
         )
         for phase_type in PhaseType
     }
@@ -89,7 +90,7 @@ def main():
         input_file_path=Path("input/modernize.md"),
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.3,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         # Using string names
         post_processors=["remove_xml_tags", "ensure_blank_line"],
     )
@@ -109,7 +110,7 @@ def main():
         input_file_path=Path("input/modernize.md"),
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.3,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         # Using PostProcessorType enum values
         post_processors=[
             PostProcessorType.REMOVE_XML_TAGS,
@@ -134,7 +135,7 @@ def main():
         input_file_path=Path("input/annotate.md"),
         output_file_path=Path("output/annotate.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.2,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         # Mixing strings, enums, and instances
         post_processors=[
             "revert_removed_block_lines",  # String
