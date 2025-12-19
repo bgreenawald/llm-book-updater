@@ -845,7 +845,219 @@ class LlmPhase(ABC):
             if hasattr(self.model, "supports_batch") and self.model.supports_batch():
                 logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
 
-                # Prepare batch requests
+                # Sub-block aware batching: when enabled, each block can expand to multiple batch requests.
+                if self.use_subblocks:
+                    block_entries: List[Dict[str, Any]] = []
+                    valid_requests: List[Dict[str, Any]] = []
+
+                    for block_index, (current_block, original_block) in enumerate(batch):
+                        current_header, current_body = self._get_header_and_body(block=current_block)
+                        original_header, original_body = self._get_header_and_body(block=original_block)
+
+                        # Skip empty blocks or blocks with only special tags
+                        if (not current_body.strip() and not original_body.strip()) or (
+                            self._contains_only_special_tags(current_body)
+                            and self._contains_only_special_tags(original_body)
+                        ):
+                            block_entries.append(
+                                {
+                                    "skipped": True,
+                                    "current_header": current_header,
+                                    "current_body": current_body,
+                                }
+                            )
+                            continue
+
+                        current_paragraphs = self._split_body_into_paragraphs(current_body)
+                        original_paragraphs = self._split_body_into_paragraphs(original_body)
+
+                        # If no paragraphs, treat as a single request (preserves previous batch behavior).
+                        if not current_paragraphs:
+                            user_message = self._format_user_message(
+                                current_body=current_body,
+                                original_body=original_body,
+                                current_header=current_header,
+                                original_header=original_header,
+                            )
+                            req = {
+                                "system_prompt": self.system_prompt,
+                                "user_prompt": user_message,
+                                "metadata": {
+                                    "block_index": block_index,
+                                    "subblock_index": 0,
+                                    "subblock_count": 1,
+                                    "current_header": current_header,
+                                    "current_body_full": current_body,
+                                    "original_body_full": original_body,
+                                    "original_header": original_header,
+                                },
+                            }
+                            block_entries.append(
+                                {
+                                    "skipped": False,
+                                    "block_index": block_index,
+                                    "current_header": current_header,
+                                    "current_body_full": current_body,
+                                    "original_body_full": original_body,
+                                    "original_header": original_header,
+                                    "subblock_count": 1,
+                                }
+                            )
+                            valid_requests.append(req)
+                            continue
+
+                        current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
+                        original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
+
+                        # Ensure same number of sub-blocks (mirror non-batch subblock path behavior)
+                        if len(current_subblocks) != len(original_subblocks):
+                            logger.warning(
+                                f"Sub-block count mismatch: current={len(current_subblocks)}, "
+                                f"original={len(original_subblocks)}. Using current body grouping for original as well."
+                            )
+                            original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
+                            if len(current_subblocks) != len(original_subblocks):
+                                while len(original_subblocks) < len(current_subblocks):
+                                    original_subblocks.append("")
+                                original_subblocks = original_subblocks[: len(current_subblocks)]
+
+                        with self._subblock_stats_lock:
+                            self._subblock_blocks_processed_total += 1
+                            self._subblocks_processed_total += len(current_subblocks)
+                            if len(current_subblocks) > self._max_subblocks_in_single_block:
+                                self._max_subblocks_in_single_block = len(current_subblocks)
+
+                        logger.debug(
+                            f"Batch mode: split block '{current_header[:30]}...' "
+                            f"into {len(current_subblocks)} sub-blocks"
+                        )
+
+                        block_entries.append(
+                            {
+                                "skipped": False,
+                                "block_index": block_index,
+                                "current_header": current_header,
+                                "current_body_full": current_body,
+                                "original_body_full": original_body,
+                                "original_header": original_header,
+                                "subblock_count": len(current_subblocks),
+                            }
+                        )
+
+                        for subblock_index, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks)):
+                            user_message = self._format_user_message(
+                                current_body=curr_sb,
+                                original_body=orig_sb,
+                                current_header=current_header,
+                                original_header=original_header,
+                            )
+                            valid_requests.append(
+                                {
+                                    "system_prompt": self.system_prompt,
+                                    "user_prompt": user_message,
+                                    "metadata": {
+                                        "block_index": block_index,
+                                        "subblock_index": subblock_index,
+                                        "subblock_count": len(current_subblocks),
+                                        "current_header": current_header,
+                                        "current_body_full": current_body,
+                                        "original_body_full": original_body,
+                                        "original_header": original_header,
+                                    },
+                                }
+                            )
+
+                    if valid_requests:
+                        call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+                        batch_responses = self.model.batch_chat_completion(
+                            requests=valid_requests, temperature=self.temperature, **call_kwargs
+                        )
+                    else:
+                        batch_responses = []
+
+                    failed_response_indices: List[int] = []
+                    for idx, response in enumerate(batch_responses):
+                        if response.get("failed", False):
+                            failed_response_indices.append(idx)
+                    if failed_response_indices:
+                        logger.warning(
+                            f"Batch processing had {len(failed_response_indices)} failed responses out of "
+                            f"{len(batch_responses)}"
+                        )
+
+                        if not self.enable_retry:
+                            first_failed = batch_responses[failed_response_indices[0]]
+                            failed_content = first_failed.get("content", "Unknown error")
+                            block_info = f"batch index {failed_response_indices[0]}"
+                            raise GenerationFailedError(
+                                message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
+                                block_info=block_info,
+                            )
+
+                        logger.info(f"Retrying {len(failed_response_indices)} failed batch responses individually")
+                        for failed_idx in failed_response_indices:
+                            original_request = valid_requests[failed_idx]
+                            header = original_request["metadata"].get("current_header", "unknown")[:50]
+                            block_info = f"batch index {failed_idx}, header: {header}"
+
+                            call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+                            retried_content, retried_gen_id = self._make_llm_call_with_retry(
+                                system_prompt=original_request["system_prompt"],
+                                user_prompt=original_request["user_prompt"],
+                                block_info=block_info,
+                                **call_kwargs_retry,
+                            )
+
+                            batch_responses[failed_idx] = {
+                                "content": retried_content,
+                                "generation_id": retried_gen_id,
+                                "metadata": original_request["metadata"],
+                                "failed": False,
+                            }
+
+                    # Group responses back into blocks
+                    subblock_outputs: Dict[int, List[Optional[str]]] = {}
+                    for req, resp in zip(valid_requests, batch_responses):
+                        req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+                        subblock_metadata: Dict[str, Any] = cast(Dict[str, Any], req_dict.get("metadata", {}))
+                        block_index = int(subblock_metadata["block_index"])
+                        subblock_index = int(subblock_metadata["subblock_index"])
+                        subblock_count = int(subblock_metadata["subblock_count"])
+                        if block_index not in subblock_outputs:
+                            subblock_outputs[block_index] = [None] * subblock_count
+                        subblock_outputs[block_index][subblock_index] = resp.get("content", "")
+
+                        generation_id = resp.get("generation_id")
+                        if generation_id:
+                            add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+                    # Reconstruct processed blocks maintaining original order
+                    processed_blocks: List[str] = []
+                    for entry in block_entries:
+                        if entry.get("skipped", False):
+                            processed_blocks.append(f"{entry['current_header']}\n\n{entry['current_body']}\n\n")
+                            continue
+
+                        block_index = int(entry["block_index"])
+                        parts = subblock_outputs.get(block_index, [])
+                        # Defensive: fill any missing subblocks with empty strings.
+                        processed_body_raw = "\n".join([(p if p is not None else "") for p in parts])
+
+                        processed_body = self._apply_post_processing(
+                            original_block=entry["current_body_full"], llm_block=processed_body_raw, **kwargs
+                        )
+                        processed_block = self._assemble_processed_block(
+                            current_header=entry["current_header"],
+                            current_body=entry["current_body_full"],
+                            llm_response=processed_body,
+                            original_body=entry["original_body_full"],
+                            **kwargs,
+                        )
+                        processed_blocks.append(processed_block)
+
+                    return processed_blocks
+
+                # Prepare batch requests (non-subblock batching: one request per block)
                 batch_requests: List[Optional[Dict[str, Any]]] = []
                 for current_block, original_block in batch:
                     current_header, current_body = self._get_header_and_body(block=current_block)
@@ -952,7 +1164,8 @@ class LlmPhase(ABC):
 
                         request = batch_requests[i]
                         assert request is not None  # Type guard for mypy
-                        metadata = request["metadata"]
+                        request_dict: Dict[str, Any] = cast(Dict[str, Any], request)
+                        metadata: Dict[str, Any] = cast(Dict[str, Any], request_dict.get("metadata", {}))
                         processed_body = response["content"]
                         generation_id = response.get("generation_id")
 

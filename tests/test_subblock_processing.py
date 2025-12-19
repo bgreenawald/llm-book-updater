@@ -500,3 +500,63 @@ class TestPhaseFactorySubblockParams:
             assert phase.use_subblocks is True
             assert phase.max_subblock_tokens == 8000
             assert phase.min_subblock_tokens == 2000
+
+
+class TestBatchModeWithSubblocks:
+    """Tests for batch mode behavior when sub-blocks are enabled."""
+
+    def test_batch_processing_splits_into_subblocks(self):
+        """Batch mode should expand a single block into multiple sub-block requests and reassemble output."""
+        from src.llm_phase import StandardLlmPhase
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            input_file = temp_path / "input.md"
+            input_file.write_text("## Header\n\nParagraph 1.\nParagraph 2.\n")
+            output_file = temp_path / "output.md"
+            system_prompt = temp_path / "system.md"
+            system_prompt.write_text("System prompt")
+            user_prompt = temp_path / "user.md"
+            user_prompt.write_text("{current_body}")
+
+            mock_model = MagicMock()
+            mock_model.supports_batch.return_value = True
+            mock_model.batch_chat_completion.return_value = [
+                {"content": "OUT-1", "generation_id": "gen-1"},
+                {"content": "OUT-2", "generation_id": "gen-2"},
+            ]
+
+            phase = StandardLlmPhase(
+                name="test_phase",
+                input_file_path=input_file,
+                output_file_path=output_file,
+                original_file_path=input_file,
+                system_prompt_path=system_prompt,
+                user_prompt_path=user_prompt,
+                book_name="Test Book",
+                author_name="Test Author",
+                model=mock_model,
+                use_subblocks=True,
+                use_batch=True,
+                max_subblock_tokens=4096,
+                min_subblock_tokens=100,
+                max_workers=1,
+            )
+
+            # Force deterministic sub-block grouping (two sub-blocks).
+            with patch.object(phase, "_split_body_into_paragraphs", return_value=["P1", "P2"]):
+                with patch.object(phase, "_group_paragraphs_into_subblocks", return_value=["SB-1", "SB-2"]):
+                    results = phase._process_batch(batch=[("## Header\n\nP1\nP2\n", "## Header\n\nP1\nP2\n")])
+
+            assert len(results) == 1
+            assert results[0].startswith("## Header")
+            assert "OUT-1\nOUT-2" in results[0]
+
+            # Sub-block stats should reflect splitting.
+            assert phase._subblocks_processed_total == 2
+            assert phase._subblock_blocks_processed_total == 1
+
+            # Batch API should have been called with two requests (one per sub-block).
+            _, call_kwargs = mock_model.batch_chat_completion.call_args
+            assert len(call_kwargs["requests"]) == 2
