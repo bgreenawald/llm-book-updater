@@ -436,6 +436,24 @@ class OpenAIClient(ProviderClient):
                 "input": user_prompt,
             }
 
+            # Handle reasoning parameter - support both formats:
+            # 1. reasoning={"effort": "high"} (standard format)
+            # 2. effort="high" (legacy format, will be wrapped)
+            reasoning = kwargs.pop("reasoning", None)
+            effort = kwargs.pop("effort", None)
+
+            if reasoning is not None:
+                if isinstance(reasoning, dict):
+                    request_kwargs["reasoning"] = reasoning
+                else:
+                    module_logger.warning(
+                        f"Invalid reasoning parameter type: {type(reasoning)}. "
+                        f"Expected dict with 'effort' key, e.g., {{'effort': 'high'}}"
+                    )
+            elif effort is not None:
+                # Legacy format: wrap effort in reasoning dict
+                request_kwargs["reasoning"] = {"effort": effort}
+
             response = client.responses.create(**request_kwargs, **kwargs)
 
             # Extract content from the new responses API format
@@ -527,9 +545,22 @@ class OpenAIClient(ProviderClient):
             if system_prompt:
                 batch_body["instructions"] = system_prompt
 
-            # Optional: pass through reasoning effort if provided (Responses API)
+            # Handle reasoning parameter - support both formats:
+            # 1. reasoning={"effort": "high"} (standard format)
+            # 2. effort="high" (legacy format, will be wrapped)
+            reasoning = kwargs.get("reasoning")
             effort = kwargs.get("effort")
-            if effort is not None:
+
+            if reasoning is not None:
+                if isinstance(reasoning, dict):
+                    batch_body["reasoning"] = reasoning
+                else:
+                    module_logger.warning(
+                        f"Invalid reasoning parameter type in batch request: {type(reasoning)}. "
+                        f"Expected dict with 'effort' key, e.g., {{'effort': 'high'}}"
+                    )
+            elif effort is not None:
+                # Legacy format: wrap effort in reasoning dict
                 batch_body["reasoning"] = {"effort": effort}
 
             # Pass through any additional kwargs (temperature, etc.)
