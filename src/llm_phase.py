@@ -895,7 +895,6 @@ class LlmPhase(ABC):
                             continue
 
                         current_paragraphs = self._split_body_into_paragraphs(current_body)
-                        original_paragraphs = self._split_body_into_paragraphs(original_body)
 
                         # If no paragraphs, treat as a single request (preserves previous batch behavior).
                         if not current_paragraphs:
@@ -933,19 +932,6 @@ class LlmPhase(ABC):
                             continue
 
                         current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
-                        original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
-
-                        # Ensure same number of sub-blocks (mirror non-batch subblock path behavior)
-                        if len(current_subblocks) != len(original_subblocks):
-                            logger.warning(
-                                f"Sub-block count mismatch: current={len(current_subblocks)}, "
-                                f"original={len(original_subblocks)}. Using current body grouping for original as well."
-                            )
-                            original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
-                            if len(current_subblocks) != len(original_subblocks):
-                                while len(original_subblocks) < len(current_subblocks):
-                                    original_subblocks.append("")
-                                original_subblocks = original_subblocks[: len(current_subblocks)]
 
                         with self._subblock_stats_lock:
                             self._subblock_blocks_processed_total += 1
@@ -970,10 +956,10 @@ class LlmPhase(ABC):
                             }
                         )
 
-                        for subblock_index, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks)):
+                        for subblock_index, curr_sb in enumerate(current_subblocks):
                             user_message = self._format_user_message(
                                 current_body=curr_sb,
-                                original_body=orig_sb,
+                                original_body=original_body,
                                 current_header=current_header,
                                 original_header=original_header,
                             )
@@ -1437,7 +1423,7 @@ class StandardLlmPhase(LlmPhase):
     def _process_subblock(
         self,
         current_subblock: str,
-        original_subblock: str,
+        original_body: str,
         current_header: str,
         original_header: str,
         subblock_index: int,
@@ -1448,7 +1434,7 @@ class StandardLlmPhase(LlmPhase):
 
         Args:
             current_subblock: The current sub-block text to process
-            original_subblock: The original sub-block text for reference
+            original_body: The full original body text for reference
             current_header: The header of the block (for context in prompts)
             original_header: The original header (for context in prompts)
             subblock_index: Index of the sub-block for logging
@@ -1460,7 +1446,7 @@ class StandardLlmPhase(LlmPhase):
         # Format the user message using sub-block content
         user_message = self._format_user_message(
             current_body=current_subblock,
-            original_body=original_subblock,
+            original_body=original_body,
             current_header=current_header,
             original_header=original_header,
         )
@@ -1511,9 +1497,8 @@ class StandardLlmPhase(LlmPhase):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
 
-        # Split bodies into paragraphs
+        # Split current body into paragraphs
         current_paragraphs = self._split_body_into_paragraphs(current_body)
-        original_paragraphs = self._split_body_into_paragraphs(original_body)
 
         # If no paragraphs, return as-is
         if not current_paragraphs:
@@ -1522,7 +1507,6 @@ class StandardLlmPhase(LlmPhase):
 
         # Group paragraphs into sub-blocks
         current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
-        original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
 
         with self._subblock_stats_lock:
             self._subblock_blocks_processed_total += 1
@@ -1532,50 +1516,33 @@ class StandardLlmPhase(LlmPhase):
 
         logger.debug(f"Split block '{current_header[:30]}...' into {len(current_subblocks)} sub-blocks")
 
-        # Ensure same number of sub-blocks (use original grouping if counts differ)
-        if len(current_subblocks) != len(original_subblocks):
-            logger.warning(
-                f"Sub-block count mismatch: current={len(current_subblocks)}, original={len(original_subblocks)}. "
-                "Using current body grouping for original as well."
-            )
-            # Re-group original using same number of paragraphs per group
-            # This is a fallback - ideally counts should match
-            original_subblocks = self._group_paragraphs_into_subblocks(original_paragraphs)
-            if len(current_subblocks) != len(original_subblocks):
-                # Last resort: pair by position, padding with empty strings
-                while len(original_subblocks) < len(current_subblocks):
-                    original_subblocks.append("")
-                original_subblocks = original_subblocks[: len(current_subblocks)]
-
         # Process sub-blocks
         if self.max_workers > 1 and len(current_subblocks) > 1:
             # Parallel processing
             logger.debug(f"Processing {len(current_subblocks)} sub-blocks in parallel with {self.max_workers} workers")
 
-            def process_subblock_wrapper(args: Tuple[int, str, str]) -> str:
-                idx, curr_sb, orig_sb = args
+            def process_subblock_wrapper(args: Tuple[int, str]) -> str:
+                idx, curr_sb = args
                 return self._process_subblock(
                     current_subblock=curr_sb,
-                    original_subblock=orig_sb,
+                    original_body=original_body,
                     current_header=current_header,
                     original_header=original_header,
                     subblock_index=idx,
                     **kwargs,
                 )
 
-            subblock_args = [
-                (i, curr_sb, orig_sb) for i, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks))
-            ]
+            subblock_args = [(i, curr_sb) for i, curr_sb in enumerate(current_subblocks)]
 
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 processed_subblocks = list(executor.map(process_subblock_wrapper, subblock_args))
         else:
             # Sequential processing
             processed_subblocks = []
-            for i, (curr_sb, orig_sb) in enumerate(zip(current_subblocks, original_subblocks)):
+            for i, curr_sb in enumerate(current_subblocks):
                 processed_sb = self._process_subblock(
                     current_subblock=curr_sb,
-                    original_subblock=orig_sb,
+                    original_body=original_body,
                     current_header=current_header,
                     original_header=original_header,
                     subblock_index=i,
