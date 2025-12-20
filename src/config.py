@@ -9,7 +9,6 @@ from src.constants import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
-    LLM_DEFAULT_TEMPERATURE,
     MAX_SUBBLOCK_TOKEN_BOUND,
     MIN_SUBBLOCK_TOKEN_BOUND,
 )
@@ -81,15 +80,11 @@ class TwoStageModelConfig:
     Attributes:
         identify_model: Model configuration for the IDENTIFY stage (analysis).
         implement_model: Model configuration for the IMPLEMENT stage (application).
-        identify_temperature: Temperature for the IDENTIFY stage.
-        implement_temperature: Temperature for the IMPLEMENT stage.
         identify_reasoning: Optional reasoning configuration for the IDENTIFY stage.
     """
 
     identify_model: ModelConfig
     implement_model: ModelConfig
-    identify_temperature: float = LLM_DEFAULT_TEMPERATURE
-    implement_temperature: float = LLM_DEFAULT_TEMPERATURE
     identify_reasoning: Optional[dict[str, str]] = None
 
     def __post_init__(self) -> None:
@@ -103,9 +98,6 @@ class TwoStageModelConfig:
             raise TypeError(f"identify_model must be a ModelConfig, got {type(self.identify_model).__name__}")
         if not isinstance(self.implement_model, ModelConfig):
             raise TypeError(f"implement_model must be a ModelConfig, got {type(self.implement_model).__name__}")
-
-        _validate_temperature(temperature=self.identify_temperature)
-        _validate_temperature(temperature=self.implement_temperature)
 
         if self.identify_reasoning is not None:
             if not isinstance(self.identify_reasoning, dict):
@@ -129,7 +121,6 @@ class PhaseConfig:
     model: ModelConfig = field(
         default_factory=lambda: ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
     )
-    temperature: float = LLM_DEFAULT_TEMPERATURE
     reasoning: Optional[dict[str, str]] = None
     llm_kwargs: Optional[dict[str, Any]] = None
     system_prompt_path: Optional[Path] = None
@@ -176,8 +167,6 @@ class PhaseConfig:
         """
         if not isinstance(self.phase_type, PhaseType):
             raise TypeError(f"phase_type must be a PhaseType, got {type(self.phase_type).__name__}")
-
-        _validate_temperature(temperature=self.temperature)
 
         if self.reasoning is not None:
             if not isinstance(self.reasoning, dict):

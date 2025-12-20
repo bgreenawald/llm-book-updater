@@ -16,8 +16,6 @@ from src.constants import (
     DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     DEFAULT_OPENROUTER_MAX_RETRIES,
     DEFAULT_OPENROUTER_RETRY_DELAY,
-    GEMINI_DEFAULT_TEMPERATURE,
-    LLM_DEFAULT_TEMPERATURE,
     OPENAI_BATCH_DEFAULT_TIMEOUT,
     OPENAI_BATCH_POLLING_INTERVAL,
     OPENROUTER_POOL_CONNECTIONS,
@@ -178,11 +176,16 @@ class ProviderClient(ABC):
         system_prompt: str,
         user_prompt: str,
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
         """
         Make a chat completion call.
+
+        Args:
+            system_prompt: System prompt for the conversation
+            user_prompt: User prompt for the conversation
+            model_name: Name of the model to use
+            **kwargs: Additional arguments (temperature can be passed here if needed)
 
         Returns:
             Tuple of (response_content, generation_id)
@@ -193,7 +196,6 @@ class ProviderClient(ABC):
         self,
         requests: list[dict[str, Any]],
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -205,8 +207,7 @@ class ProviderClient(ABC):
                 - user_prompt: User prompt for the request
                 - metadata: Optional metadata to include in response
             model_name: Name of the model to use
-            temperature: Temperature setting for the model
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments (temperature can be passed here if needed)
 
         Returns:
             List of response dictionaries, each containing:
@@ -221,7 +222,6 @@ class ProviderClient(ABC):
                 system_prompt=request["system_prompt"],
                 user_prompt=request["user_prompt"],
                 model_name=model_name,
-                temperature=temperature,
                 **kwargs,
             )
             responses.append(
@@ -355,7 +355,6 @@ class OpenRouterClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using OpenRouter API."""
@@ -363,6 +362,10 @@ class OpenRouterClient(ProviderClient):
         # values. Detect and omit temperature to avoid 400 errors from upstream.
         provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
         is_gpt5_series_model = provider_model.lower().startswith("gpt-5")
+
+        # Filter out temperature for GPT-5 models
+        if is_gpt5_series_model:
+            kwargs.pop("temperature", None)
 
         data: dict[str, Any] = {
             "model": model_name,
@@ -372,8 +375,6 @@ class OpenRouterClient(ProviderClient):
             ],
             **kwargs,
         }
-        if not is_gpt5_series_model:
-            data["temperature"] = temperature
 
         resp_data = self._make_api_call(data=data)
 
@@ -423,26 +424,17 @@ class OpenAIClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using OpenAI SDK."""
         client = self._get_client()
 
         try:
-            # GPT-5 models (and variants) currently do not support custom
-            # temperature values; only the default is allowed. Omit the
-            # temperature parameter for these models to avoid 400 errors.
-            is_gpt5_series_model = model_name.lower().startswith("gpt-5")
-
             request_kwargs: dict[str, Any] = {
                 "model": model_name,
                 "instructions": system_prompt,
                 "input": user_prompt,
             }
-
-            if not is_gpt5_series_model:
-                request_kwargs["temperature"] = temperature
 
             response = client.responses.create(**request_kwargs, **kwargs)
 
@@ -500,29 +492,31 @@ class OpenAIClient(ProviderClient):
             module_logger.error(f"OpenAI API call failed: {e}")
             raise LlmModelError(f"OpenAI API call failed: {e}") from e
 
-    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, temperature: float, **kwargs) -> str:
+    def _create_batch_jsonl(self, requests: list[dict[str, Any]], model_name: str, **kwargs) -> str:
         """
         Create JSONL content for batch processing using the OpenAI Responses API.
 
         Args:
             requests: List of request dictionaries containing system_prompt, user_prompt, metadata
             model_name: Name of the model to use
-            temperature: Temperature setting for the model
-            **kwargs: Additional parameters (e.g., effort under reasoning)
+            **kwargs: Additional parameters (temperature can be passed here if needed, e.g., effort under reasoning)
 
         Returns:
             str: JSONL formatted string for batch processing
         """
         import json
 
+        # Handle GPT-5 models that don't support custom temperature
+        is_gpt5_series_model = model_name.lower().startswith("gpt-5")
+        # Filter out temperature for GPT-5 models
+        if is_gpt5_series_model:
+            kwargs.pop("temperature", None)
+
         jsonl_lines = []
         for i, request in enumerate(requests):
             system_prompt = request.get("system_prompt", "")
             user_prompt = request.get("user_prompt", "")
             metadata = request.get("metadata", {})
-
-            # Handle GPT-5 models that don't support custom temperature
-            is_gpt5_series_model = model_name.lower().startswith("gpt-5")
 
             # Build request body for Responses API
             batch_body: Dict[str, Any] = {
@@ -533,14 +527,14 @@ class OpenAIClient(ProviderClient):
             if system_prompt:
                 batch_body["instructions"] = system_prompt
 
-            # Only add temperature for non-GPT-5 models
-            if not is_gpt5_series_model:
-                batch_body["temperature"] = temperature
-
             # Optional: pass through reasoning effort if provided (Responses API)
             effort = kwargs.get("effort")
             if effort is not None:
                 batch_body["reasoning"] = {"effort": effort}
+
+            # Pass through any additional kwargs (temperature, etc.)
+            # Note: temperature is already filtered out for GPT-5 models above
+            batch_body.update(kwargs)
 
             batch_request = {
                 "custom_id": f"request_{i}_{metadata.get('id', '')}",
@@ -764,7 +758,6 @@ class OpenAIClient(ProviderClient):
         self,
         requests: list[dict[str, Any]],
         model_name: str,
-        temperature: float,
         batch_timeout: int = OPENAI_BATCH_DEFAULT_TIMEOUT,
         **kwargs,
     ) -> list[dict[str, Any]]:
@@ -778,9 +771,8 @@ class OpenAIClient(ProviderClient):
         Args:
             requests: List of request dictionaries
             model_name: Name of the model to use
-            temperature: Temperature setting for the model
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments (temperature can be passed here if needed)
 
         Returns:
             List of response dictionaries
@@ -794,7 +786,7 @@ class OpenAIClient(ProviderClient):
             module_logger.info(f"Starting OpenAI batch processing for {len(requests)} requests")
 
             # Create JSONL content for batch processing
-            jsonl_content = self._create_batch_jsonl(requests, model_name, temperature, **kwargs)
+            jsonl_content = self._create_batch_jsonl(requests, model_name, **kwargs)
 
             # Log sample of batch content for debugging
             jsonl_lines = jsonl_content.split("\n")
@@ -841,7 +833,7 @@ class OpenAIClient(ProviderClient):
                             module_logger.error(f"Failed to retrieve error file: {e}")
 
                     # Fall back to sequential processing
-                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                    return super().batch_chat_completion(requests, model_name, **kwargs)
 
                 # Log detailed job information for debugging
                 module_logger.info(
@@ -889,7 +881,7 @@ class OpenAIClient(ProviderClient):
                         f"Failed requests: {failed_count}"
                     )
                     # Fall back to sequential processing
-                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                    return super().batch_chat_completion(requests, model_name, **kwargs)
 
             finally:
                 # Clean up temporary file
@@ -902,12 +894,12 @@ class OpenAIClient(ProviderClient):
         except ImportError as e:
             module_logger.error(f"OpenAI SDK not available for batch processing: {e}")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
         except Exception as e:
             module_logger.error(f"OpenAI batch API call failed: {e}")
             module_logger.exception("Batch processing error details:")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
 
 
 class GeminiClient(ProviderClient):
@@ -938,7 +930,6 @@ class GeminiClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using Gemini SDK."""
@@ -957,15 +948,12 @@ class GeminiClient(ProviderClient):
             # Build config_kwargs from remaining kwargs, avoiding duplicates
             config_kwargs = dict(kwargs)
 
-            # Explicitly set system_instruction and temperature, overriding any in kwargs
+            # Explicitly set system_instruction, overriding any in kwargs
             if system_prompt:
                 config_kwargs["system_instruction"] = system_prompt
             else:
                 # Remove system_instruction if it exists in kwargs and no system_prompt provided
                 config_kwargs.pop("system_instruction", None)
-
-            # Always set temperature explicitly to avoid duplicates
-            config_kwargs["temperature"] = temperature
 
             # Create the config with deduplicated parameters
             config = types.GenerateContentConfig(**config_kwargs)
@@ -1174,7 +1162,6 @@ class GeminiClient(ProviderClient):
         self,
         requests: list[dict[str, Any]],
         model_name: str,
-        temperature: float,
         batch_timeout: int = 3600 * 24,
         **kwargs,
     ) -> list[dict[str, Any]]:
@@ -1188,9 +1175,8 @@ class GeminiClient(ProviderClient):
         Args:
             requests: List of request dictionaries
             model_name: Name of the model to use
-            temperature: Temperature setting for the model
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments (temperature can be passed here if needed)
 
         Returns:
             List of response dictionaries
@@ -1226,11 +1212,8 @@ class GeminiClient(ProviderClient):
                     display_name=f"llm_book_updater_batch_{int(time.time())}",
                 )
 
-                # Add temperature to the config if supported
-                if temperature != GEMINI_DEFAULT_TEMPERATURE:  # Only set if different from default
-                    # Note: Temperature might need to be set differently in batch config
-                    # The exact parameter name may vary - check latest API docs
-                    pass
+                # Note: Temperature can be passed via kwargs if needed for batch config
+                # The exact parameter name may vary - check latest API docs
 
                 # Create the batch job
                 module_logger.info(f"Creating batch job with model {model_name}...")
@@ -1247,7 +1230,7 @@ class GeminiClient(ProviderClient):
                 if not self._poll_batch_job(client, batch_job.name, batch_timeout):
                     module_logger.error("Batch job did not complete successfully")
                     # Fall back to sequential processing
-                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                    return super().batch_chat_completion(requests, model_name, **kwargs)
 
                 # Get the completed job to retrieve results
                 completed_job = client.batches.get(name=batch_job.name)
@@ -1268,7 +1251,7 @@ class GeminiClient(ProviderClient):
                 else:
                     module_logger.error("No result file found in completed batch job")
                     # Fall back to sequential processing
-                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                    return super().batch_chat_completion(requests, model_name, **kwargs)
 
             finally:
                 # Clean up temporary file
@@ -1281,12 +1264,12 @@ class GeminiClient(ProviderClient):
         except ImportError as e:
             module_logger.error(f"Google GenAI SDK not available for batch processing: {e}")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
         except Exception as e:
             module_logger.error(f"Gemini batch API call failed: {e}")
             module_logger.exception("Batch processing error details:")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
 
 
 class ClaudeClient(ProviderClient):
@@ -1317,7 +1300,6 @@ class ClaudeClient(ProviderClient):
         system_prompt: str,
         user_prompt: str,
         model_name: str,
-        temperature: float,
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using Anthropic SDK."""
@@ -1329,14 +1311,13 @@ class ClaudeClient(ProviderClient):
                 "model": model_name,
                 "max_tokens": kwargs.pop("max_tokens", 65536),  # 64K for Claude 4.5 book chapters
                 "messages": [{"role": "user", "content": user_prompt}],
-                "temperature": temperature,
             }
 
             # Add system prompt if provided
             if system_prompt:
                 request_params["system"] = system_prompt
 
-            # Pass through any additional kwargs
+            # Pass through any additional kwargs (including temperature if provided)
             request_params.update(kwargs)
 
             response = client.messages.create(**request_params)
@@ -1379,7 +1360,6 @@ class ClaudeClient(ProviderClient):
         self,
         requests: list[dict[str, Any]],
         model_name: str,
-        temperature: float,
         batch_timeout: int = 3600 * 24,  # 24 hours default
         **kwargs,
     ) -> list[dict[str, Any]]:
@@ -1393,9 +1373,8 @@ class ClaudeClient(ProviderClient):
         Args:
             requests: List of request dictionaries
             model_name: Name of the model to use
-            temperature: Temperature setting for the model
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments (e.g., max_tokens)
+            **kwargs: Additional arguments (temperature can be passed here if needed, e.g., max_tokens)
 
         Returns:
             List of response dictionaries
@@ -1419,12 +1398,14 @@ class ClaudeClient(ProviderClient):
                     "model": model_name,
                     "max_tokens": kwargs.get("max_tokens", 65536),  # 64K for Claude 4.5
                     "messages": [{"role": "user", "content": user_prompt}],
-                    "temperature": temperature,
                 }
 
                 # Add system prompt if provided
                 if system_prompt:
                     params["system"] = system_prompt
+
+                # Pass through any additional kwargs (including temperature if provided)
+                params.update(kwargs)
 
                 # Create batch request with custom_id
                 batch_request = {
@@ -1455,14 +1436,14 @@ class ClaudeClient(ProviderClient):
                 elif message_batch.processing_status in ["canceling", "canceled"]:
                     module_logger.error("Batch job was canceled")
                     # Fall back to sequential processing
-                    return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                    return super().batch_chat_completion(requests, model_name, **kwargs)
 
                 time.sleep(poll_interval)
             else:
                 # Timeout reached
                 module_logger.error(f"Batch job timed out after {batch_timeout} seconds")
                 # Fall back to sequential processing
-                return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+                return super().batch_chat_completion(requests, model_name, **kwargs)
 
             # Retrieve and process results
             module_logger.info("Downloading batch results...")
@@ -1553,12 +1534,12 @@ class ClaudeClient(ProviderClient):
         except ImportError as e:
             module_logger.error(f"Anthropic SDK not available for batch processing: {e}")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
         except Exception as e:
             module_logger.error(f"Claude batch API call failed: {e}")
             module_logger.exception("Batch processing error details:")
             # Fall back to sequential processing
-            return super().batch_chat_completion(requests, model_name, temperature, **kwargs)
+            return super().batch_chat_completion(requests, model_name, **kwargs)
 
 
 class LlmModel:
@@ -1579,7 +1560,6 @@ class LlmModel:
     def __init__(
         self,
         model: ModelConfig,
-        temperature: float = LLM_DEFAULT_TEMPERATURE,
         # OpenRouter settings
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
@@ -1598,7 +1578,6 @@ class LlmModel:
 
         Args:
             model: Model configuration (ModelConfig) specifying provider and model.
-            temperature: Temperature for sampling.
             openrouter_api_key_env: Environment variable for OpenRouter API key.
             openrouter_base_url: OpenRouter base URL.
             openrouter_max_retries: Maximum retry attempts for OpenRouter.
@@ -1611,7 +1590,6 @@ class LlmModel:
                 If None, checks LLM_ENABLE_PROMPT_LOGGING environment variable.
         """
         self.model_config = model
-        self.temperature = temperature
 
         # Determine prompt logging setting
         if enable_prompt_logging is None:
@@ -1709,7 +1687,6 @@ class LlmModel:
     def create(
         cls,
         model: ModelConfig,
-        temperature: float = LLM_DEFAULT_TEMPERATURE,
         openrouter_api_key_env: str = DEFAULT_OPENROUTER_API_ENV,
         openrouter_base_url: str = DEFAULT_OPENROUTER_BASE_URL,
         openrouter_max_retries: int = DEFAULT_MAX_RETRIES,
@@ -1723,7 +1700,6 @@ class LlmModel:
         """Create a new LlmModel instance with the specified configuration."""
         return cls(
             model=model,
-            temperature=temperature,
             openrouter_api_key_env=openrouter_api_key_env,
             openrouter_base_url=openrouter_base_url,
             openrouter_max_retries=openrouter_max_retries,
@@ -1741,16 +1717,10 @@ class LlmModel:
         return self.model_config.model_id
 
     def __str__(self) -> str:
-        return (
-            f"LlmModel(provider={self.model_config.provider.value}, "
-            f"model_id={self.model_config.model_id}, temperature={self.temperature})"
-        )
+        return f"LlmModel(provider={self.model_config.provider.value}, model_id={self.model_config.model_id})"
 
     def __repr__(self) -> str:
-        return (
-            f"LlmModel(provider={self.model_config.provider.value}, "
-            f"model_id={self.model_config.model_id}, temperature={self.temperature})"
-        )
+        return f"LlmModel(provider={self.model_config.provider.value}, model_id={self.model_config.model_id})"
 
     def _log_prompt(self, role: str, content: str) -> None:
         """
@@ -1780,7 +1750,6 @@ class LlmModel:
     def batch_chat_completion(
         self,
         requests: list[dict[str, Any]],
-        temperature: Optional[float] = None,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -1788,8 +1757,7 @@ class LlmModel:
 
         Args:
             requests: List of request dictionaries
-            temperature: Optional temperature override
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments (temperature can be passed here if needed)
 
         Returns:
             List of response dictionaries
@@ -1810,13 +1778,9 @@ class LlmModel:
         # Ensure model_name is a concrete string
         model_name: str = self.model_config.provider_model_name or self.model_config.model_id
 
-        # Use provided temperature or default
-        call_temperature: float = temperature if temperature is not None else self.temperature
-
         return client.batch_chat_completion(
             requests=requests,
             model_name=model_name,
-            temperature=call_temperature,
             **kwargs,
         )
 
@@ -1846,6 +1810,11 @@ class LlmModel:
         """
         Make a chat completion call using the appropriate provider.
 
+        Args:
+            system_prompt: System prompt for the conversation
+            user_prompt: User prompt for the conversation
+            **kwargs: Additional arguments (temperature can be passed here if needed)
+
         Returns:
             Tuple of (assistant reply content, generation ID).
 
@@ -1861,13 +1830,9 @@ class LlmModel:
         # Ensure model_name is a concrete string
         model_name: str = self.model_config.provider_model_name or self.model_config.model_id
 
-        # Allow per-call temperature override without duplicating keyword
-        call_temperature: float = kwargs.pop("temperature", self.temperature)
-
         return client.chat_completion(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model_name=model_name,
-            temperature=call_temperature,
             **kwargs,
         )

@@ -60,7 +60,7 @@ class Pipeline:
         """
         return f"Pipeline(config={self.config})"
 
-    def _get_or_create_model(self, model_config: ModelConfig, temperature: float) -> LlmModel:
+    def _get_or_create_model(self, model_config: ModelConfig) -> LlmModel:
         """
         Get or create a cached LlmModel instance for connection pooling.
 
@@ -70,14 +70,12 @@ class Pipeline:
 
         Args:
             model_config: Configuration for the model to create
-            temperature: Temperature setting for the model
 
         Returns:
             LlmModel: A cached or newly created LlmModel instance
         """
-        # Create cache key from model config and temperature
-        # Include temperature in key as it affects model behavior
-        cache_key = f"{model_config.provider.value}:{model_config.model_id}:{temperature}"
+        # Create cache key from model config
+        cache_key = f"{model_config.provider.value}:{model_config.model_id}"
 
         # Use double-checked locking pattern for thread-safe caching
         # First check without lock (fast path)
@@ -96,7 +94,6 @@ class Pipeline:
             logger.debug(f"Creating new LlmModel instance: {cache_key}")
             model = LlmModel.create(
                 model=model_config,
-                temperature=temperature,
             )
             self._llm_model_instances[cache_key] = model
             return model
@@ -181,8 +178,6 @@ class Pipeline:
             # Prefix model metadata keys for two-stage
             model_metadata = {"identify_" + k: v for k, v in identify_model_metadata.items()}
             model_metadata.update({"implement_" + k: v for k, v in implement_model_metadata.items()})
-            model_metadata["identify_temperature"] = phase_config.two_stage_config.identify_temperature
-            model_metadata["implement_temperature"] = phase_config.two_stage_config.implement_temperature
         else:
             model_metadata = self._get_model_metadata(model_type=phase_config.model)
 
@@ -192,7 +187,6 @@ class Pipeline:
             "phase_index": phase_index,
             "phase_type": phase_config.phase_type.name,
             "enabled": phase_config.enabled,
-            "temperature": phase_config.temperature,
             "post_processors": post_processors_info,
             "post_processor_count": len(post_processors_info),
             "completed": completed,
@@ -454,11 +448,9 @@ class Pipeline:
             # Create both model instances
             identify_model = self._get_or_create_model(
                 model_config=phase_config.two_stage_config.identify_model,
-                temperature=phase_config.two_stage_config.identify_temperature,
             )
             implement_model = self._get_or_create_model(
                 model_config=phase_config.two_stage_config.implement_model,
-                temperature=phase_config.two_stage_config.implement_temperature,
             )
 
             # Create PhaseConfig for the factory
@@ -491,7 +483,6 @@ class Pipeline:
             # Get or create the model (uses caching for connection pool reuse)
             model = self._get_or_create_model(
                 model_config=phase_config.model,
-                temperature=phase_config.temperature,
             )
 
             # Create PhaseConfig for the factory
@@ -506,7 +497,6 @@ class Pipeline:
                 book_name=self.config.book_name,
                 author_name=self.config.author_name,
                 llm_model_instance=model,
-                temperature=phase_config.temperature,
                 reasoning=phase_config.reasoning,
                 llm_kwargs=phase_config.llm_kwargs,
                 post_processors=phase_config.post_processors,

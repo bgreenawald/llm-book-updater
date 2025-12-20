@@ -8,8 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-from src.constants import LLM_DEFAULT_TEMPERATURE
-
 
 @pytest.fixture(autouse=True)
 def mock_openrouter_api_key():
@@ -32,7 +30,6 @@ def mock_llm_model():
         # Create a mock instance with necessary attributes
         mock_instance = Mock(spec=LlmModel)
         mock_instance.model_id = "test/model"
-        mock_instance.temperature = LLM_DEFAULT_TEMPERATURE
         mock_instance.chat_completion = mock_completion
 
         with patch("src.llm_model.LlmModel", return_value=mock_instance):

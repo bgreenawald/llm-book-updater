@@ -9,8 +9,6 @@ processor names (strings) and custom processor instances.
 import sys
 from pathlib import Path
 
-from src.constants import LLM_DEFAULT_TEMPERATURE
-
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -30,7 +28,6 @@ def main():
         input_file_path=Path("input/modernize.md"),
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.3,
         # Unified post-processors list: mix of strings and instances
         post_processors=[
             PostProcessorType.NO_NEW_HEADERS,  # Built-in processor by enum
@@ -47,7 +44,6 @@ def main():
         input_file_path=Path("input/intro.md"),
         output_file_path=Path("output/intro.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=LLM_DEFAULT_TEMPERATURE,
         # Only built-in processors
         post_processors=[PostProcessorType.REMOVE_XML_TAGS],
     )
@@ -61,7 +57,6 @@ def main():
         input_file_path=Path("input/summary.md"),
         output_file_path=Path("output/summary.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.1,
         # Mix of built-in and custom processors
         post_processors=[
             PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
@@ -75,21 +70,18 @@ def main():
     print("1. Standard Phase Configuration:")
     print(f"   - Phase Type: {standard_config.phase_type}")
     print(f"   - Name: {standard_config.name}")
-    print(f"   - Temperature: {standard_config.temperature}")
     print(f"   - Post Processors: {standard_config.post_processors}")
     print()
 
     print("2. Introduction Annotation Phase Configuration:")
     print(f"   - Phase Type: {intro_config.phase_type}")
     print(f"   - Name: {intro_config.name}")
-    print(f"   - Temperature: {intro_config.temperature}")
     print(f"   - Post Processors: {intro_config.post_processors}")
     print()
 
     print("3. Summary Annotation Phase Configuration:")
     print(f"   - Phase Type: {summary_config.phase_type}")
     print(f"   - Name: {summary_config.name}")
-    print(f"   - Temperature: {summary_config.temperature}")
     print(f"   - Post Processors: {summary_config.post_processors}")
     print()
 

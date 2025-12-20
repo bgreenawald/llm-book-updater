@@ -4,7 +4,6 @@ from typing import List
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
@@ -23,7 +22,6 @@ run_phases: List[PhaseConfig] = [
         min_subblock_tokens=4096,
         max_subblock_tokens=8192,
         use_subblocks=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=False,
     ),
     PhaseConfig(
@@ -31,7 +29,6 @@ run_phases: List[PhaseConfig] = [
         model=KIMI_K2,
         reasoning={"effort": "high"},
         enable_retry=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=False,
     ),
     PhaseConfig(
@@ -40,12 +37,9 @@ run_phases: List[PhaseConfig] = [
         two_stage_config=TwoStageModelConfig(
             identify_model=GEMINI_3_FLASH,
             implement_model=GEMINI_3_FLASH,
-            identify_temperature=LLM_DEFAULT_TEMPERATURE,
-            implement_temperature=LLM_DEFAULT_TEMPERATURE,
         ),
         reasoning={"effort": "high"},
         enable_retry=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=False,
     ),
     PhaseConfig(
@@ -53,14 +47,12 @@ run_phases: List[PhaseConfig] = [
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
         enable_retry=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
         enable_retry=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
@@ -70,7 +62,6 @@ run_phases: List[PhaseConfig] = [
         min_subblock_tokens=4096,
         max_subblock_tokens=8192,
         use_subblocks=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=False,
     ),
 ]

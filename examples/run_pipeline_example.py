@@ -21,7 +21,7 @@ def main() -> None:
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model=OPENAI_04_MINI,
-            temperature=0.3,  # Example: Set a custom temperature
+            # Note: Temperature can be passed via llm_kwargs if needed: llm_kwargs={"temperature": 0.3}
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
@@ -39,12 +39,10 @@ def main() -> None:
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,
             model=GEMINI_PRO,
-            temperature=0.4,
         ),
         PhaseConfig(
             phase_type=PhaseType.SUMMARY,
             model=OPENAI_04_MINI,
-            temperature=0.3,
         ),
     ]
 

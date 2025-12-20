@@ -4,7 +4,6 @@ from typing import List
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
@@ -43,7 +42,6 @@ run_phases: List[PhaseConfig] = [
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
         enable_retry=True,
-        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,

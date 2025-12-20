@@ -18,7 +18,6 @@ from src.constants import (
     DEFAULT_MAX_WORKERS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
-    LLM_DEFAULT_TEMPERATURE,
 )
 from src.cost_tracking_wrapper import add_generation_id
 from src.llm_model import (
@@ -50,7 +49,6 @@ class LlmPhase(ABC):
         book_name: str,
         author_name: str,
         model: LlmModel,
-        temperature: float = LLM_DEFAULT_TEMPERATURE,
         max_workers: Optional[int] = None,
         reasoning: Optional[Dict[str, str]] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,
@@ -77,7 +75,6 @@ class LlmPhase(ABC):
             book_name (str): Name of the book being processed
             author_name (str): Name of the book's author
             model (LlmModel): LLM model instance for making API calls
-            temperature (float): Temperature setting for the LLM model
             max_workers (Optional[int]): Maximum number of worker threads for parallel processing
             reasoning (Optional[Dict[str, str]]): Reasoning configuration for the model
             llm_kwargs (Optional[Dict[str, Any]]): Additional kwargs to pass to LLM calls
@@ -103,7 +100,6 @@ class LlmPhase(ABC):
         self.book_name = book_name
         self.author_name = author_name
         self.model = model
-        self.temperature = temperature
         self.max_workers = max_workers or DEFAULT_MAX_WORKERS
         self.reasoning = reasoning or {}
         self.llm_kwargs = llm_kwargs or {}
@@ -143,7 +139,7 @@ class LlmPhase(ABC):
         logger.debug(f"System prompt path: {system_prompt_path}")
         logger.debug(f"User prompt path: {user_prompt_path}")
         logger.debug(f"Book: {book_name} by {author_name}")
-        logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
+        logger.debug(f"Max workers: {max_workers}")
         if use_subblocks:
             logger.debug(f"Sub-block processing enabled: min={min_subblock_tokens}, max={max_subblock_tokens} tokens")
             logger.info(
@@ -184,7 +180,6 @@ class LlmPhase(ABC):
             f"output_file={self.output_file_path}, "
             f"book={self.book_name}, "
             f"author={self.author_name}, "
-            f"temperature={self.temperature}, "
             f"max_workers={self.max_workers})"
         )
 
@@ -979,9 +974,7 @@ class LlmPhase(ABC):
 
                     if valid_requests:
                         call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                        batch_responses = self.model.batch_chat_completion(
-                            requests=valid_requests, temperature=self.temperature, **call_kwargs
-                        )
+                        batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
                     else:
                         batch_responses = []
 
@@ -1112,9 +1105,7 @@ class LlmPhase(ABC):
                 if valid_requests:
                     # Merge reasoning and llm_kwargs
                     call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                    batch_responses = self.model.batch_chat_completion(
-                        requests=valid_requests, temperature=self.temperature, **call_kwargs
-                    )
+                    batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
                 else:
                     batch_responses = []
 
@@ -1707,7 +1698,6 @@ class IntroductionAnnotationPhase(LlmPhase):
                 system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 block_info=block_info,
-                temperature=self.temperature,
                 **call_kwargs,
             )
 
@@ -1793,7 +1783,6 @@ class SummaryAnnotationPhase(LlmPhase):
                 system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 block_info=block_info,
-                temperature=self.temperature,
                 **call_kwargs,
             )
 
@@ -1838,8 +1827,6 @@ class TwoStageFinalPhase(LlmPhase):
         identify_user_prompt_path: Path,
         implement_system_prompt_path: Path,
         implement_user_prompt_path: Path,
-        identify_temperature: float = LLM_DEFAULT_TEMPERATURE,
-        implement_temperature: float = LLM_DEFAULT_TEMPERATURE,
         identify_reasoning: Optional[Dict[str, str]] = None,
         max_workers: Optional[int] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,
@@ -1866,8 +1853,6 @@ class TwoStageFinalPhase(LlmPhase):
             identify_user_prompt_path: Path to the IDENTIFY user prompt.
             implement_system_prompt_path: Path to the IMPLEMENT system prompt.
             implement_user_prompt_path: Path to the IMPLEMENT user prompt.
-            identify_temperature: Temperature for the IDENTIFY stage.
-            implement_temperature: Temperature for the IMPLEMENT stage.
             identify_reasoning: Optional reasoning configuration for IDENTIFY stage.
             max_workers: Maximum number of worker threads for parallel processing.
             llm_kwargs: Additional kwargs to pass to LLM calls.
@@ -1886,8 +1871,6 @@ class TwoStageFinalPhase(LlmPhase):
         self.identify_user_prompt_path = identify_user_prompt_path
         self.implement_system_prompt_path = implement_system_prompt_path
         self.implement_user_prompt_path = implement_user_prompt_path
-        self.identify_temperature = identify_temperature
-        self.implement_temperature = implement_temperature
         self.identify_reasoning = identify_reasoning or {}
 
         # Debug data collection (thread-safe)
@@ -1915,7 +1898,6 @@ class TwoStageFinalPhase(LlmPhase):
             book_name=book_name,
             author_name=author_name,
             model=implement_model,  # Primary model for base class compatibility
-            temperature=implement_temperature,
             max_workers=max_workers,
             reasoning=None,  # Reasoning is stage-specific
             llm_kwargs=llm_kwargs,
@@ -2046,9 +2028,9 @@ class TwoStageFinalPhase(LlmPhase):
         model: LlmModel,
         system_prompt: str,
         user_prompt: str,
-        temperature: float,
         reasoning: Optional[Dict[str, str]] = None,
         block_info: Optional[str] = None,
+        **kwargs,
     ) -> Tuple[str, str]:
         """
         Make an LLM call with a specific model (for stage-specific calls).
@@ -2057,9 +2039,9 @@ class TwoStageFinalPhase(LlmPhase):
             model: The LLM model to use for this call.
             system_prompt: The system prompt.
             user_prompt: The user prompt.
-            temperature: Temperature setting for this call.
             reasoning: Optional reasoning configuration.
             block_info: Optional identifier for error messages.
+            **kwargs: Additional arguments (temperature can be passed here if needed).
 
         Returns:
             Tuple of (response_content, generation_id).
@@ -2068,7 +2050,7 @@ class TwoStageFinalPhase(LlmPhase):
         last_content: str = ""
         max_attempts = (self.max_retries + 1) if self.enable_retry else 1
 
-        call_kwargs = {**self.llm_kwargs}
+        call_kwargs = {**self.llm_kwargs, **kwargs}
         if reasoning:
             call_kwargs["reasoning"] = reasoning
 
@@ -2077,7 +2059,6 @@ class TwoStageFinalPhase(LlmPhase):
                 content, generation_id = model.chat_completion(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    temperature=temperature,
                     **call_kwargs,
                 )
 
@@ -2205,7 +2186,6 @@ class TwoStageFinalPhase(LlmPhase):
             model=self.identify_model,
             system_prompt=self.identify_system_prompt,
             user_prompt=identify_user_message,
-            temperature=self.identify_temperature,
             reasoning=self.identify_reasoning,
             block_info=f"identify: {current_header[:50]}",
         )
@@ -2232,7 +2212,6 @@ class TwoStageFinalPhase(LlmPhase):
             model=self.implement_model,
             system_prompt=self.implement_system_prompt,
             user_prompt=implement_user_message,
-            temperature=self.implement_temperature,
             block_info=f"implement: {current_header[:50]}",
         )
 
@@ -2437,7 +2416,6 @@ class TwoStageFinalPhase(LlmPhase):
                 call_kwargs["reasoning"] = self.identify_reasoning
             batch_responses = self.identify_model.batch_chat_completion(
                 requests=valid_requests,
-                temperature=self.identify_temperature,
                 **call_kwargs,
             )
 
@@ -2494,7 +2472,6 @@ class TwoStageFinalPhase(LlmPhase):
         if valid_requests:
             batch_responses = self.implement_model.batch_chat_completion(
                 requests=valid_requests,
-                temperature=self.implement_temperature,
                 **self.llm_kwargs,
             )
 
@@ -2548,7 +2525,6 @@ class TwoStageFinalPhase(LlmPhase):
         # Retry failed responses individually
         logger.info(f"Retrying {len(failed_indices)} failed {stage} responses individually")
         model = self.identify_model if stage == "identify" else self.implement_model
-        temperature = self.identify_temperature if stage == "identify" else self.implement_temperature
         reasoning = self.identify_reasoning if stage == "identify" else None
 
         for failed_idx in failed_indices:
@@ -2559,7 +2535,6 @@ class TwoStageFinalPhase(LlmPhase):
                 model=model,
                 system_prompt=original_request["system_prompt"],
                 user_prompt=original_request["user_prompt"],
-                temperature=temperature,
                 reasoning=reasoning,
                 block_info=block_info,
             )
