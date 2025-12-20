@@ -14,7 +14,7 @@ from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
 from src.pipeline import run_pipeline
 
 
-def main():
+def main() -> None:
     # Define the sequence of phases for this run
     # This list can be customized to change the order, repeat phases, or disable them.
     run_phases: List[PhaseConfig] = [
@@ -50,6 +50,7 @@ def main():
 
     # Create a run configuration from the defined phases
     config = RunConfig(
+        book_id="on_liberty",
         book_name="On Liberty",
         author_name="John Stuart Mill",
         input_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),

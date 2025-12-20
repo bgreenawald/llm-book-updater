@@ -14,7 +14,7 @@ from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
 from src.pipeline import run_pipeline
 
 
-def main():
+def main() -> None:
     """Run the pipeline with different phase types."""
 
     # Define phases with different types
@@ -52,6 +52,7 @@ def main():
 
     # Create run configuration
     config = RunConfig(
+        book_id="on_liberty",
         book_name="On Liberty",
         author_name="John Stuart Mill",
         input_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),
