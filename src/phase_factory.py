@@ -218,6 +218,7 @@ class PhaseFactory:
             "use_subblocks": config.use_subblocks,
             "max_subblock_tokens": config.max_subblock_tokens,
             "min_subblock_tokens": config.min_subblock_tokens,
+            "skip_if_less_than_tokens": config.skip_if_less_than_tokens,
         }
 
     @staticmethod
@@ -382,6 +383,7 @@ class PhaseFactory:
             batch_size=config.batch_size,
             enable_retry=config.enable_retry,
             max_retries=config.max_retries,
+            skip_if_less_than_tokens=config.skip_if_less_than_tokens,
         )
 
     @staticmethod

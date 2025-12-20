@@ -63,6 +63,7 @@ class LlmPhase(ABC):
         use_subblocks: bool = False,
         max_subblock_tokens: int = DEFAULT_MAX_SUBBLOCK_TOKENS,
         min_subblock_tokens: int = DEFAULT_MIN_SUBBLOCK_TOKENS,
+        skip_if_less_than_tokens: Optional[int] = None,
     ) -> None:
         """
         Initialize the LLM phase with all necessary parameters.
@@ -92,6 +93,8 @@ class LlmPhase(ABC):
             use_subblocks (bool): Whether to split large blocks into smaller sub-blocks for processing
             max_subblock_tokens (int): Maximum tokens per sub-block when use_subblocks is enabled
             min_subblock_tokens (int): Minimum tokens per sub-block when grouping paragraphs
+            skip_if_less_than_tokens (Optional[int]): If set, blocks with fewer tokens than this value
+                will be skipped entirely (before chunking into subblocks). Default None means no skipping.
         """
         self.name = name
         self.input_file_path = input_file_path
@@ -115,6 +118,7 @@ class LlmPhase(ABC):
         self.use_subblocks = use_subblocks
         self.max_subblock_tokens = max_subblock_tokens
         self.min_subblock_tokens = min_subblock_tokens
+        self.skip_if_less_than_tokens = skip_if_less_than_tokens
 
         # Sub-block processing stats (only used when self.use_subblocks is True)
         self._subblock_stats_lock = threading.Lock()
@@ -213,6 +217,27 @@ class LlmPhase(ABC):
             logger.warning(f"Error counting tokens: {str(e)}, returning character count / 4 as fallback")
             # Fallback: rough approximation of 1 token per 4 characters
             return len(text) // 4
+
+    def _should_skip_block_by_tokens(self, current_block: str) -> bool:
+        """
+        Check if a block should be skipped based on token count threshold.
+
+        Args:
+            current_block (str): The block to check
+
+        Returns:
+            bool: True if the block should be skipped, False otherwise
+        """
+        if self.skip_if_less_than_tokens is None:
+            return False
+
+        token_count = self._count_tokens(current_block)
+        should_skip = token_count < self.skip_if_less_than_tokens
+
+        if should_skip:
+            logger.debug(f"Skipping block with {token_count} tokens (threshold: {self.skip_if_less_than_tokens})")
+
+        return should_skip
 
     @abstractmethod
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
@@ -854,6 +879,17 @@ class LlmPhase(ABC):
                         current_header, current_body = self._get_header_and_body(block=current_block)
                         original_header, original_body = self._get_header_and_body(block=original_block)
 
+                        # Skip blocks based on token count threshold (before subblock processing)
+                        if self._should_skip_block_by_tokens(current_block):
+                            block_entries.append(
+                                {
+                                    "skipped": True,
+                                    "current_header": current_header,
+                                    "current_body": current_body,
+                                }
+                            )
+                            continue
+
                         # Skip empty blocks or blocks with only special tags
                         if (not current_body.strip() and not original_body.strip()) or (
                             self._contains_only_special_tags(current_body)
@@ -1062,6 +1098,11 @@ class LlmPhase(ABC):
                 for current_block, original_block in batch:
                     current_header, current_body = self._get_header_and_body(block=current_block)
                     original_header, original_body = self._get_header_and_body(block=original_block)
+
+                    # Skip blocks based on token count threshold (before processing)
+                    if self._should_skip_block_by_tokens(current_block):
+                        batch_requests.append(None)  # Mark as skip
+                        continue
 
                     # Skip empty blocks or blocks with only special tags
                     if (not current_body.strip() and not original_body.strip()) or (
@@ -1589,6 +1630,12 @@ class StandardLlmPhase(LlmPhase):
             MaxRetriesExceededError: If all retry attempts are exhausted
             EmptySectionError: If post-processing detects an invalid empty section
         """
+        # Check if block should be skipped based on token count (before subblock processing)
+        if self._should_skip_block_by_tokens(current_block):
+            # Extract header and body to return block in proper format
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            return f"{current_header}\n\n{current_body}\n\n"
+
         # Check if sub-block processing is enabled
         if self.use_subblocks:
             return self._process_block_with_subblocks(current_block, original_block, **kwargs)
@@ -1679,6 +1726,11 @@ class IntroductionAnnotationPhase(LlmPhase):
             MaxRetriesExceededError: If all retry attempts are exhausted
             EmptySectionError: If post-processing detects an invalid empty section
         """
+        # Check if block should be skipped based on token count (before processing)
+        if self._should_skip_block_by_tokens(current_block):
+            current_header, current_body = self._get_header_and_body(current_block)
+            return f"{current_header}\n\n{current_body}\n\n"
+
         current_header, current_body = self._get_header_and_body(current_block)
         original_header, original_body = self._get_header_and_body(original_block)
 
@@ -1760,6 +1812,11 @@ class SummaryAnnotationPhase(LlmPhase):
             MaxRetriesExceededError: If all retry attempts are exhausted
             EmptySectionError: If post-processing detects an invalid empty section
         """
+        # Check if block should be skipped based on token count (before processing)
+        if self._should_skip_block_by_tokens(current_block):
+            current_header, current_body = self._get_header_and_body(current_block)
+            return f"{current_header}\n\n{current_body}\n\n"
+
         current_header, current_body = self._get_header_and_body(current_block)
         original_header, original_body = self._get_header_and_body(original_block)
 
@@ -1837,6 +1894,7 @@ class TwoStageFinalPhase(LlmPhase):
         batch_size: Optional[int] = None,
         enable_retry: bool = False,
         max_retries: int = DEFAULT_GENERATION_MAX_RETRIES,
+        skip_if_less_than_tokens: Optional[int] = None,
     ) -> None:
         """
         Initialize the two-stage FINAL phase.
@@ -1865,6 +1923,8 @@ class TwoStageFinalPhase(LlmPhase):
             batch_size: Number of items to process in each batch.
             enable_retry: Whether to retry failed generations.
             max_retries: Maximum number of retry attempts per generation.
+            skip_if_less_than_tokens: If set, blocks with fewer tokens than this value
+                will be skipped entirely (before chunking into subblocks). Default None means no skipping.
         """
         # Store two-stage specific attributes before calling parent __init__
         self.identify_model = identify_model
@@ -1912,6 +1972,7 @@ class TwoStageFinalPhase(LlmPhase):
             batch_size=batch_size,
             enable_retry=enable_retry,
             max_retries=max_retries,
+            skip_if_less_than_tokens=skip_if_less_than_tokens,
         )
 
         # Load stage-specific prompts
@@ -2171,6 +2232,11 @@ class TwoStageFinalPhase(LlmPhase):
         Returns:
             The processed block content.
         """
+        # Check if block should be skipped based on token count (before processing)
+        if self._should_skip_block_by_tokens(current_block):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            return f"{current_header}\n\n{current_body}\n\n"
+
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)
 
@@ -2347,13 +2413,16 @@ class TwoStageFinalPhase(LlmPhase):
         for i, (current_block, original_block) in enumerate(blocks):
             current_header, current_body = self._get_header_and_body(block=current_block)
             original_header, original_body = self._get_header_and_body(block=original_block)
+            # Skip if token count is below threshold or if block is empty/special tags only
+            skip_by_tokens = self._should_skip_block_by_tokens(current_block)
+            skip_by_content = self._should_skip_block(current_body, original_body)
             block_data.append(
                 {
                     "index": start_index + i,
                     "current_header": current_header,
                     "current_body": current_body,
                     "original_body": original_body,
-                    "skip": self._should_skip_block(current_body, original_body),
+                    "skip": skip_by_tokens or skip_by_content,
                 }
             )
 
