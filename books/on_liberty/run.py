@@ -12,6 +12,7 @@ from src.pipeline import run_pipeline
 DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
 GEMINI_3_FLASH = ModelConfig(Provider.GEMINI, "gemini-3-flash-preview")
 GPT_52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
+KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
@@ -23,15 +24,15 @@ run_phases: List[PhaseConfig] = [
         max_subblock_tokens=8192,
         use_subblocks=True,
         temperature=LLM_DEFAULT_TEMPERATURE,
-        use_batch=True,
+        use_batch=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GPT_52,
+        model=KIMI_K2,
         reasoning={"effort": "high"},
         enable_retry=True,
         temperature=LLM_DEFAULT_TEMPERATURE,
-        use_batch=True,
+        use_batch=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL_TWO_STAGE,
@@ -45,7 +46,7 @@ run_phases: List[PhaseConfig] = [
         reasoning={"effort": "high"},
         enable_retry=True,
         temperature=LLM_DEFAULT_TEMPERATURE,
-        use_batch=True,
+        use_batch=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
@@ -70,7 +71,7 @@ run_phases: List[PhaseConfig] = [
         max_subblock_tokens=8192,
         use_subblocks=True,
         temperature=LLM_DEFAULT_TEMPERATURE,
-        use_batch=True,
+        use_batch=False,
     ),
 ]
 
@@ -79,11 +80,10 @@ config = RunConfig(
     book_id="on_liberty",
     book_name="On Liberty",
     author_name="John Stuart Mill",
-    input_file=Path(r"books/on_liberty/input_transformed.md"),
+    input_file=Path(r"books/on_liberty/input_small.md"),
     output_dir=Path(r"books/on_liberty/output"),
-    original_file=Path(r"books/on_liberty/input_transformed.md"),
+    original_file=Path(r"books/on_liberty/input_small.md"),
     phases=run_phases,
-    length_reduction=30,
     max_workers=10,
 )
 
