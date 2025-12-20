@@ -61,7 +61,6 @@ config = RunConfig(
     output_dir=Path(r"books/the_wealth_of_nations/output"),
     original_file=Path(r"books/the_wealth_of_nations/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(50, 65),
     max_workers=10,
 )
 

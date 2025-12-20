@@ -13,7 +13,7 @@ Your mission is to harmonize these two sources. You should feel **free to make c
 ## Context: The Work So Far
 
 * **Stage 1 (Modernize):** Translated archaic language.
-* **Stage 2 (Edit):** Shortened for clarity and conciseness ({length_reduction} reduction).
+* **Stage 2 (Edit):** Shortened for clarity and conciseness.
 
 You are applying the final, expert touch that integrates these layers into a perfect whole.
 
@@ -39,7 +39,7 @@ You should consider making an edit when you spot one of these opportunities. The
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Enhance, Don't Revert**: Your allegiance is to creating the best possible modern version. Use the `Original` for guidance on meaning and voice, but all your edits must result in clear, contemporary prose.
-* **Respect the Core Edit**: The {length_reduction} length reduction is a key goal. Your refinements should not significantly increase the length of the text.
+* **Respect the Core Edit**: The length reduction is a key goal. Your refinements should not significantly increase the length of the text.
 * **Special F-String Tags**:
   * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
   * Do not modify, remove, or replace these tags with any other content.

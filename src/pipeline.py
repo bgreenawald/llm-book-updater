@@ -216,7 +216,6 @@ class Pipeline:
                     "system_prompt_path": phase.system_prompt_path.as_posix() if phase.system_prompt_path else None,
                     "user_prompt_path": phase.user_prompt_path.as_posix() if phase.user_prompt_path else None,
                     "fully_rendered_system_prompt": phase.system_prompt,
-                    "length_reduction_parameter": phase.length_reduction,
                     "output_exists": phase.output_file_path.exists() if phase.output_file_path else False,
                 }
             )
@@ -233,7 +232,6 @@ class Pipeline:
                     if phase_config.user_prompt_path
                     else None,
                     "fully_rendered_system_prompt": None,
-                    "length_reduction_parameter": self.config.length_reduction,
                     "output_exists": False,
                 }
             )
@@ -270,7 +268,6 @@ class Pipeline:
             "input_file": self.config.input_file.as_posix(),
             "original_file": self.config.original_file.as_posix(),
             "output_directory": self.config.output_dir.as_posix(),
-            "length_reduction": self.config.length_reduction,
             "phases": self._phase_metadata,
         }
 
@@ -486,7 +483,6 @@ class Pipeline:
                 config=factory_config,
                 identify_model=identify_model,
                 implement_model=implement_model,
-                length_reduction=self.config.length_reduction,
                 tags_to_preserve=self.config.tags_to_preserve,
                 max_workers=self.config.max_workers,
             )
@@ -498,7 +494,7 @@ class Pipeline:
                 temperature=phase_config.temperature,
             )
 
-            # Create PhaseConfig for the factory (do NOT include length_reduction)
+            # Create PhaseConfig for the factory
             factory_config = type(phase_config)(
                 phase_type=phase_config.phase_type,
                 name=phase_config.phase_type.name.lower(),
@@ -527,21 +523,18 @@ class Pipeline:
             if phase_config.phase_type in [PhaseType.MODERNIZE, PhaseType.EDIT, PhaseType.FINAL, PhaseType.ANNOTATE]:
                 phase = PhaseFactory.create_standard_phase(
                     config=factory_config,
-                    length_reduction=self.config.length_reduction,
                     tags_to_preserve=self.config.tags_to_preserve,
                     max_workers=self.config.max_workers,
                 )
             elif phase_config.phase_type == PhaseType.INTRODUCTION:
                 phase = PhaseFactory.create_introduction_annotation_phase(
                     config=factory_config,
-                    length_reduction=self.config.length_reduction,
                     tags_to_preserve=self.config.tags_to_preserve,
                     max_workers=self.config.max_workers,
                 )
             elif phase_config.phase_type == PhaseType.SUMMARY:
                 phase = PhaseFactory.create_summary_annotation_phase(
                     config=factory_config,
-                    length_reduction=self.config.length_reduction,
                     tags_to_preserve=self.config.tags_to_preserve,
                     max_workers=self.config.max_workers,
                 )

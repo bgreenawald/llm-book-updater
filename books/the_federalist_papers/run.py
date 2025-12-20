@@ -83,7 +83,6 @@ config = RunConfig(
     output_dir=Path(r"books/the_federalist_papers/output"),
     original_file=Path(r"books/the_federalist_papers/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(50, 75),
     max_workers=10,
 )
 

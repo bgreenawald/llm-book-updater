@@ -41,9 +41,6 @@ DEFAULT_MAX_WORKERS = 1
 # Default maximum retries for failed LLM generations (when retry is enabled)
 DEFAULT_GENERATION_MAX_RETRIES = 2
 
-# Default length reduction bounds (percentage) for text compression
-DEFAULT_LENGTH_REDUCTION_BOUNDS = (35, 50)
-
 # Input file index prefix in output directory
 INPUT_FILE_INDEX_PREFIX = "00"
 
