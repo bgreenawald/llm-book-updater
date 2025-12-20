@@ -21,7 +21,7 @@ from src.llm_model import GROK_3_MINI, ModelConfig
 from src.pipeline import run_pipeline
 
 
-def main():
+def main() -> None:
     """Run the pipeline with OpenRouter provider routing preferences."""
 
     # Example 1: Prioritize specific providers in order
@@ -113,7 +113,8 @@ def main():
     print("Running pipeline with provider routing preferences...")
     print("\nPhase configurations:")
     for i, phase in enumerate(run_phases, 1):
-        print(f"{i}. {phase.phase_type.name}: {phase.llm_kwargs.get('provider', 'default')}")
+        provider = phase.llm_kwargs.get("provider", "default") if phase.llm_kwargs else "default"
+        print(f"{i}. {phase.phase_type.name}: {provider}")
 
     run_pipeline(config)
     print("\nPipeline completed successfully!")
