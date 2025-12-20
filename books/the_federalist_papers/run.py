@@ -3,48 +3,74 @@ from pathlib import Path
 from typing import List
 
 from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig
+from src.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-CHATGPT_GPT52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
-GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
-GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
+DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
+GEMINI_3_FLASH = ModelConfig(Provider.GEMINI, "gemini-3-flash-preview")
+GPT_52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GEMINI_PRO,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=2048,
+        max_subblock_tokens=4096,
+        use_subblocks=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=CHATGPT_GPT52,
-        reasoning={"effort": "medium"},
+        model=GPT_52,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=True,
     ),
     PhaseConfig(
-        phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT52,
-        reasoning={"effort": "medium"},
+        phase_type=PhaseType.FINAL_TWO_STAGE,
+        model=GEMINI_3_FLASH,
+        two_stage_config=TwoStageModelConfig(
+            identify_model=GEMINI_3_FLASH,
+            implement_model=GEMINI_3_FLASH,
+            identify_temperature=LLM_DEFAULT_TEMPERATURE,
+            implement_temperature=LLM_DEFAULT_TEMPERATURE,
+        ),
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
+        use_subblocks=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
+        use_batch=True,
     ),
 ]
 
@@ -57,7 +83,7 @@ config = RunConfig(
     output_dir=Path(r"books/the_federalist_papers/output"),
     original_file=Path(r"books/the_federalist_papers/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(45, 60),
+    length_reduction=(50, 75),
     max_workers=10,
 )
 

@@ -4,6 +4,7 @@ from typing import List
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
+from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
@@ -11,6 +12,7 @@ from src.pipeline import run_pipeline
 CHATGPT_GPT52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
 GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
 GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
+DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
@@ -38,8 +40,10 @@ run_phases: List[PhaseConfig] = [
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        temperature=LLM_DEFAULT_TEMPERATURE,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
