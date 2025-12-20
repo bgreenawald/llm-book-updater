@@ -38,7 +38,6 @@ class TestInputFileCopying:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -73,7 +72,6 @@ class TestInputFileCopying:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -107,7 +105,6 @@ class TestInputFileCopying:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -147,7 +144,6 @@ class TestInputFileCopying:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -182,7 +178,6 @@ class TestInputFileCopying:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -427,7 +422,6 @@ class TestFileSystemPermissions:
                 mock_config.book_name = "test_book"
                 mock_config.author_name = "test_author"
                 mock_config.original_file = input_file
-                mock_config.length_reduction = [50]
                 mock_config.phases = []
                 mock_config.get_phase_order.return_value = []
 
@@ -463,7 +457,6 @@ class TestFileSystemPermissions:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -500,7 +493,6 @@ class TestFileSystemPermissions:
                 mock_config.book_name = "test_book"
                 mock_config.author_name = "test_author"
                 mock_config.original_file = input_file
-                mock_config.length_reduction = [50]
                 mock_config.phases = []
                 mock_config.get_phase_order.return_value = []
 
@@ -539,7 +531,6 @@ class TestFileSystemPermissions:
             mock_config.book_name = "test_book"
             mock_config.author_name = "test_author"
             mock_config.original_file = input_file
-            mock_config.length_reduction = [50]
             mock_config.phases = []
             mock_config.get_phase_order.return_value = []
 
@@ -581,7 +572,6 @@ class TestFileSystemPermissions:
                     mock_config.book_name = f"test_book_{worker_id}"
                     mock_config.author_name = "test_author"
                     mock_config.original_file = input_file
-                    mock_config.length_reduction = [50]
                     mock_config.phases = []
                     mock_config.get_phase_order.return_value = []
 

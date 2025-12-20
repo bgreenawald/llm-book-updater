@@ -42,7 +42,6 @@ class TestConfigurationValidation:
                 output_dir=output_dir,
                 original_file=non_existent_file,
                 phases=[],
-                length_reduction=(35, 50),
             )
 
             # But using it should fail
@@ -79,7 +78,6 @@ class TestConfigurationValidation:
                     output_dir=invalid_output_dir,
                     original_file=input_file,
                     phases=[],
-                    length_reduction=(35, 50),
                 )
                 pipeline = Pipeline(config=config)
                 pipeline._copy_input_file_to_output()
@@ -106,7 +104,6 @@ class TestConfigurationValidation:
                 output_dir=output_dir,
                 original_file=input_file,
                 phases=[],
-                length_reduction=(35, 50),
             )
             # Verify empty string is stored
             assert config.book_name == ""
@@ -120,7 +117,6 @@ class TestConfigurationValidation:
                 output_dir=output_dir,
                 original_file=input_file,
                 phases=[],
-                length_reduction=(35, 50),
             )
             # Verify None is stored (though this might cause issues later)
             assert config_with_none.book_name is None
@@ -151,7 +147,6 @@ class TestConfigurationValidation:
                             temperature=0.5,
                         )
                     ],
-                    length_reduction=(35, 50),
                 )
 
     def test_invalid_temperature_values(self):
@@ -170,77 +165,6 @@ class TestConfigurationValidation:
                 enabled=True,
                 temperature=3.0,  # High temperature
             )
-
-    def test_invalid_length_reduction_values(self):
-        """Test behavior with extreme length reduction values."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            input_file = temp_path / "test_input.md"
-            input_file.write_text("# Test Content")
-            output_dir = temp_path / "output"
-            output_dir.mkdir()
-
-            # Length reduction should be validated at config construction time
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(-10, 50),  # Negative value
-                )
-
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(110, 120),  # Values > 100
-                )
-
-    def test_malformed_length_reduction_tuple(self):
-        """Test behavior with different length reduction formats."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            input_file = temp_path / "test_input.md"
-            input_file.write_text("# Test Content")
-            output_dir = temp_path / "output"
-            output_dir.mkdir()
-
-            # Test single value instead of tuple - should work per Union type
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=50,  # Single int value
-            )
-            assert config.length_reduction == 50
-
-            # Test tuple with wrong order - should fail at config construction time
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(70, 30),  # High before low
-                )
 
 
 class TestPostProcessorConfigurationEdgeCases:
@@ -407,7 +331,6 @@ class TestErrorRecoveryAndGracefulDegradation:
                             temperature=0.5,
                         ),
                     ],
-                    length_reduction=(35, 50),
                 )
 
                 pipeline = Pipeline(config=config)
@@ -462,10 +385,8 @@ class TestErrorRecoveryAndGracefulDegradation:
                         temperature=0.0,  # Very low temperature might generate warning
                     )
                 ],
-                length_reduction=(35, 35),  # Same min/max might generate warning
             )
 
             # Should create successfully despite potential warnings
             pipeline = Pipeline(config=config)
             assert pipeline is not None
-            assert pipeline.config.length_reduction == (35, 35)

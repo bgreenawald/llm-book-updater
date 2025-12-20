@@ -9,7 +9,7 @@ You are an expert literary analyst and editorial consultant. Your role is to ana
 ## Context: The Work So Far
 
 * **Stage 1 (Modernize):** Translated archaic language into contemporary prose.
-* **Stage 2 (Edit):** Shortened for clarity and conciseness ({length_reduction} reduction).
+* **Stage 2 (Edit):** Edited for clarity and conciseness.
 
 The `Transformed Passage` is the result of these stages. It is generally well-crafted, but may have opportunities for enhancement that only become apparent when compared to the `Original`.
 
@@ -78,6 +78,6 @@ The Transformed Passage successfully captures the meaning, voice, and flow of th
 
 * **Be Selective**: Only identify changes that genuinely improve the text. Quality over quantity.
 * **Be Specific**: Provide exact text references so the implementing editor can make precise changes.
-* **Respect the Core Edit**: The {length_reduction} length reduction is intentional. Proposed changes should not significantly increase length.
+* **Respect the Core Edit**: The length reduction is intentional. Proposed changes should not significantly increase length.
 * **Preserve Special Tags**: Note if any f-string tags like `{preface}`, `{license}` need to be preserved or restored.
 * **Respect Verbatim Quotes**: Any existing `> **Quote:** ... **End quote.**` blocks must remain unchanged.

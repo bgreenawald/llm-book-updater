@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import tiktoken
 from loguru import logger
@@ -55,7 +55,6 @@ class LlmPhase(ABC):
         reasoning: Optional[Dict[str, str]] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,
         post_processor_chain: Optional[PostProcessorChain] = None,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         use_batch: bool = False,
         batch_size: Optional[int] = None,
         enable_retry: bool = False,
@@ -84,7 +83,6 @@ class LlmPhase(ABC):
             llm_kwargs (Optional[Dict[str, Any]]): Additional kwargs to pass to LLM calls
                 (e.g., provider for OpenRouter)
             post_processor_chain (Optional[PostProcessorChain]): Chain of post-processors to apply
-            length_reduction (Optional[Union[int, Tuple[int, int]]]): Length reduction parameter for the phase
             use_batch (bool): Whether to use batch processing for LLM calls (if supported)
             batch_size (Optional[int]): Number of items to process in each batch (if None, processes all blocks at once)
             enable_retry (bool): Whether to retry failed generations. When False (default),
@@ -110,7 +108,6 @@ class LlmPhase(ABC):
         self.reasoning = reasoning or {}
         self.llm_kwargs = llm_kwargs or {}
         self.post_processor_chain = post_processor_chain
-        self.length_reduction = length_reduction
         self.use_batch = use_batch
         self.batch_size = batch_size
         self.enable_retry = enable_retry
@@ -147,7 +144,6 @@ class LlmPhase(ABC):
         logger.debug(f"User prompt path: {user_prompt_path}")
         logger.debug(f"Book: {book_name} by {author_name}")
         logger.debug(f"Temperature: {temperature}, Max workers: {max_workers}")
-        logger.debug(f"Length reduction: {length_reduction}")
         if use_subblocks:
             logger.debug(f"Sub-block processing enabled: min={min_subblock_tokens}, max={max_subblock_tokens} tokens")
             logger.info(
@@ -535,29 +531,23 @@ class LlmPhase(ABC):
             logger.debug(f"Read system prompt from {self.system_prompt_path}")
 
             # Format the system prompt with parameters if needed
-            if self.length_reduction is not None:
-                format_params = {}
-                if isinstance(self.length_reduction, int):
-                    format_params["length_reduction"] = f"{self.length_reduction}%"
-                elif isinstance(self.length_reduction, tuple) and len(self.length_reduction) == 2:
-                    format_params["length_reduction"] = f"{self.length_reduction[0]}%-{self.length_reduction[1]}%"
-                else:
-                    format_params["length_reduction"] = str(self.length_reduction)
+            format_params = {}
 
-                # Get tags to preserve from post-processor chain if available
-                tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
-                if self.post_processor_chain:
-                    for processor in self.post_processor_chain.processors:
-                        if hasattr(processor, "tags_to_preserve"):
-                            tags_to_preserve = processor.tags_to_preserve
-                            break
+            # Get tags to preserve from post-processor chain if available
+            tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
+            if self.post_processor_chain:
+                for processor in self.post_processor_chain.processors:
+                    if hasattr(processor, "tags_to_preserve"):
+                        tags_to_preserve = processor.tags_to_preserve
+                        break
 
-                # Add all tags_to_preserve as format parameters with their original values
-                for tag in tags_to_preserve:
-                    # Extract the tag name without braces
-                    tag_name = tag.strip("{}")
-                    format_params[tag_name] = tag
+            # Add all tags_to_preserve as format parameters with their original values
+            for tag in tags_to_preserve:
+                # Extract the tag name without braces
+                tag_name = tag.strip("{}")
+                format_params[tag_name] = tag
 
+            if format_params:
                 try:
                     content = content.format(**format_params)
                     logger.debug(f"Formatted system prompt with parameters: {format_params}")
@@ -1889,7 +1879,6 @@ class TwoStageFinalPhase(LlmPhase):
         max_workers: Optional[int] = None,
         llm_kwargs: Optional[Dict[str, Any]] = None,
         post_processor_chain: Optional[PostProcessorChain] = None,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         use_batch: bool = False,
         batch_size: Optional[int] = None,
         enable_retry: bool = False,
@@ -1918,7 +1907,6 @@ class TwoStageFinalPhase(LlmPhase):
             max_workers: Maximum number of worker threads for parallel processing.
             llm_kwargs: Additional kwargs to pass to LLM calls.
             post_processor_chain: Chain of post-processors to apply to IMPLEMENT output.
-            length_reduction: Length reduction parameter for the phase.
             use_batch: Whether to use batch processing for LLM calls.
             batch_size: Number of items to process in each batch.
             enable_retry: Whether to retry failed generations.
@@ -1967,7 +1955,6 @@ class TwoStageFinalPhase(LlmPhase):
             reasoning=None,  # Reasoning is stage-specific
             llm_kwargs=llm_kwargs,
             post_processor_chain=post_processor_chain,
-            length_reduction=length_reduction,
             use_batch=use_batch,
             batch_size=batch_size,
             enable_retry=enable_retry,
@@ -1995,35 +1982,29 @@ class TwoStageFinalPhase(LlmPhase):
         logger.debug("Loaded all stage-specific prompts")
 
     def _load_and_format_prompt(self, prompt_path: Path) -> str:
-        """Load a prompt file and format it with length_reduction if needed."""
+        """Load a prompt file and format it with tags if needed."""
         if not prompt_path.exists():
             raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
 
         with prompt_path.open(mode="r", encoding="utf-8") as f:
             content = f.read()
 
-        # Format with length_reduction if present
-        if self.length_reduction is not None:
-            format_params = {}
-            if isinstance(self.length_reduction, int):
-                format_params["length_reduction"] = f"{self.length_reduction}%"
-            elif isinstance(self.length_reduction, tuple) and len(self.length_reduction) == 2:
-                format_params["length_reduction"] = f"{self.length_reduction[0]}%-{self.length_reduction[1]}%"
-            else:
-                format_params["length_reduction"] = str(self.length_reduction)
+        # Format with tags_to_preserve if present
+        format_params = {}
 
-            # Add tags_to_preserve as format parameters
-            tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
-            if self.post_processor_chain:
-                for processor in self.post_processor_chain.processors:
-                    if hasattr(processor, "tags_to_preserve"):
-                        tags_to_preserve = processor.tags_to_preserve
-                        break
+        # Add tags_to_preserve as format parameters
+        tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
+        if self.post_processor_chain:
+            for processor in self.post_processor_chain.processors:
+                if hasattr(processor, "tags_to_preserve"):
+                    tags_to_preserve = processor.tags_to_preserve
+                    break
 
-            for tag in tags_to_preserve:
-                tag_name = tag.strip("{}")
-                format_params[tag_name] = tag
+        for tag in tags_to_preserve:
+            tag_name = tag.strip("{}")
+            format_params[tag_name] = tag
 
+        if format_params:
             try:
                 content = content.format(**format_params)
             except KeyError as e:

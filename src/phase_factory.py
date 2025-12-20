@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, TypedDict, Union
+from typing import Any, List, Optional, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
 from src.llm_model import LlmModel
@@ -167,7 +167,6 @@ class PhaseFactory:
     def _prepare_phase_parameters(
         config: PhaseConfig,
         phase_type: str,
-        length_reduction: Optional[Any] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> dict[str, Any]:
@@ -182,7 +181,6 @@ class PhaseFactory:
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
             phase_type (str): Name of the phase type for error messages
-            length_reduction: Length reduction parameter for the phase
             tags_to_preserve: Tags to preserve during processing
             max_workers: Maximum number of workers for parallel processing
 
@@ -210,7 +208,6 @@ class PhaseFactory:
             "reasoning": config.reasoning,
             "llm_kwargs": config.llm_kwargs,
             "post_processor_chain": post_processor_chain,
-            "length_reduction": length_reduction,
             "use_batch": config.use_batch,
             "batch_size": config.batch_size,
             "enable_retry": config.enable_retry,
@@ -224,7 +221,6 @@ class PhaseFactory:
     @staticmethod
     def create_standard_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> StandardLlmPhase:
@@ -233,7 +229,6 @@ class PhaseFactory:
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
-            length_reduction: Length reduction parameter for the phase
             tags_to_preserve: Tags to preserve during processing
             max_workers: Maximum number of workers for parallel processing
 
@@ -243,7 +238,6 @@ class PhaseFactory:
         params = PhaseFactory._prepare_phase_parameters(
             config=config,
             phase_type="StandardLlmPhase",
-            length_reduction=length_reduction,
             tags_to_preserve=tags_to_preserve,
             max_workers=max_workers,
         )
@@ -252,7 +246,6 @@ class PhaseFactory:
     @staticmethod
     def create_introduction_annotation_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> IntroductionAnnotationPhase:
@@ -261,7 +254,6 @@ class PhaseFactory:
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
-            length_reduction: Length reduction parameter for the phase
             tags_to_preserve: Tags to preserve during processing
             max_workers: Maximum number of workers for parallel processing
 
@@ -271,7 +263,6 @@ class PhaseFactory:
         params = PhaseFactory._prepare_phase_parameters(
             config=config,
             phase_type="IntroductionAnnotationPhase",
-            length_reduction=length_reduction,
             tags_to_preserve=tags_to_preserve,
             max_workers=max_workers,
         )
@@ -280,7 +271,6 @@ class PhaseFactory:
     @staticmethod
     def create_summary_annotation_phase(
         config: PhaseConfig,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> SummaryAnnotationPhase:
@@ -289,7 +279,6 @@ class PhaseFactory:
 
         Args:
             config (PhaseConfig): Configuration object containing all phase parameters
-            length_reduction: Length reduction parameter for the phase
             tags_to_preserve: Tags to preserve during processing
             max_workers: Maximum number of workers for parallel processing
 
@@ -299,7 +288,6 @@ class PhaseFactory:
         params = PhaseFactory._prepare_phase_parameters(
             config=config,
             phase_type="SummaryAnnotationPhase",
-            length_reduction=length_reduction,
             tags_to_preserve=tags_to_preserve,
             max_workers=max_workers,
         )
@@ -310,7 +298,6 @@ class PhaseFactory:
         config: PhaseConfig,
         identify_model: LlmModel,
         implement_model: LlmModel,
-        length_reduction: Optional[Union[int, Tuple[int, int]]] = None,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> TwoStageFinalPhase:
@@ -325,7 +312,6 @@ class PhaseFactory:
             config: Configuration object. Must have two_stage_config set.
             identify_model: LLM model instance for the IDENTIFY stage.
             implement_model: LLM model instance for the IMPLEMENT stage.
-            length_reduction: Length reduction parameter for the phase.
             tags_to_preserve: Tags to preserve during processing.
             max_workers: Maximum number of workers for parallel processing.
 
@@ -378,7 +364,6 @@ class PhaseFactory:
             max_workers=max_workers,
             llm_kwargs=config.llm_kwargs,
             post_processor_chain=post_processor_chain,
-            length_reduction=length_reduction,
             use_batch=config.use_batch,
             batch_size=config.batch_size,
             enable_retry=config.enable_retry,

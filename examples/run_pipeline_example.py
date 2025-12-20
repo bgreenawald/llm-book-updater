@@ -56,7 +56,6 @@ def main():
         output_dir=Path("books/On Liberty/markdown/Mill, On Liberty"),
         original_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),
         phases=run_phases,
-        length_reduction=(30, 50),  # Set length reduction for the entire run
     )
 
     # Run the pipeline
