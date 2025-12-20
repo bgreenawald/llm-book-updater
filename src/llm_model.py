@@ -435,6 +435,13 @@ class OpenAIClient(ProviderClient):
             # temperature parameter for these models to avoid 400 errors.
             is_gpt5_series_model = model_name.lower().startswith("gpt-5")
 
+            # Warn if trying to use non-default temperature with reasoning models
+            if is_gpt5_series_model and temperature != 1.0:
+                module_logger.warning(
+                    f"GPT-5/o-series models do not support custom temperature. "
+                    f"Ignoring temperature={temperature}, using default (1.0)"
+                )
+
             request_kwargs: dict[str, Any] = {
                 "model": model_name,
                 "instructions": system_prompt,
@@ -443,6 +450,24 @@ class OpenAIClient(ProviderClient):
 
             if not is_gpt5_series_model:
                 request_kwargs["temperature"] = temperature
+
+            # Handle reasoning parameter - support both formats:
+            # 1. reasoning={"effort": "high"} (standard format)
+            # 2. effort="high" (legacy format, will be wrapped)
+            reasoning = kwargs.pop("reasoning", None)
+            effort = kwargs.pop("effort", None)
+
+            if reasoning is not None:
+                if isinstance(reasoning, dict):
+                    request_kwargs["reasoning"] = reasoning
+                else:
+                    module_logger.warning(
+                        f"Invalid reasoning parameter type: {type(reasoning)}. "
+                        f"Expected dict with 'effort' key, e.g., {{'effort': 'high'}}"
+                    )
+            elif effort is not None:
+                # Legacy format: wrap effort in reasoning dict
+                request_kwargs["reasoning"] = {"effort": effort}
 
             response = client.responses.create(**request_kwargs, **kwargs)
 
@@ -537,9 +562,22 @@ class OpenAIClient(ProviderClient):
             if not is_gpt5_series_model:
                 batch_body["temperature"] = temperature
 
-            # Optional: pass through reasoning effort if provided (Responses API)
+            # Handle reasoning parameter - support both formats:
+            # 1. reasoning={"effort": "high"} (standard format)
+            # 2. effort="high" (legacy format, will be wrapped)
+            reasoning = kwargs.get("reasoning")
             effort = kwargs.get("effort")
-            if effort is not None:
+
+            if reasoning is not None:
+                if isinstance(reasoning, dict):
+                    batch_body["reasoning"] = reasoning
+                else:
+                    module_logger.warning(
+                        f"Invalid reasoning parameter type in batch request: {type(reasoning)}. "
+                        f"Expected dict with 'effort' key, e.g., {{'effort': 'high'}}"
+                    )
+            elif effort is not None:
+                # Legacy format: wrap effort in reasoning dict
                 batch_body["reasoning"] = {"effort": effort}
 
             batch_request = {
