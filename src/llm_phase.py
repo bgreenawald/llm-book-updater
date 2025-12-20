@@ -283,16 +283,14 @@ class LlmPhase(ABC):
             # EmptySectionError is a critical validation error that should stop the pipeline
             logger.error("EmptySectionError in post-processing - propagating to stop pipeline")
             raise
-        except (ValueError, KeyError, AttributeError, TypeError) as e:
-            # Common post-processor errors are logged but non-fatal; return unprocessed block
-            logger.error(f"Error during post-processing: {str(e)}")
-            logger.exception("Post-processing error stack trace")
-            return llm_block
         except Exception as e:
-            # Catch-all for unexpected errors; log and return unprocessed block
-            logger.error(f"Unexpected error during post-processing: {str(e)}")
-            logger.exception("Unexpected post-processing error stack trace")
-            return llm_block
+            # All post-processor errors should stop the pipeline to prevent corrupt output
+            logger.error(f"Post-processing failed: {str(e)}")
+            logger.exception("Post-processing error stack trace")
+            raise RuntimeError(
+                f"Post-processing failed for block. This is a critical error that prevents "
+                f"producing correct output. Original error: {str(e)}"
+            ) from e
 
     def _make_llm_call_with_retry(
         self,
