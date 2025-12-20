@@ -104,10 +104,8 @@ def main():
         original_file=Path("original.md"),
         phases=run_phases,
         tags_to_preserve=["{preface}", "{license}", "{dedication}"],
-        length_reduction=(30, 50),
     )
     print(f"Config 5 tags_to_preserve: {config5.tags_to_preserve}")
-    print(f"Config 5 length_reduction: {config5.length_reduction}")
     print()
 
     print("Benefits of tags_to_preserve configuration:")

@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 from src.common.provider import Provider
 from src.constants import (
     DEFAULT_GENERATION_MAX_RETRIES,
-    DEFAULT_LENGTH_REDUCTION_BOUNDS,
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
@@ -70,47 +69,6 @@ def _validate_temperature(*, temperature: float) -> None:
             raise ValueError(f"Temperature must be between 0 and 2, got {temperature}")
     except TypeError as e:
         raise TypeError(f"Temperature must be a number, got {type(temperature).__name__}") from e
-
-
-def _validate_length_reduction(*, length_reduction: Optional[Union[int, Tuple[int, int]]]) -> None:
-    """Validate length reduction configuration.
-
-    Length reduction is represented as a percentage, used for prompt formatting
-    (e.g., ``35%`` or ``35-50%``).
-
-    Args:
-        length_reduction: Either a single percentage (int) or a 2-tuple of bounds.
-
-    Raises:
-        TypeError: If the input type is invalid.
-        ValueError: If the value is out of range or bounds are malformed.
-    """
-    if length_reduction is None:
-        return
-
-    if isinstance(length_reduction, int):
-        if length_reduction < 0 or length_reduction > 100:
-            raise ValueError(f"length_reduction must be between 0 and 100, got {length_reduction}")
-        return
-
-    if isinstance(length_reduction, tuple):
-        if len(length_reduction) != 2:
-            raise ValueError(f"length_reduction tuple must have exactly 2 values, got {len(length_reduction)}")
-        low, high = length_reduction
-        if not isinstance(low, int) or not isinstance(high, int):
-            raise TypeError(
-                f"length_reduction tuple values must both be ints, got ({type(low).__name__}, {type(high).__name__})"
-            )
-        if low < 0 or high < 0 or low > 100 or high > 100:
-            raise ValueError(f"length_reduction bounds must be between 0 and 100, got {length_reduction}")
-        if low > high:
-            raise ValueError(f"length_reduction lower bound must be <= upper bound, got {length_reduction}")
-        return
-
-    raise TypeError(
-        "length_reduction must be an int percentage, a 2-tuple of int bounds, or None; "
-        f"got {type(length_reduction).__name__}"
-    )
 
 
 @dataclass
@@ -314,9 +272,6 @@ class RunConfig:
     output_dir: Path
     original_file: Path
     phases: List[PhaseConfig] = field(default_factory=list)
-    # Length reduction parameter for the entire run (can be int or tuple of bounds)
-    # Default to 35-50% reduction if not specified
-    length_reduction: Optional[Union[int, Tuple[int, int]]] = DEFAULT_LENGTH_REDUCTION_BOUNDS
     # Tags to preserve during processing (f-string tags like {preface}, {license})
     tags_to_preserve: List[str] = field(default_factory=lambda: list(DEFAULT_TAGS_TO_PRESERVE))
     # Maximum number of workers for parallel processing across all phases
@@ -334,7 +289,6 @@ class RunConfig:
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
             f"phases={self.phases}, "
-            f"length_reduction={self.length_reduction}, "
             f"tags_to_preserve={self.tags_to_preserve})"
         )
 
@@ -347,7 +301,6 @@ class RunConfig:
             f"output_dir={self.output_dir}, "
             f"original_file={self.original_file}, "
             f"phases={self.phases}, "
-            f"length_reduction={self.length_reduction}, "
             f"tags_to_preserve={self.tags_to_preserve})"
         )
 
@@ -359,8 +312,6 @@ class RunConfig:
             TypeError: If a field has an invalid type.
             ValueError: If a field has an invalid value.
         """
-        _validate_length_reduction(length_reduction=self.length_reduction)
-
         if self.max_workers is not None:
             if not isinstance(self.max_workers, int):
                 raise TypeError(f"max_workers must be an int or None, got {type(self.max_workers).__name__}")

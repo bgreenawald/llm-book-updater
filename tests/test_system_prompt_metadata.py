@@ -64,7 +64,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
                         temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -96,7 +95,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "input_file" in metadata
             assert "original_file" in metadata
             assert "output_directory" in metadata
-            assert "length_reduction" in metadata
             assert "phases" in metadata
 
             # Verify metadata version
@@ -118,7 +116,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "system_prompt_path" in phase_metadata
             assert "user_prompt_path" in phase_metadata
             assert "fully_rendered_system_prompt" in phase_metadata
-            assert "length_reduction_parameter" in phase_metadata
             assert "post_processors" in phase_metadata
             assert "post_processor_count" in phase_metadata
             assert "completed" in phase_metadata
@@ -128,7 +125,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert phase_metadata["phase_index"] == 0
             assert phase_metadata["book_name"] == "Test Book"
             assert phase_metadata["author_name"] == "Test Author"
-            assert phase_metadata["length_reduction_parameter"] == [35, 50]
             assert phase_metadata["completed"] is True
 
             # Verify system prompt content
@@ -190,7 +186,6 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
                         temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -325,7 +320,6 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
                         temperature=0.1,
                     ),
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -400,7 +394,6 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
                         temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline

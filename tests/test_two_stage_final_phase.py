@@ -226,7 +226,7 @@ class TestTwoStageFinalPhaseInitialization:
             prompts_dir = temp_path / "prompts"
             prompts_dir.mkdir()
 
-            (prompts_dir / "final_identify_system.md").write_text("IDENTIFY system prompt {length_reduction}")
+            (prompts_dir / "final_identify_system.md").write_text("IDENTIFY system prompt")
             (prompts_dir / "final_identify_user.md").write_text(
                 "IDENTIFY: {current_body} vs {original_body} for {book_name}"
             )
@@ -276,35 +276,11 @@ class TestTwoStageFinalPhaseInitialization:
             identify_user_prompt_path=temp_files["prompts_dir"] / "final_identify_user.md",
             implement_system_prompt_path=temp_files["prompts_dir"] / "final_implement_system.md",
             implement_user_prompt_path=temp_files["prompts_dir"] / "final_implement_user.md",
-            length_reduction=(35, 50),
         )
 
         assert phase.name == "final_two_stage"
         assert phase.identify_model == mock_models["identify"]
         assert phase.implement_model == mock_models["implement"]
-        assert "35%-50%" in phase.identify_system_prompt
-
-    def test_initialization_with_int_length_reduction(self, temp_files, mock_models):
-        """Test initialization with integer length_reduction."""
-        from src.llm_phase import TwoStageFinalPhase
-
-        phase = TwoStageFinalPhase(
-            name="final_two_stage",
-            input_file_path=temp_files["input_file"],
-            output_file_path=temp_files["output_file"],
-            original_file_path=temp_files["original_file"],
-            book_name="Test Book",
-            author_name="Test Author",
-            identify_model=mock_models["identify"],
-            implement_model=mock_models["implement"],
-            identify_system_prompt_path=temp_files["prompts_dir"] / "final_identify_system.md",
-            identify_user_prompt_path=temp_files["prompts_dir"] / "final_identify_user.md",
-            implement_system_prompt_path=temp_files["prompts_dir"] / "final_implement_system.md",
-            implement_user_prompt_path=temp_files["prompts_dir"] / "final_implement_user.md",
-            length_reduction=40,
-        )
-
-        assert "40%" in phase.identify_system_prompt
 
 
 class TestTwoStageFinalPhaseProcessing:

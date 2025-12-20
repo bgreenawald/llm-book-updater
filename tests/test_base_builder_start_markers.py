@@ -59,7 +59,7 @@ class TestCleanStartMarkers:
         assert result == expected
 
     def test_replace_annotated_introduction_marker(self, builder, temp_markdown_file):
-        """Test that **Annotated introduction:** is replaced with **Overview:**."""
+        """Test that **Annotated introduction:** is replaced with **Introduction:**."""
         content = (
             "## Chapter 1\n\n"
             "> **Annotated introduction:**<br>\n"
@@ -74,7 +74,7 @@ class TestCleanStartMarkers:
         result = temp_markdown_file.read_text(encoding="utf-8")
         expected = (
             "## Chapter 1\n\n"
-            "> **Overview:**<br>\n"
+            "> **Introduction:**<br>\n"
             "> This is the introduction.\n"
             "> **End annotated introduction.**\n\n"
             "Chapter content."
@@ -133,7 +133,7 @@ class TestCleanStartMarkers:
         content = (
             "# Chapter\n\n"
             "> **Annotated introduction:**<br>\n"
-            "> Overview text.\n"
+            "> Introduction text.\n"
             "> **End annotated introduction.**\n\n"
             "Main content.\n\n"
             "> **Annotation:** A note about something. **End annotation.**\n\n"
@@ -150,8 +150,8 @@ class TestCleanStartMarkers:
         result = temp_markdown_file.read_text(encoding="utf-8")
         expected = (
             "# Chapter\n\n"
-            "> **Overview:**<br>\n"
-            "> Overview text.\n"
+            "> **Introduction:**<br>\n"
+            "> Introduction text.\n"
             "> **End annotated introduction.**\n\n"
             "Main content.\n\n"
             "> **Note:** A note about something. **End annotation.**\n\n"
@@ -237,7 +237,7 @@ class TestCleanStartMarkers:
         content = (
             "> **Annotated introduction:**<br>\n"
             "><br>\n"
-            "> **Overview**<br>\n"
+            "> **Introduction**<br>\n"
             "> This is a detailed overview spanning multiple lines.\n"
             "> It continues here.<br>\n"
             "><br>\n"
@@ -253,9 +253,9 @@ class TestCleanStartMarkers:
 
         result = temp_markdown_file.read_text(encoding="utf-8")
         expected = (
-            "> **Overview:**<br>\n"
+            "> **Introduction:**<br>\n"
             "><br>\n"
-            "> **Overview**<br>\n"
+            "> **Introduction**<br>\n"
             "> This is a detailed overview spanning multiple lines.\n"
             "> It continues here.<br>\n"
             "><br>\n"

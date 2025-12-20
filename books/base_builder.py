@@ -519,7 +519,7 @@ class BaseBookBuilder(ABC):
         # Note: These patterns should only match within blockquotes (lines starting with >)
         replacements = [
             (r"(>\s*)\*\*Annotation:\*\*", r"\1**Note:**"),
-            (r"(>\s*)\*\*Annotated introduction:\*\*", r"\1**Overview:**"),
+            (r"(>\s*)\*\*Annotated introduction:\*\*", r"\1**Introduction:**"),
             (r"(>\s*)\*\*Annotated summary:\*\*", r"\1**Summary:**"),
         ]
 
