@@ -53,23 +53,6 @@ class PostProcessorType(Enum):
     VALIDATE_NON_EMPTY_SECTION = auto()
 
 
-def _validate_temperature(*, temperature: float) -> None:
-    """Validate temperature configuration.
-
-    Args:
-        temperature: Sampling temperature. Must be between 0 and 2 (inclusive).
-
-    Raises:
-        TypeError: If temperature cannot be compared as a number.
-        ValueError: If temperature is out of range.
-    """
-    try:
-        if temperature < 0 or temperature > 2:
-            raise ValueError(f"Temperature must be between 0 and 2, got {temperature}")
-    except TypeError as e:
-        raise TypeError(f"Temperature must be a number, got {type(temperature).__name__}") from e
-
-
 @dataclass
 class TwoStageModelConfig:
     """Configuration for two-stage phases requiring different models per stage.

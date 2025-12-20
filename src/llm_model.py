@@ -185,7 +185,7 @@ class ProviderClient(ABC):
             system_prompt: System prompt for the conversation
             user_prompt: User prompt for the conversation
             model_name: Name of the model to use
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             Tuple of (response_content, generation_id)
@@ -207,7 +207,7 @@ class ProviderClient(ABC):
                 - user_prompt: User prompt for the request
                 - metadata: Optional metadata to include in response
             model_name: Name of the model to use
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             List of response dictionaries, each containing:
@@ -358,15 +358,6 @@ class OpenRouterClient(ProviderClient):
         **kwargs,
     ) -> Tuple[str, str]:
         """Make a chat completion call using OpenRouter API."""
-        # GPT-5 models (and variants) currently do not accept custom temperature
-        # values. Detect and omit temperature to avoid 400 errors from upstream.
-        provider_model = model_name.split("/", 1)[1] if "/" in model_name else model_name
-        is_gpt5_series_model = provider_model.lower().startswith("gpt-5")
-
-        # Filter out temperature for GPT-5 models
-        if is_gpt5_series_model:
-            kwargs.pop("temperature", None)
-
         data: dict[str, Any] = {
             "model": model_name,
             "messages": [
@@ -517,18 +508,12 @@ class OpenAIClient(ProviderClient):
         Args:
             requests: List of request dictionaries containing system_prompt, user_prompt, metadata
             model_name: Name of the model to use
-            **kwargs: Additional parameters (temperature can be passed here if needed, e.g., effort under reasoning)
+            **kwargs: Additional parameters (e.g., effort under reasoning)
 
         Returns:
             str: JSONL formatted string for batch processing
         """
         import json
-
-        # Handle GPT-5 models that don't support custom temperature
-        is_gpt5_series_model = model_name.lower().startswith("gpt-5")
-        # Filter out temperature for GPT-5 models
-        if is_gpt5_series_model:
-            kwargs.pop("temperature", None)
 
         jsonl_lines = []
         for i, request in enumerate(requests):
@@ -563,8 +548,7 @@ class OpenAIClient(ProviderClient):
                 # Legacy format: wrap effort in reasoning dict
                 batch_body["reasoning"] = {"effort": effort}
 
-            # Pass through any additional kwargs (temperature, etc.)
-            # Note: temperature is already filtered out for GPT-5 models above
+            # Pass through any additional kwargs
             batch_body.update(kwargs)
 
             batch_request = {
@@ -803,7 +787,7 @@ class OpenAIClient(ProviderClient):
             requests: List of request dictionaries
             model_name: Name of the model to use
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             List of response dictionaries
@@ -1207,7 +1191,7 @@ class GeminiClient(ProviderClient):
             requests: List of request dictionaries
             model_name: Name of the model to use
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             List of response dictionaries
@@ -1242,9 +1226,6 @@ class GeminiClient(ProviderClient):
                 batch_config = CreateBatchJobConfig(
                     display_name=f"llm_book_updater_batch_{int(time.time())}",
                 )
-
-                # Note: Temperature can be passed via kwargs if needed for batch config
-                # The exact parameter name may vary - check latest API docs
 
                 # Create the batch job
                 module_logger.info(f"Creating batch job with model {model_name}...")
@@ -1348,7 +1329,7 @@ class ClaudeClient(ProviderClient):
             if system_prompt:
                 request_params["system"] = system_prompt
 
-            # Pass through any additional kwargs (including temperature if provided)
+            # Pass through any additional kwargs
             request_params.update(kwargs)
 
             response = client.messages.create(**request_params)
@@ -1405,7 +1386,7 @@ class ClaudeClient(ProviderClient):
             requests: List of request dictionaries
             model_name: Name of the model to use
             batch_timeout: Maximum time to wait for batch job completion (seconds)
-            **kwargs: Additional arguments (temperature can be passed here if needed, e.g., max_tokens)
+            **kwargs: Additional arguments (e.g., max_tokens)
 
         Returns:
             List of response dictionaries
@@ -1435,7 +1416,7 @@ class ClaudeClient(ProviderClient):
                 if system_prompt:
                     params["system"] = system_prompt
 
-                # Pass through any additional kwargs (including temperature if provided)
+                # Pass through any additional kwargs
                 params.update(kwargs)
 
                 # Create batch request with custom_id
@@ -1788,7 +1769,7 @@ class LlmModel:
 
         Args:
             requests: List of request dictionaries
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             List of response dictionaries
@@ -1844,7 +1825,7 @@ class LlmModel:
         Args:
             system_prompt: System prompt for the conversation
             user_prompt: User prompt for the conversation
-            **kwargs: Additional arguments (temperature can be passed here if needed)
+            **kwargs: Additional arguments
 
         Returns:
             Tuple of (assistant reply content, generation ID).
