@@ -32,7 +32,6 @@ def main():
             input_file_path=Path(f"input/{phase_type.name.lower()}.md"),
             output_file_path=Path(f"output/{phase_type.name.lower()}.md"),
             original_file_path=Path("original/gatsby.md"),
-            temperature=LLM_DEFAULT_TEMPERATURE,
         )
         for phase_type in PhaseType
     }

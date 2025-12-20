@@ -13,7 +13,6 @@ from pathlib import Path
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import ModelConfig
 from src.pipeline import Pipeline
 
@@ -26,7 +25,6 @@ def main():
     author_name = "F. Scott Fitzgerald"
     input_file = Path("examples/annotation_input.md")
     output_dir = Path("examples/annotation_output")
-    temperature = LLM_DEFAULT_TEMPERATURE
 
     # File paths
     original_file = Path("original.md")
@@ -56,7 +54,6 @@ def main():
             PhaseConfig(
                 phase_type=PhaseType.INTRODUCTION,
                 model=model,
-                temperature=temperature,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -78,7 +75,6 @@ def main():
             PhaseConfig(
                 phase_type=PhaseType.SUMMARY,
                 model=model,
-                temperature=temperature,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -100,7 +96,6 @@ def main():
             PhaseConfig(
                 phase_type=PhaseType.EDIT,
                 model=model,
-                temperature=temperature,
                 system_prompt_path=standard_prompt,
                 user_prompt_path=user_prompt,
             )
@@ -122,14 +117,12 @@ def main():
             PhaseConfig(
                 phase_type=PhaseType.INTRODUCTION,
                 model=model,
-                temperature=temperature,
                 system_prompt_path=introduction_prompt,
                 user_prompt_path=user_prompt,
             ),
             PhaseConfig(
                 phase_type=PhaseType.SUMMARY,
                 model=model,
-                temperature=temperature,
                 system_prompt_path=summary_prompt,
                 user_prompt_path=user_prompt,
             ),

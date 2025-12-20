@@ -13,7 +13,6 @@ from unittest.mock import Mock, patch
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import PhaseConfig, PhaseType, RunConfig
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.pipeline import Pipeline
 
 
@@ -24,7 +23,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = LLM_DEFAULT_TEMPERATURE
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -61,7 +59,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
             )
@@ -109,7 +106,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "phase_type" in phase_metadata
             assert "enabled" in phase_metadata
             assert "model_type" in phase_metadata
-            assert "temperature" in phase_metadata
             assert "max_workers" in phase_metadata
             assert "input_file" in phase_metadata
             assert "output_file" in phase_metadata
@@ -146,7 +142,6 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = LLM_DEFAULT_TEMPERATURE
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -183,7 +178,6 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
             )
@@ -270,7 +264,6 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = LLM_DEFAULT_TEMPERATURE
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -307,17 +300,14 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=LLM_DEFAULT_TEMPERATURE,
                     ),
                     PhaseConfig(
                         phase_type=PhaseType.EDIT,
                         enabled=False,  # Disabled phase
-                        temperature=0.3,
                     ),
                     PhaseConfig(
                         phase_type=PhaseType.ANNOTATE,
                         enabled=True,
-                        temperature=0.1,
                     ),
                 ],
             )
@@ -338,7 +328,6 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
             assert disabled_phase_metadata["enabled"] is False
             assert disabled_phase_metadata["completed"] is False
             assert disabled_phase_metadata["reason"] == "disabled"
-            assert disabled_phase_metadata["temperature"] == 0.3
 
             print("✓ Disabled phase metadata test passed")
 
@@ -354,7 +343,6 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = LLM_DEFAULT_TEMPERATURE
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -391,7 +379,6 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=LLM_DEFAULT_TEMPERATURE,
                     )
                 ],
             )
@@ -416,7 +403,6 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
             assert failed_phase_metadata["enabled"] is True
             assert failed_phase_metadata["completed"] is False
             assert failed_phase_metadata["reason"] == "not_run"
-            assert failed_phase_metadata["temperature"] == LLM_DEFAULT_TEMPERATURE
 
             print("✓ Failed phase metadata test passed")
 

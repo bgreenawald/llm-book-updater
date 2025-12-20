@@ -8,7 +8,6 @@ post-processor configurations to clean up and improve LLM-generated content.
 from pathlib import Path
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import LlmModel
 from src.phase_factory import PhaseFactory
 from src.post_processors import PostProcessor
@@ -64,7 +63,6 @@ def example_standard_phase_with_post_processing():
         book_name="Example Book",
         author_name="Example Author",
         model=model,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         post_processors=[PostProcessorType.PRESERVE_F_STRING_TAGS],
     )
     phase = PhaseFactory.create_standard_phase(config)
@@ -99,7 +97,6 @@ def example_annotation_phase_with_custom_post_processing():
         book_name="Example Book",
         author_name="Example Author",
         model=model,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         post_processors=[custom_processor],
     )
     phase = PhaseFactory.create_introduction_annotation_phase(config)
@@ -134,7 +131,6 @@ def example_summary_phase_with_mixed_post_processing():
         book_name="Example Book",
         author_name="Example Author",
         model=model,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         post_processors=[PostProcessorType.REVERT_REMOVED_BLOCK_LINES, custom_processor],
     )
     phase = PhaseFactory.create_summary_annotation_phase(config)
@@ -166,7 +162,6 @@ def example_phase_without_post_processing():
         book_name="Example Book",
         author_name="Example Author",
         model=model,
-        temperature=LLM_DEFAULT_TEMPERATURE,
         # No post_processors specified, so defaults will be used
     )
     phase = PhaseFactory.create_standard_phase(config)
