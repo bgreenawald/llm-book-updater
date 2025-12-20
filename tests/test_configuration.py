@@ -144,27 +144,9 @@ class TestConfigurationValidation:
                         PhaseConfig(
                             phase_type="INVALID_PHASE_TYPE",  # Invalid type
                             enabled=True,
-                            temperature=0.5,
                         )
                     ],
                 )
-
-    def test_invalid_temperature_values(self):
-        """Test behavior with extreme temperature values."""
-        # Temperature should be validated at config construction time
-        with pytest.raises(ValueError):
-            PhaseConfig(
-                phase_type=PhaseType.MODERNIZE,
-                enabled=True,
-                temperature=-0.1,  # Negative temperature
-            )
-
-        with pytest.raises(ValueError):
-            PhaseConfig(
-                phase_type=PhaseType.MODERNIZE,
-                enabled=True,
-                temperature=3.0,  # High temperature
-            )
 
 
 class TestPostProcessorConfigurationEdgeCases:
@@ -322,13 +304,11 @@ class TestErrorRecoveryAndGracefulDegradation:
                         PhaseConfig(
                             phase_type=PhaseType.MODERNIZE,
                             enabled=True,
-                            temperature=0.5,
                         ),
                         # This phase has invalid configuration but system should handle it
                         PhaseConfig(
                             phase_type=PhaseType.EDIT,
                             enabled=True,
-                            temperature=0.5,
                         ),
                     ],
                 )
@@ -382,7 +362,6 @@ class TestErrorRecoveryAndGracefulDegradation:
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.0,  # Very low temperature might generate warning
                     )
                 ],
             )

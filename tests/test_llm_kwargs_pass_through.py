@@ -42,7 +42,7 @@ def test_pipeline_initialization_preserves_llm_kwargs(tmp_path: Path, monkeypatc
     pipeline = Pipeline(config=config)
 
     mock_model = Mock(spec=LlmModel)
-    monkeypatch.setattr(pipeline, "_get_or_create_model", lambda model_config, temperature: mock_model)
+    monkeypatch.setattr(pipeline, "_get_or_create_model", lambda model_config: mock_model)
 
     phase = pipeline._initialize_phase(phase_index=0)
     assert phase is not None

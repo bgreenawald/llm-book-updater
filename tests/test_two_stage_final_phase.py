@@ -33,14 +33,10 @@ class TestTwoStageModelConfig:
         config = TwoStageModelConfig(
             identify_model=identify_model,
             implement_model=implement_model,
-            identify_temperature=0.3,
-            implement_temperature=0.1,
         )
 
         assert config.identify_model == identify_model
         assert config.implement_model == implement_model
-        assert config.identify_temperature == 0.3
-        assert config.implement_temperature == 0.1
         assert config.identify_reasoning is None
 
     def test_config_with_reasoning(self):
@@ -74,37 +70,6 @@ class TestTwoStageModelConfig:
             TwoStageModelConfig(
                 identify_model=identify_model,
                 implement_model="not_a_model_config",  # type: ignore
-            )
-
-    def test_invalid_identify_temperature(self):
-        """Test that invalid identify_temperature raises ValueError."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
-
-        with pytest.raises(ValueError, match="Temperature must be between 0 and 2"):
-            TwoStageModelConfig(
-                identify_model=identify_model,
-                implement_model=implement_model,
-                identify_temperature=-0.5,
-            )
-
-        with pytest.raises(ValueError, match="Temperature must be between 0 and 2"):
-            TwoStageModelConfig(
-                identify_model=identify_model,
-                implement_model=implement_model,
-                identify_temperature=2.5,
-            )
-
-    def test_invalid_implement_temperature(self):
-        """Test that invalid implement_temperature raises ValueError."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
-
-        with pytest.raises(ValueError, match="Temperature must be between 0 and 2"):
-            TwoStageModelConfig(
-                identify_model=identify_model,
-                implement_model=implement_model,
-                implement_temperature=3.0,
             )
 
     def test_invalid_reasoning_type(self):

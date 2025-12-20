@@ -13,7 +13,6 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.constants import LLM_DEFAULT_TEMPERATURE
 from src.llm_model import LlmModel, LlmModelError
 
 
@@ -24,7 +23,6 @@ def example_basic_retry():
     # Create model with default retry settings (3 retries, 1s delay, 2x backoff)
     model = LlmModel.create(
         model="google/gemini-2.5-flash",
-        temperature=LLM_DEFAULT_TEMPERATURE,
         max_retries=3,
         retry_delay=1.0,
         backoff_factor=2.0,
@@ -45,7 +43,6 @@ def example_custom_retry():
     # Create model with aggressive retry settings
     model = LlmModel.create(
         model="google/gemini-2.5-flash",
-        temperature=LLM_DEFAULT_TEMPERATURE,
         max_retries=5,
         retry_delay=0.5,
         backoff_factor=1.5,
@@ -70,7 +67,6 @@ def example_no_retry():
     # Create model with no retries
     model = LlmModel.create(
         model="google/gemini-2.5-flash",
-        temperature=LLM_DEFAULT_TEMPERATURE,
         max_retries=0,
         retry_delay=1.0,
         backoff_factor=2.0,
@@ -89,7 +85,6 @@ def example_error_handling():
     # Create model with minimal retries for quick demonstration
     model = LlmModel.create(
         model="google/gemini-2.5-flash",
-        temperature=LLM_DEFAULT_TEMPERATURE,
         max_retries=1,
         retry_delay=0.1,
         backoff_factor=1.0,
