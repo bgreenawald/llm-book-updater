@@ -201,6 +201,10 @@ class PhaseConfig:
     use_subblocks: bool = False
     max_subblock_tokens: int = DEFAULT_MAX_SUBBLOCK_TOKENS
     min_subblock_tokens: int = DEFAULT_MIN_SUBBLOCK_TOKENS
+    # Block skipping parameter
+    # If set, blocks with fewer tokens than this value will be skipped entirely
+    # (before chunking into subblocks). Default None means no skipping.
+    skip_if_less_than_tokens: Optional[int] = None
     # Two-stage phase configuration (required for FINAL_TWO_STAGE)
     two_stage_config: Optional[TwoStageModelConfig] = None
 
