@@ -6,7 +6,7 @@ any class with these attributes/methods works, no inheritance required.
 """
 
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from src.post_processors import PostProcessorChain
 
@@ -29,6 +29,7 @@ class Phase(Protocol):
         user_prompt_path: Path to user prompt file (can be None)
         system_prompt: Fully rendered system prompt text (for metadata)
         post_processor_chain: Optional chain of post-processors
+        llm_kwargs: Additional kwargs to pass to LLM calls (e.g., provider parameters)
     """
 
     # Core identification
@@ -49,6 +50,9 @@ class Phase(Protocol):
 
     # Post-processing
     post_processor_chain: Optional[PostProcessorChain]
+
+    # LLM call parameters
+    llm_kwargs: Dict[str, Any]
 
     def run(self, **kwargs) -> None:
         """Execute the phase processing.

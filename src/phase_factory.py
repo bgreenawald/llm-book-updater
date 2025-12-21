@@ -26,6 +26,26 @@ from src.post_processors import (
 )
 
 
+class SafeDict(dict):
+    """Dictionary subclass that preserves unknown placeholders during format_map.
+
+    When a key is missing, __missing__ returns the original placeholder format
+    (e.g., "{key}") instead of raising a KeyError. This enables safe partial
+    formatting where unknown placeholders are preserved in the output.
+    """
+
+    def __missing__(self, key: str) -> str:
+        """Return the original placeholder format for missing keys.
+
+        Args:
+            key: The missing key name
+
+        Returns:
+            The original placeholder format string (e.g., "{key}")
+        """
+        return "{%s}" % key
+
+
 class ValidatedPhaseFields(TypedDict):
     """Type-safe container for validated phase fields."""
 
@@ -405,17 +425,13 @@ class PhaseFactory:
 
         content = read_file(path)
 
-        # Format with tags_to_preserve
+        # Format with tags_to_preserve using safe partial formatting
         if tags_to_preserve:
             format_params = {}
             for tag in tags_to_preserve:
                 tag_name = tag.strip("{}")
                 format_params[tag_name] = tag
-            try:
-                content = content.format(**format_params)
-            except KeyError:
-                # Ignore missing keys - some prompts may not use all tags
-                pass
+            content = content.format_map(SafeDict(format_params))
 
         return content
 
