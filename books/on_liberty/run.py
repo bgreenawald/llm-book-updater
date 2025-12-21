@@ -33,12 +33,11 @@ run_phases: List[PhaseConfig] = [
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL_TWO_STAGE,
-        model=GEMINI_3_FLASH,
         two_stage_config=TwoStageModelConfig(
-            identify_model=GEMINI_3_FLASH,
+            identify_model=KIMI_K2,
             implement_model=GEMINI_3_FLASH,
+            identify_reasoning={"effort": "high"},
         ),
-        reasoning={"effort": "high"},
         enable_retry=True,
         use_batch=False,
     ),

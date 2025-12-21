@@ -12,8 +12,8 @@ from src.config import PhaseType, RunConfig
 from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
 from src.cost_tracking_wrapper import calculate_and_log_costs
 from src.llm_model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
-from src.llm_phase import LlmPhase
 from src.phase_factory import PhaseFactory
+from src.phase_protocol import Phase
 
 # Metadata version for compatibility
 METADATA_VERSION = "0.0"
@@ -36,7 +36,7 @@ class Pipeline:
             config (RunConfig): Configuration object containing all run parameters
         """
         self.config = config
-        self._phase_instances: List[LlmPhase] = []
+        self._phase_instances: List[Phase] = []  # Use Protocol for structural typing
         self._phase_metadata: List[Dict[str, Any]] = []  # Collect comprehensive metadata for all phases
         self._model_cache: Dict[str, Dict[str, str]] = {}  # Cache for model information
         self._llm_model_instances: Dict[str, LlmModel] = {}  # Cache for LlmModel instances (connection pooling)
@@ -137,7 +137,7 @@ class Pipeline:
             raise
 
     def _collect_phase_metadata(
-        self, phase: Optional[LlmPhase], phase_index: int, completed: bool = False, skipped: bool = False
+        self, phase: Optional[Phase], phase_index: int, completed: bool = False, skipped: bool = False
     ) -> None:
         """
         Collect comprehensive metadata about a phase.
@@ -147,7 +147,7 @@ class Pipeline:
         stored for later saving.
 
         Args:
-            phase (Optional[LlmPhase]): The phase instance to collect metadata from,
+            phase (Optional[Phase]): The phase instance to collect metadata from,
                 or None for disabled/failed/skipped phases
             phase_index (int): The index of the phase in the pipeline sequence
             completed (bool): Whether the phase completed successfully
@@ -241,7 +241,7 @@ class Pipeline:
 
         self._phase_metadata.append(metadata)
 
-    def _save_metadata(self, completed_phases: List[LlmPhase]) -> None:
+    def _save_metadata(self, completed_phases: List[Phase]) -> None:
         """
         Save comprehensive metadata about the pipeline run to the output directory.
 
@@ -251,7 +251,7 @@ class Pipeline:
         system prompt information.
 
         Args:
-            completed_phases (List[LlmPhase]): List of phases that were successfully completed
+            completed_phases (List[Phase]): List of phases that were successfully completed
         """
         metadata = {
             "metadata_version": METADATA_VERSION,
@@ -292,7 +292,7 @@ class Pipeline:
             logger.error(f"Failed to save cost analysis: {str(e)}")
             logger.exception("Cost analysis save error details")
 
-    def _log_token_progression_table(self, completed_phases: List[LlmPhase]) -> None:
+    def _log_token_progression_table(self, completed_phases: List[Phase]) -> None:
         """
         Log a table showing the token count progression through the pipeline.
 
@@ -300,7 +300,7 @@ class Pipeline:
         length (in approximate tokens) changed through each phase of processing.
 
         Args:
-            completed_phases (List[LlmPhase]): List of phases that were successfully completed
+            completed_phases (List[Phase]): List of phases that were successfully completed
         """
         if not completed_phases:
             logger.info("No phases completed - skipping token progression table")
@@ -410,7 +410,7 @@ class Pipeline:
         previous_phase_index = phase_index - 1
         return self._get_phase_output_path(phase_index=previous_phase_index)
 
-    def _initialize_phase(self, phase_index: int) -> Optional[LlmPhase]:
+    def _initialize_phase(self, phase_index: int) -> Optional[Phase]:
         """
         Initialize a single phase when it's about to run.
 
@@ -422,7 +422,7 @@ class Pipeline:
             phase_index (int): The index of the phase to initialize
 
         Returns:
-            Optional[LlmPhase]: The initialized phase instance, or None if the phase is disabled
+            Optional[Phase]: The initialized phase instance, or None if the phase is disabled
         """
         phase_config = self.config.phases[phase_index]
         if not phase_config.enabled:
@@ -440,7 +440,7 @@ class Pipeline:
         logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
         # Handle FINAL_TWO_STAGE specially - it needs two models
-        phase: LlmPhase
+        phase: Phase
         if phase_config.phase_type == PhaseType.FINAL_TWO_STAGE:
             if phase_config.two_stage_config is None:
                 raise ValueError("two_stage_config is required for FINAL_TWO_STAGE phase")
@@ -666,7 +666,7 @@ class Pipeline:
         if start_phase == 0:
             self._copy_input_file_to_output()
 
-        completed_phases: List[LlmPhase] = []
+        completed_phases: List[Phase] = []
 
         try:
             for i, phase_config in enumerate(self.config.phases):

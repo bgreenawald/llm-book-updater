@@ -975,8 +975,45 @@ class GeminiClient(ProviderClient):
 
             response = client.models.generate_content(model=model_name, contents=contents, config=config)
 
-            if not response.text:
-                raise ValueError("Empty response from Gemini")
+            # Extract text from text parts, filtering out non-text parts like 'thought_signature'
+            # This avoids duplication that can occur when response.text concatenates all parts incorrectly
+            # The warning indicates response.text may concatenate text incorrectly when non-text parts exist
+            content = ""
+            text_parts = []
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if (
+                    hasattr(candidate, "content")
+                    and candidate.content is not None
+                    and hasattr(candidate.content, "parts")
+                ):
+                    parts = candidate.content.parts
+                    if parts:
+                        # Collect all text parts (skip non-text parts like thought_signature)
+                        for part in parts:
+                            if hasattr(part, "text") and part.text:
+                                text_parts.append(part.text)
+                            elif isinstance(part, dict) and part.get("text"):
+                                text_parts.append(part["text"])
+
+                        # Use only the first text part to avoid duplication
+                        # If there are multiple text parts, they may be duplicates or the LLM may have
+                        # split the response incorrectly
+                        if text_parts:
+                            if len(text_parts) > 1:
+                                module_logger.warning(
+                                    f"Found {len(text_parts)} text parts in Gemini response, "
+                                    f"using only the first to avoid duplication"
+                                )
+                            content = text_parts[0]
+
+            # Fallback to response.text if explicit extraction didn't work
+            if not content:
+                if not response.text:
+                    raise ValueError("Empty response from Gemini")
+                # Log a warning if we're falling back to response.text
+                module_logger.warning("Falling back to response.text - explicit text extraction found no text parts")
+                content = response.text
 
             # Gemini doesn't provide a completion ID in the same way, so we'll generate one
             generation_id = f"gemini_{int(time.time())}"
@@ -999,7 +1036,7 @@ class GeminiClient(ProviderClient):
                 # Log but don't fail if we can't extract usage metadata
                 module_logger.debug(f"Could not extract Gemini usage metadata: {e}")
 
-            return response.text, generation_id
+            return content, generation_id
 
         except Exception as e:
             module_logger.error(f"Gemini API call failed: {e}")
