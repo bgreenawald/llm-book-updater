@@ -1109,7 +1109,7 @@ class GeminiClient(ProviderClient):
         return False
 
     def _parse_batch_results(
-        self, result_content: str, original_requests: list[dict[str, Any]]
+        self, result_content: str, original_requests: list[dict[str, Any]], model_name: str
     ) -> list[dict[str, Any]]:
         """
         Parse batch job results and match them with original requests.
@@ -1117,6 +1117,7 @@ class GeminiClient(ProviderClient):
         Args:
             result_content: JSONL content from batch job results
             original_requests: Original request list for metadata matching
+            model_name: Name of the model used for the batch job
 
         Returns:
             List of response dictionaries
@@ -1179,7 +1180,7 @@ class GeminiClient(ProviderClient):
                         if prompt_tokens is not None or completion_tokens is not None:
                             register_generation_model_info(
                                 generation_id=generation_id,
-                                model="gemini",  # Model name from batch job
+                                model=model_name,
                                 prompt_tokens=prompt_tokens,
                                 completion_tokens=completion_tokens,
                                 is_batch=True,  # This is batch processing, apply 50% discount
@@ -1296,7 +1297,7 @@ class GeminiClient(ProviderClient):
                     result_content = result_bytes.decode("utf-8")
 
                     # Parse and return results
-                    responses = self._parse_batch_results(result_content, requests)
+                    responses = self._parse_batch_results(result_content, requests, model_name)
 
                     module_logger.info(f"Successfully processed {len(responses)} batch responses")
                     return responses
