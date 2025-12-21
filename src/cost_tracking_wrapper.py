@@ -5,31 +5,29 @@ This module provides a wrapper that can be used to add cost tracking
 to existing LLM calls without modifying the core classes.
 """
 
-import os
 import threading
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional
 
-from dotenv import load_dotenv
 from loguru import logger
+from pydantic import Field
 
 from src.common.provider import Provider
 from src.cost_tracker import CostTracker, RunCosts
-
-# Load environment variables from .env to ensure API keys are available
-load_dotenv(override=True)
+from src.pydantic_config import BaseConfig
+from src.settings import Settings
 
 # Initialize module-level logger
 module_logger = logger
 
 
-class ModelInfo(TypedDict, total=False):
-    """Type definition for model information stored with generation IDs."""
+class ModelInfo(BaseConfig):
+    """Model information stored with generation IDs."""
 
-    model: Optional[str]
-    prompt_tokens: Optional[int]
-    completion_tokens: Optional[int]
-    is_batch: bool
-    provider: Optional[Provider]
+    model: str | None = None
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    is_batch: bool = False
+    provider: Provider | None = None
 
 
 class CostTrackingWrapper:
@@ -49,7 +47,7 @@ class CostTrackingWrapper:
             api_key: OpenRouter API key. If None, will try to get from environment.
         """
         if api_key is None:
-            api_key = os.getenv("OPENROUTER_API_KEY")
+            api_key = Settings().get_api_key("openrouter")  # type: ignore[call-arg]
 
         if api_key:
             self.cost_tracker: CostTracker | None = CostTracker(api_key=api_key)
@@ -96,11 +94,11 @@ class CostTrackingWrapper:
 
             # Store model information if provided
             if model or prompt_tokens is not None or completion_tokens is not None:
-                self.model_info[generation_id] = {
-                    "model": model,
-                    "prompt_tokens": prompt_tokens,
-                    "completion_tokens": completion_tokens,
-                }
+                self.model_info[generation_id] = ModelInfo(
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
 
         module_logger.debug(f"Added generation ID {generation_id} for phase {phase_name}")
 
@@ -129,12 +127,12 @@ class CostTrackingWrapper:
             return
 
         with self._lock:
-            self.model_info[generation_id] = {
-                "model": model,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "is_batch": is_batch,
-            }
+            self.model_info[generation_id] = ModelInfo(
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                is_batch=is_batch,
+            )
         module_logger.debug(
             f"Registered model info for generation {generation_id}: model={model}, "
             f"prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens}"

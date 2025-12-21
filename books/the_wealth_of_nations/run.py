@@ -8,10 +8,10 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-CHATGPT_GPT52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
-GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
-GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
+CHATGPT_GPT52 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5.2")
+GROK_41 = ModelConfig(provider=Provider.OPENROUTER, model_id="x-ai/grok-4.1-fast")
+GEMINI_PRO = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-pro-preview")
+DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(

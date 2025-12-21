@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from src.common.provider import Provider
 from src.config import PhaseConfig, PhaseType, TwoStageModelConfig
@@ -27,8 +28,16 @@ class TestTwoStageModelConfig:
 
     def test_valid_config_creation(self):
         """Test creating a valid TwoStageModelConfig."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
         config = TwoStageModelConfig(
             identify_model=identify_model,
@@ -41,8 +50,16 @@ class TestTwoStageModelConfig:
 
     def test_config_with_reasoning(self):
         """Test creating config with identify_reasoning set."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
         config = TwoStageModelConfig(
             identify_model=identify_model,
@@ -53,31 +70,47 @@ class TestTwoStageModelConfig:
         assert config.identify_reasoning == {"effort": "high"}
 
     def test_invalid_identify_model_type(self):
-        """Test that invalid identify_model type raises TypeError."""
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        """Test that invalid identify_model type raises ValidationError."""
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
-        with pytest.raises(TypeError, match="identify_model must be a ModelConfig"):
+        with pytest.raises(ValidationError):
             TwoStageModelConfig(
                 identify_model="not_a_model_config",  # type: ignore
                 implement_model=implement_model,
             )
 
     def test_invalid_implement_model_type(self):
-        """Test that invalid implement_model type raises TypeError."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
+        """Test that invalid implement_model type raises ValidationError."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
 
-        with pytest.raises(TypeError, match="implement_model must be a ModelConfig"):
+        with pytest.raises(ValidationError):
             TwoStageModelConfig(
                 identify_model=identify_model,
                 implement_model="not_a_model_config",  # type: ignore
             )
 
     def test_invalid_reasoning_type(self):
-        """Test that non-dict identify_reasoning raises TypeError."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        """Test that non-dict identify_reasoning raises ValidationError."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
-        with pytest.raises(TypeError, match="identify_reasoning must be a dict"):
+        with pytest.raises(ValidationError):
             TwoStageModelConfig(
                 identify_model=identify_model,
                 implement_model=implement_model,
@@ -85,11 +118,19 @@ class TestTwoStageModelConfig:
             )
 
     def test_invalid_reasoning_key_type(self):
-        """Test that non-string keys in identify_reasoning raise TypeError."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        """Test that non-string keys in identify_reasoning raise ValidationError."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
-        with pytest.raises(TypeError, match="identify_reasoning must be a dict\\[str, str\\]"):
+        with pytest.raises(ValidationError):
             TwoStageModelConfig(
                 identify_model=identify_model,
                 implement_model=implement_model,
@@ -102,7 +143,7 @@ class TestPhaseConfigWithTwoStage:
 
     def test_final_two_stage_requires_two_stage_config(self):
         """Test that FINAL_TWO_STAGE requires two_stage_config."""
-        with pytest.raises(ValueError, match="two_stage_config is required"):
+        with pytest.raises(ValidationError):
             PhaseConfig(
                 phase_type=PhaseType.FINAL_TWO_STAGE,
                 enabled=True,
@@ -110,8 +151,16 @@ class TestPhaseConfigWithTwoStage:
 
     def test_final_two_stage_with_valid_config(self):
         """Test FINAL_TWO_STAGE with valid two_stage_config."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
         two_stage_config = TwoStageModelConfig(
             identify_model=identify_model,
@@ -129,15 +178,23 @@ class TestPhaseConfigWithTwoStage:
 
     def test_non_two_stage_rejects_two_stage_config(self):
         """Test that non-FINAL_TWO_STAGE phases reject two_stage_config."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
         two_stage_config = TwoStageModelConfig(
             identify_model=identify_model,
             implement_model=implement_model,
         )
 
-        with pytest.raises(ValueError, match="two_stage_config is only valid for FINAL_TWO_STAGE"):
+        with pytest.raises(ValidationError):
             PhaseConfig(
                 phase_type=PhaseType.FINAL,
                 enabled=True,
@@ -146,8 +203,16 @@ class TestPhaseConfigWithTwoStage:
 
     def test_final_two_stage_no_default_prompt_paths(self):
         """Test that FINAL_TWO_STAGE doesn't set default prompt paths."""
-        identify_model = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1", "deepseek-r1")
-        implement_model = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
 
         two_stage_config = TwoStageModelConfig(
             identify_model=identify_model,
@@ -816,8 +881,16 @@ class TestPhaseFactoryTwoStage:
             output_file = temp_path / "output.md"
 
             # Create two-stage config
-            identify_model_config = ModelConfig(Provider.OPENROUTER, "test/identify", "identify")
-            implement_model_config = ModelConfig(Provider.OPENROUTER, "test/implement", "implement")
+            identify_model_config = ModelConfig(
+                provider=Provider.OPENROUTER,
+                model_id="test/identify",
+                provider_model_name="identify",
+            )
+            implement_model_config = ModelConfig(
+                provider=Provider.OPENROUTER,
+                model_id="test/implement",
+                provider_model_name="implement",
+            )
 
             two_stage_config = TwoStageModelConfig(
                 identify_model=identify_model_config,
@@ -864,7 +937,7 @@ class TestPhaseFactoryTwoStage:
         """Test that factory raises error when two_stage_config is missing."""
         # Create phase config without two_stage_config
         # This should fail at PhaseConfig creation, not factory
-        with pytest.raises(ValueError, match="two_stage_config is required"):
+        with pytest.raises(ValidationError):
             PhaseConfig(
                 phase_type=PhaseType.FINAL_TWO_STAGE,
                 enabled=True,

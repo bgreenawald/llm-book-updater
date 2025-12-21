@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
@@ -80,7 +81,7 @@ class TestPhaseSkipping:
             output_dir = temp_path / "output"
             output_dir.mkdir()
 
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValidationError) as exc_info:
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",
@@ -107,7 +108,7 @@ class TestPhaseSkipping:
             output_dir = temp_path / "output"
             output_dir.mkdir()
 
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ValidationError) as exc_info:
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",
