@@ -685,25 +685,38 @@ class TwoStageFinalPhase:
             valid_requests: List of valid request dictionaries
             stage: Stage name ("identify" or "implement")
         """
-        failed_indices = [idx for idx, response in enumerate(batch_responses) if response.get("failed", False)]
+        # Build mapping from metadata.index to request
+        request_by_index: Dict[int, Dict[str, Any]] = {}
+        for req in valid_requests:
+            idx = req.get("metadata", {}).get("index")
+            if idx is not None:
+                request_by_index[idx] = req
 
-        if not failed_indices:
+        # Find failed responses with their positions
+        failed_responses = [
+            (resp_idx, response) for resp_idx, response in enumerate(batch_responses) if response.get("failed", False)
+        ]
+
+        if not failed_responses:
             return
 
         logger.warning(
-            f"{stage.upper()} batch had {len(failed_indices)} failed responses out of {len(batch_responses)}"
+            f"{stage.upper()} batch had {len(failed_responses)} failed responses out of {len(batch_responses)}"
         )
 
         if not self.enable_retry:
-            first_failed = batch_responses[failed_indices[0]]
+            _, first_failed = failed_responses[0]
             failed_content = first_failed.get("content", "Unknown error")
+            block_index = first_failed.get("metadata", {}).get("index")
             raise GenerationFailedError(
                 message=f"{stage.upper()} batch generation failed (retry disabled): {failed_content[:200]}",
-                block_info=f"batch index {failed_indices[0]}",
+                block_info=f"block index {block_index}"
+                if block_index is not None
+                else f"batch position {failed_responses[0][0]}",
             )
 
         # Retry failed responses individually
-        logger.info(f"Retrying {len(failed_indices)} failed {stage} responses individually")
+        logger.info(f"Retrying {len(failed_responses)} failed {stage} responses individually")
         model = self.identify_config.model if stage == "identify" else self.implement_config.model
         reasoning = self.identify_config.reasoning if stage == "identify" else None
 
@@ -711,9 +724,19 @@ class TwoStageFinalPhase:
         if reasoning:
             call_kwargs["reasoning"] = reasoning
 
-        for failed_idx in failed_indices:
-            original_request = valid_requests[failed_idx]
-            block_info = f"{stage} batch index {failed_idx}"
+        for resp_idx, failed_response in failed_responses:
+            # Use metadata.index to find the correct request
+            block_index = failed_response.get("metadata", {}).get("index")
+            if block_index is None:
+                logger.error(f"Failed response at position {resp_idx} missing metadata.index, skipping retry")
+                continue
+
+            original_request = request_by_index.get(block_index)
+            if original_request is None:
+                logger.error(f"No request found for block index {block_index}, skipping retry")
+                continue
+
+            block_info = f"{stage} block index {block_index}"
 
             retried_content, retried_gen_id = make_llm_call_with_retry(
                 model=model,
@@ -725,11 +748,11 @@ class TwoStageFinalPhase:
                 **call_kwargs,
             )
 
-            # Update the response
-            batch_responses[failed_idx] = {
+            # Update the response IN-PLACE, preserving original metadata
+            batch_responses[resp_idx] = {
                 "content": retried_content,
                 "generation_id": retried_gen_id,
-                "metadata": original_request.get("metadata"),
+                "metadata": failed_response.get("metadata"),  # Preserve original metadata
                 "failed": False,
             }
 
