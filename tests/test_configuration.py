@@ -210,7 +210,7 @@ class TestPostProcessorConfigurationEdgeCases:
         assert "{лицензия}" in result
 
     def test_processor_chain_with_failing_processor(self):
-        """Test processor chain resilience when one processor fails."""
+        """Test processor chain fails fast when one processor fails."""
 
         class FailingProcessor:
             def __init__(self):
@@ -231,11 +231,11 @@ class TestPostProcessorConfigurationEdgeCases:
         chain.add_processor(FailingProcessor())
         chain.add_processor(WorkingProcessor())
 
-        # Chain should continue processing despite failure
-        result = chain.process(original_block="", llm_block="old content old")
+        # Chain should fail fast when a processor raises an exception
+        with pytest.raises(RuntimeError) as exc_info:
+            chain.process(original_block="", llm_block="old content old")
 
-        # Should have processed with working processors despite failure
-        assert "new content new" in result
+        assert "Post-processing failed at processor failing_processor" in str(exc_info.value)
 
     def test_processor_with_extremely_large_config(self):
         """Test processor behavior with extremely large configuration."""
