@@ -690,6 +690,115 @@ class TestTwoStageFinalPhaseBatchMode:
         # Batch API should not have been called
         assert not identify_model.batch_chat_completion.called
 
+    def test_batch_retry_with_out_of_order_responses(self, batch_phase_setup):
+        """Test that batch retry uses correct request when responses are out of order."""
+        # Create input file with 3 blocks to test out-of-order handling
+        input_file = batch_phase_setup["input_file"]
+        input_file.write_text(
+            "## Chapter 1\n\nContent 1.\n\n## Chapter 2\n\nContent 2.\n\n## Chapter 3\n\nContent 3.\n\n"
+        )
+
+        original_file = batch_phase_setup["original_file"]
+        original_file.write_text(
+            "## Chapter 1\n\nOriginal 1.\n\n## Chapter 2\n\nOriginal 2.\n\n## Chapter 3\n\nOriginal 3.\n\n"
+        )
+
+        # Create models that support batch
+        identify_model = MagicMock()
+        identify_model.supports_batch.return_value = True
+        # Return responses OUT OF ORDER: index 1, then 0 (FAILED), then 2
+        identify_model.batch_chat_completion.return_value = [
+            {"content": "Changes 2", "generation_id": "id-2", "metadata": {"index": 1}},
+            {"content": "Error occurred", "generation_id": "id-error", "metadata": {"index": 0}, "failed": True},
+            {"content": "Changes 3", "generation_id": "id-3", "metadata": {"index": 2}},
+        ]
+        identify_model.__str__ = lambda self: "id-model"
+
+        implement_model = MagicMock()
+        implement_model.supports_batch.return_value = True
+        # Implement stage responses in order (after identify is fixed)
+        implement_model.batch_chat_completion.return_value = [
+            {"content": "Refined 1", "generation_id": "impl-1", "metadata": {"index": 0}},
+            {"content": "Refined 2", "generation_id": "impl-2", "metadata": {"index": 1}},
+            {"content": "Refined 3", "generation_id": "impl-3", "metadata": {"index": 2}},
+        ]
+        implement_model.__str__ = lambda self: "impl-model"
+
+        from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+        # Load prompts from files
+        prompts_dir = batch_phase_setup["prompts_dir"]
+        identify_system = (prompts_dir / "final_identify_system.md").read_text()
+        identify_user = (prompts_dir / "final_identify_user.md").read_text()
+        implement_system = (prompts_dir / "final_implement_system.md").read_text()
+        implement_user = (prompts_dir / "final_implement_user.md").read_text()
+
+        # Create stage configs
+        identify_config = StageConfig(
+            model=identify_model,
+            system_prompt=identify_system,
+            user_prompt_template=identify_user,
+        )
+        implement_config = StageConfig(
+            model=implement_model,
+            system_prompt=implement_system,
+            user_prompt_template=implement_user,
+        )
+
+        phase = TwoStageFinalPhase(
+            name="batch_retry_test",
+            input_file_path=batch_phase_setup["input_file"],
+            output_file_path=batch_phase_setup["output_file"],
+            original_file_path=batch_phase_setup["original_file"],
+            book_name="Test",
+            author_name="Author",
+            identify_config=identify_config,
+            implement_config=implement_config,
+            use_batch=True,
+            enable_retry=True,
+        )
+
+        # Track retry calls to verify correct prompt is used
+        retry_calls = []
+
+        def mock_retry(*args, **kwargs):
+            """Mock make_llm_call_with_retry to capture calls."""
+            retry_calls.append(
+                {
+                    "user_prompt": kwargs.get("user_prompt"),
+                    "system_prompt": kwargs.get("system_prompt"),
+                    "block_info": kwargs.get("block_info"),
+                }
+            )
+            # Return successful retry result
+            return ("Changes 1 (retried)", "id-1-retried")
+
+        with (
+            patch("src.final_two_stage_phase.add_generation_id"),
+            patch("src.final_two_stage_phase.make_llm_call_with_retry", side_effect=mock_retry),
+        ):
+            phase.run()
+
+        # Verify retry was called exactly once (for the failed response)
+        assert len(retry_calls) == 1
+
+        # Verify retry was called with the correct prompt for block index 0
+        retry_call = retry_calls[0]
+        assert "identify block index 0" in retry_call["block_info"]
+        # The user prompt should contain "Content 1" (from block 0), not "Content 2" (from block 1)
+        assert "Content 1" in retry_call["user_prompt"]
+        assert "Content 2" not in retry_call["user_prompt"]
+
+        # Verify batch API was called
+        assert identify_model.batch_chat_completion.called
+        assert implement_model.batch_chat_completion.called
+
+        # Verify final output contains all three chapters
+        output_content = batch_phase_setup["output_file"].read_text()
+        assert "## Chapter 1" in output_content
+        assert "## Chapter 2" in output_content
+        assert "## Chapter 3" in output_content
+
 
 class TestPhaseFactoryTwoStage:
     """Tests for PhaseFactory.create_two_stage_final_phase."""
