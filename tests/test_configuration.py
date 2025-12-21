@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from src.config import PhaseConfig, PhaseType, RunConfig
 from src.pipeline import Pipeline
@@ -108,18 +109,17 @@ class TestConfigurationValidation:
             # Verify empty string is stored
             assert config.book_name == ""
 
-            # Test None - dataclasses don't enforce type hints at runtime
-            config_with_none = RunConfig(
-                book_id="test_book",
-                book_name=None,  # None value
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-            )
-            # Verify None is stored (though this might cause issues later)
-            assert config_with_none.book_name is None
+            # Test None - Pydantic enforces type hints at runtime
+            with pytest.raises(ValidationError):
+                RunConfig(
+                    book_id="test_book",
+                    book_name=None,  # type: ignore[arg-type]
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[],
+                )
 
     def test_invalid_phase_configuration(self):
         """Test behavior with invalid phase configurations."""
@@ -132,7 +132,7 @@ class TestConfigurationValidation:
             output_dir.mkdir()
 
             # Test invalid phase type
-            with pytest.raises((TypeError, ValueError, AttributeError)):
+            with pytest.raises(ValidationError):
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",

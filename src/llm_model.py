@@ -1,16 +1,15 @@
 import json
-import os
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
-import requests
-from dotenv import load_dotenv
+import requests  # type: ignore[import-untyped]
 from loguru import logger
-from requests.adapters import HTTPAdapter
+from pydantic import model_validator
+from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
 from urllib3.util.retry import Retry
 
+from src.api_models import GeminiResponse, OpenRouterResponse
 from src.common.provider import Provider
 from src.constants import (
     DEFAULT_OPENROUTER_BACKOFF_FACTOR,
@@ -24,16 +23,14 @@ from src.constants import (
     PROMPT_PREVIEW_MAX_LENGTH,
 )
 from src.cost_tracking_wrapper import register_generation_model_info
-
-# Load environment variables from .env to ensure API keys are available
-load_dotenv(override=True)
+from src.pydantic_config import BaseConfig
+from src.settings import settings
 
 # Initialize module-level logger
 module_logger = logger
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseConfig):
     """Configuration for a model, including provider and model identifier."""
 
     provider: Provider
@@ -41,39 +38,46 @@ class ModelConfig:
     # Provider-specific model name (for direct SDK calls)
     provider_model_name: Optional[str] = None
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def _set_provider_model_name(self) -> "ModelConfig":
         """Set provider_model_name if not specified."""
         if self.provider_model_name is None:
-            if self.provider == Provider.OPENAI:
-                # Extract OpenAI model name from OpenRouter format
-                if "/" in self.model_id:
-                    self.provider_model_name = self.model_id.split("/", 1)[1]
-                else:
-                    self.provider_model_name = self.model_id
-            elif self.provider == Provider.GEMINI:
-                # Extract Gemini model name from OpenRouter format
-                if "/" in self.model_id:
-                    self.provider_model_name = self.model_id.split("/", 1)[1]
-                else:
-                    self.provider_model_name = self.model_id
+            if self.provider in (Provider.OPENAI, Provider.GEMINI):
+                self.provider_model_name = self.model_id.split("/", 1)[1] if "/" in self.model_id else self.model_id
             else:
-                # For OpenRouter, use the full model_id
                 self.provider_model_name = self.model_id
+        return self
 
 
 # Model constants with provider information
-GROK_3_MINI = ModelConfig(Provider.OPENROUTER, "x-ai/grok-3-mini")
-GEMINI_FLASH = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash", "gemini-2.5-flash")
-GEMINI_PRO = ModelConfig(Provider.GEMINI, "google/gemini-2.5-pro", "gemini-2.5-pro")
-DEEPSEEK = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-r1-0528")
-OPENAI_04_MINI = ModelConfig(Provider.OPENAI, "openai/o4-mini-high", "o4-mini")
-CLAUDE_4_SONNET = ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4")
-GEMINI_FLASH_LITE = ModelConfig(Provider.GEMINI, "google/gemini-2.5-flash-lite-preview-06-17", "gemini-2.5-flash-lite")
-KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2:free")
+GROK_3_MINI = ModelConfig(provider=Provider.OPENROUTER, model_id="x-ai/grok-3-mini")
+GEMINI_FLASH = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-flash",
+    provider_model_name="gemini-2.5-flash",
+)
+GEMINI_PRO = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-pro",
+    provider_model_name="gemini-2.5-pro",
+)
+DEEPSEEK = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-r1-0528")
+OPENAI_04_MINI = ModelConfig(
+    provider=Provider.OPENAI,
+    model_id="openai/o4-mini-high",
+    provider_model_name="o4-mini",
+)
+CLAUDE_4_SONNET = ModelConfig(provider=Provider.OPENROUTER, model_id="anthropic/claude-sonnet-4")
+GEMINI_FLASH_LITE = ModelConfig(
+    provider=Provider.GEMINI,
+    model_id="google/gemini-2.5-flash-lite-preview-06-17",
+    provider_model_name="gemini-2.5-flash-lite",
+)
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2:free")
 # Claude API models (direct Anthropic API)
-CLAUDE_OPUS_4_5 = ModelConfig(Provider.CLAUDE, "claude-opus-4-5")
-CLAUDE_SONNET_4_5 = ModelConfig(Provider.CLAUDE, "claude-sonnet-4-5")
-CLAUDE_HAIKU_4_5 = ModelConfig(Provider.CLAUDE, "claude-haiku-4-5")
+CLAUDE_OPUS_4_5 = ModelConfig(provider=Provider.CLAUDE, model_id="claude-opus-4-5")
+CLAUDE_SONNET_4_5 = ModelConfig(provider=Provider.CLAUDE, model_id="claude-sonnet-4-5")
+CLAUDE_HAIKU_4_5 = ModelConfig(provider=Provider.CLAUDE, model_id="claude-haiku-4-5")
 
 
 class LlmModelError(Exception):
@@ -368,13 +372,13 @@ class OpenRouterClient(ProviderClient):
         }
 
         resp_data = self._make_api_call(data=data)
+        response = OpenRouterResponse.model_validate(resp_data)
 
-        choices = resp_data.get("choices", [])
-        if not choices or not choices[0].get("message", {}).get("content"):
+        if not response.choices or not response.choices[0].message.get("content"):
             raise ValueError(f"Empty or malformed response: {resp_data}")
 
-        content = choices[0]["message"]["content"]
-        finish_reason = choices[0].get("finish_reason", "unknown")
+        content = response.choices[0].message["content"]
+        finish_reason = response.choices[0].finish_reason or "unknown"
 
         if finish_reason == "length":
             module_logger.warning("Response truncated: consider increasing max_tokens or reviewing model limits")
@@ -383,7 +387,7 @@ class OpenRouterClient(ProviderClient):
                 model_name=model_name,
             )
 
-        generation_id = resp_data.get("id", "unknown")
+        generation_id = response.id or "unknown"
         return content, generation_id
 
 
@@ -1153,13 +1157,13 @@ class GeminiClient(ProviderClient):
                 # Extract response data
                 key = result.get("key", "")
                 response_data = result.get("response", {})
+                response = GeminiResponse.model_validate(response_data)
 
                 # Get the generated content
-                candidates = response_data.get("candidates", [])
                 content = ""
-                if candidates:
-                    candidate = candidates[0]
-                    content_parts = candidate.get("content", {}).get("parts", [])
+                if response.candidates:
+                    candidate = response.candidates[0]
+                    content_parts = candidate.content.parts if candidate.content else []
                     if content_parts:
                         # Collect all text parts (skip non-text parts like thought_signature)
                         text_parts = []
@@ -1188,10 +1192,10 @@ class GeminiClient(ProviderClient):
 
                 # Track token usage if available
                 try:
-                    usage_metadata = response_data.get("usageMetadata", {})
+                    usage_metadata = response.usage_metadata
                     if usage_metadata:
-                        prompt_tokens = usage_metadata.get("promptTokenCount")
-                        completion_tokens = usage_metadata.get("candidatesTokenCount")
+                        prompt_tokens = usage_metadata.prompt_token_count
+                        completion_tokens = usage_metadata.candidates_token_count
 
                         if prompt_tokens is not None or completion_tokens is not None:
                             register_generation_model_info(
@@ -1662,9 +1666,7 @@ class LlmModel:
 
         # Determine prompt logging setting
         if enable_prompt_logging is None:
-            # Check environment variable, default to False for security
-            env_value = os.getenv("LLM_ENABLE_PROMPT_LOGGING", "false").lower()
-            self.enable_prompt_logging = env_value in ("true", "1", "yes", "on")
+            self.enable_prompt_logging = settings.llm_enable_prompt_logging
         else:
             self.enable_prompt_logging = enable_prompt_logging
 
@@ -1710,7 +1712,7 @@ class LlmModel:
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-        if not os.getenv(api_key_env):
+        if not settings.get_env(api_key_env):
             msg = f"Missing environment variable: {api_key_env}"
             module_logger.error(msg)
             raise ValueError(msg)
@@ -1722,7 +1724,7 @@ class LlmModel:
         if provider not in self._clients:
             if provider == Provider.OPENROUTER:
                 config = self._config["openrouter"]
-                api_key = os.getenv(config["api_key_env"])
+                api_key = settings.get_env(config["api_key_env"])
                 if api_key is None:
                     raise ValueError(f"Missing environment variable: {config['api_key_env']}")
                 self._clients[provider] = OpenRouterClient(
@@ -1733,17 +1735,17 @@ class LlmModel:
                     backoff_factor=config["backoff_factor"],
                 )
             elif provider == Provider.OPENAI:
-                api_key = os.getenv(self._config["openai"]["api_key_env"])
+                api_key = settings.get_env(self._config["openai"]["api_key_env"])
                 if api_key is None:
                     raise ValueError(f"Missing environment variable: {self._config['openai']['api_key_env']}")
                 self._clients[provider] = OpenAIClient(api_key=api_key)
             elif provider == Provider.GEMINI:
-                api_key = os.getenv(self._config["gemini"]["api_key_env"])
+                api_key = settings.get_env(self._config["gemini"]["api_key_env"])
                 if api_key is None:
                     raise ValueError(f"Missing environment variable: {self._config['gemini']['api_key_env']}")
                 self._clients[provider] = GeminiClient(api_key=api_key)
             elif provider == Provider.CLAUDE:
-                api_key = os.getenv(self._config["claude"]["api_key_env"])
+                api_key = settings.get_env(self._config["claude"]["api_key_env"])
                 if api_key is None:
                     raise ValueError(f"Missing environment variable: {self._config['claude']['api_key_env']}")
                 self._clients[provider] = ClaudeClient(api_key=api_key)

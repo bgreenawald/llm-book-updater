@@ -24,15 +24,14 @@ pricing and may not reflect actual charges, especially for enterprise pricing.
 """
 
 import json
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from src.cost_tracking_wrapper import ModelInfo
 
-import requests
-from dotenv import load_dotenv
+import requests  # type: ignore[import-untyped]
 from loguru import logger
+from pydantic import Field, model_validator
 
 from src.common.provider import Provider
 from src.constants import (
@@ -54,24 +53,21 @@ from src.constants import (
     OPENROUTER_MODELS_API_TIMEOUT,
     TOKENS_PER_MILLION,
 )
-
-# Load environment variables from .env to ensure API keys are available
-load_dotenv(override=True)
+from src.pydantic_config import BaseConfig
 
 # Initialize module-level logger
 module_logger = logger
 
 
-@dataclass
-class GenerationStats:
+class GenerationStats(BaseConfig):
     """Data class for generation statistics from any LLM provider."""
 
     generation_id: str
     model: str
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    cost: float
+    prompt_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    cost: float = 0.0
     currency: str = "USD"
     created_at: Optional[str] = None
     finish_reason: Optional[str] = None
@@ -79,39 +75,43 @@ class GenerationStats:
     is_estimated: bool = False
     estimation_method: Optional[str] = None
 
+    @model_validator(mode="after")
+    def validate_token_totals(self) -> "GenerationStats":
+        if self.total_tokens != self.prompt_tokens + self.completion_tokens:
+            raise ValueError("total_tokens must equal prompt_tokens + completion_tokens")
+        return self
 
-@dataclass
-class PhaseCosts:
+
+class PhaseCosts(BaseConfig):
     """Data class for tracking costs per phase."""
 
     phase_name: str
-    phase_index: int
+    phase_index: int = Field(ge=0)
     generation_ids: List[str]
-    total_prompt_tokens: int
-    total_completion_tokens: int
-    total_tokens: int
-    total_cost: float
+    total_prompt_tokens: int = Field(ge=0)
+    total_completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    total_cost: float = 0.0
     currency: str = "USD"
-    generation_count: int = 0
-    estimated_count: int = 0
-    actual_count: int = 0
+    generation_count: int = Field(default=0, ge=0)
+    estimated_count: int = Field(default=0, ge=0)
+    actual_count: int = Field(default=0, ge=0)
 
 
-@dataclass
-class RunCosts:
+class RunCosts(BaseConfig):
     """Data class for tracking total run costs."""
 
-    total_phases: int
-    completed_phases: int
-    total_generations: int
-    total_prompt_tokens: int
-    total_completion_tokens: int
-    total_tokens: int
-    total_cost: float
+    total_phases: int = Field(ge=0)
+    completed_phases: int = Field(ge=0)
+    total_generations: int = Field(ge=0)
+    total_prompt_tokens: int = Field(ge=0)
+    total_completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    total_cost: float = 0.0
     phase_costs: List[PhaseCosts]
     currency: str = "USD"
-    total_estimated_count: int = 0
-    total_actual_count: int = 0
+    total_estimated_count: int = Field(default=0, ge=0)
+    total_actual_count: int = Field(default=0, ge=0)
 
 
 class CostTracker:
@@ -623,19 +623,19 @@ class CostTracker:
 
         for gen_id in generation_ids:
             # Get model info for this generation if available
-            gen_model_info = model_info.get(gen_id, {}) if model_info else {}
+            gen_model_info = model_info.get(gen_id) if model_info else None
 
             # Extract provider with proper type handling
-            provider_value = gen_model_info.get("provider")
+            provider_value = gen_model_info.provider if gen_model_info else None
             provider: Optional[Provider] = provider_value if isinstance(provider_value, Provider) else None
 
             stats = self.get_generation_stats(
                 generation_id=gen_id,
-                model=gen_model_info.get("model"),
-                prompt_tokens=gen_model_info.get("prompt_tokens"),
-                completion_tokens=gen_model_info.get("completion_tokens"),
+                model=gen_model_info.model if gen_model_info else None,
+                prompt_tokens=gen_model_info.prompt_tokens if gen_model_info else None,
+                completion_tokens=gen_model_info.completion_tokens if gen_model_info else None,
                 provider=provider,
-                is_batch=gen_model_info.get("is_batch", False),
+                is_batch=gen_model_info.is_batch if gen_model_info else False,
             )
 
             if stats:

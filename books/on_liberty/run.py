@@ -8,10 +8,10 @@ from src.llm_model import ModelConfig
 from src.logging_config import setup_logging
 from src.pipeline import run_pipeline
 
-DEEPSEEK_V32 = ModelConfig(Provider.OPENROUTER, "deepseek/deepseek-v3.2")
-GEMINI_3_FLASH = ModelConfig(Provider.GEMINI, "gemini-3-flash-preview")
-GPT_52 = ModelConfig(Provider.OPENAI, "gpt-5.2")
-KIMI_K2 = ModelConfig(Provider.OPENROUTER, "moonshotai/kimi-k2-thinking")
+DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
+GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
+GPT_52 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5.2")
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(

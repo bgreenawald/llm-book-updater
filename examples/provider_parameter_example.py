@@ -38,7 +38,7 @@ def main() -> None:
     # Example 2: Only use providers that don't collect data
     provider_privacy_focused = PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4"),
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="anthropic/claude-sonnet-4"),
         llm_kwargs={
             "provider": {
                 "data_collection": "deny",  # Only use providers that don't collect data
@@ -61,7 +61,7 @@ def main() -> None:
     # Example 4: Set maximum price limits
     provider_budget_limited = PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=ModelConfig(Provider.OPENROUTER, "anthropic/claude-sonnet-4"),
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="anthropic/claude-sonnet-4"),
         llm_kwargs={
             "provider": {
                 "max_price": {

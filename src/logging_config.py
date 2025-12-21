@@ -2,11 +2,12 @@
 
 import sys
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
 
-def setup_logging(log_name: str = "app") -> logger:
+def setup_logging(log_name: str = "app") -> Any:
     """
     Configure logging for the application.
 
@@ -31,7 +32,8 @@ def setup_logging(log_name: str = "app") -> logger:
     )
 
     # Add stdout handler if not already added
-    if not any(handler._sink == sys.stdout for handler in logger._core.handlers.values()):
+    core = getattr(logger, "_core", None)
+    if core is None or not any(getattr(handler, "_sink", None) == sys.stdout for handler in core.handlers.values()):
         logger.add(
             sink=sys.stdout,
             level="INFO",
