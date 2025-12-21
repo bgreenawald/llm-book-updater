@@ -2,13 +2,14 @@ from pathlib import Path
 from typing import Any, List, Optional, TypedDict, Union
 
 from src.config import PhaseConfig, PhaseType, PostProcessorType
+from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
 from src.llm_model import LlmModel
 from src.llm_phase import (
     IntroductionAnnotationPhase,
     StandardLlmPhase,
     SummaryAnnotationPhase,
-    TwoStageFinalPhase,
 )
+from src.phase_utils import read_file
 from src.post_processors import (
     EnsureBlankLineProcessor,
     NoNewHeadersPostProcessor,
@@ -323,7 +324,7 @@ class PhaseFactory:
         if config.two_stage_config is None:
             raise ValueError("two_stage_config is required for FINAL_TWO_STAGE phase")
 
-        # Validate required fields (but don't use llm_model_instance since we have separate models)
+        # Validate required fields
         if config.name is None:
             raise ValueError("name is required for TwoStageFinalPhase")
         if config.input_file_path is None:
@@ -336,6 +337,32 @@ class PhaseFactory:
             raise ValueError("book_name is required for TwoStageFinalPhase")
         if config.author_name is None:
             raise ValueError("author_name is required for TwoStageFinalPhase")
+
+        # Load and format prompts
+        identify_system = PhaseFactory._load_and_format_prompt(
+            Path("./prompts/final_identify_system.md"),
+            tags_to_preserve,
+        )
+        identify_user = read_file(Path("./prompts/final_identify_user.md"))
+        implement_system = PhaseFactory._load_and_format_prompt(
+            Path("./prompts/final_implement_system.md"),
+            tags_to_preserve,
+        )
+        implement_user = read_file(Path("./prompts/final_implement_user.md"))
+
+        # Create stage configs
+        identify_stage = StageConfig(
+            model=identify_model,
+            system_prompt=identify_system,
+            user_prompt_template=identify_user,
+            reasoning=config.two_stage_config.identify_reasoning,
+        )
+
+        implement_stage = StageConfig(
+            model=implement_model,
+            system_prompt=implement_system,
+            user_prompt_template=implement_user,
+        )
 
         # Create post-processor chain (applies to IMPLEMENT output only)
         post_processor_chain = PhaseFactory._create_post_processor_chain(
@@ -351,22 +378,46 @@ class PhaseFactory:
             original_file_path=config.original_file_path,
             book_name=config.book_name,
             author_name=config.author_name,
-            identify_model=identify_model,
-            implement_model=implement_model,
-            identify_system_prompt_path=Path("./prompts/final_identify_system.md"),
-            identify_user_prompt_path=Path("./prompts/final_identify_user.md"),
-            implement_system_prompt_path=Path("./prompts/final_implement_system.md"),
-            implement_user_prompt_path=Path("./prompts/final_implement_user.md"),
-            identify_reasoning=config.two_stage_config.identify_reasoning,
+            identify_config=identify_stage,
+            implement_config=implement_stage,
+            post_processor_chain=post_processor_chain,
             max_workers=max_workers,
             llm_kwargs=config.llm_kwargs,
-            post_processor_chain=post_processor_chain,
             use_batch=config.use_batch,
             batch_size=config.batch_size,
             enable_retry=config.enable_retry,
             max_retries=config.max_retries,
             skip_if_less_than_tokens=config.skip_if_less_than_tokens,
+            tags_to_preserve=tags_to_preserve,
         )
+
+    @staticmethod
+    def _load_and_format_prompt(path: Path, tags_to_preserve: Optional[List[str]]) -> str:
+        """Load a prompt file and format with tags.
+
+        Args:
+            path: Path to the prompt file
+            tags_to_preserve: Tags to preserve for formatting
+
+        Returns:
+            Formatted prompt content
+        """
+
+        content = read_file(path)
+
+        # Format with tags_to_preserve
+        if tags_to_preserve:
+            format_params = {}
+            for tag in tags_to_preserve:
+                tag_name = tag.strip("{}")
+                format_params[tag_name] = tag
+            try:
+                content = content.format(**format_params)
+            except KeyError:
+                # Ignore missing keys - some prompts may not use all tags
+                pass
+
+        return content
 
     @staticmethod
     def _create_built_in_processor(processor_name: str) -> Optional[PostProcessor]:

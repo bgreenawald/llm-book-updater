@@ -226,7 +226,19 @@ class TestTwoStageFinalPhaseInitialization:
 
     def test_initialization_success(self, temp_files, mock_models):
         """Test successful initialization of TwoStageFinalPhase."""
-        from src.llm_phase import TwoStageFinalPhase
+        from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+        # Create stage configs
+        identify_config = StageConfig(
+            model=mock_models["identify"],
+            system_prompt="IDENTIFY system prompt",
+            user_prompt_template="Process {current_body}",
+        )
+        implement_config = StageConfig(
+            model=mock_models["implement"],
+            system_prompt="IMPLEMENT system prompt",
+            user_prompt_template="Apply changes: {changes}",
+        )
 
         phase = TwoStageFinalPhase(
             name="final_two_stage",
@@ -235,17 +247,13 @@ class TestTwoStageFinalPhaseInitialization:
             original_file_path=temp_files["original_file"],
             book_name="Test Book",
             author_name="Test Author",
-            identify_model=mock_models["identify"],
-            implement_model=mock_models["implement"],
-            identify_system_prompt_path=temp_files["prompts_dir"] / "final_identify_system.md",
-            identify_user_prompt_path=temp_files["prompts_dir"] / "final_identify_user.md",
-            implement_system_prompt_path=temp_files["prompts_dir"] / "final_implement_system.md",
-            implement_user_prompt_path=temp_files["prompts_dir"] / "final_implement_user.md",
+            identify_config=identify_config,
+            implement_config=implement_config,
         )
 
         assert phase.name == "final_two_stage"
-        assert phase.identify_model == mock_models["identify"]
-        assert phase.implement_model == mock_models["implement"]
+        assert phase.identify_config.model == mock_models["identify"]
+        assert phase.implement_config.model == mock_models["implement"]
 
 
 class TestTwoStageFinalPhaseProcessing:
@@ -288,7 +296,19 @@ class TestTwoStageFinalPhaseProcessing:
             implement_model.supports_batch.return_value = False
             implement_model.__str__ = lambda self: "mock-implement"
 
-            from src.llm_phase import TwoStageFinalPhase
+            from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+            # Create stage configs
+            identify_config = StageConfig(
+                model=identify_model,
+                system_prompt="IDENTIFY system prompt",
+                user_prompt_template="Process {current_body}",
+            )
+            implement_config = StageConfig(
+                model=implement_model,
+                system_prompt="IMPLEMENT system prompt",
+                user_prompt_template="Apply changes: {changes}",
+            )
 
             phase = TwoStageFinalPhase(
                 name="final_two_stage",
@@ -297,12 +317,8 @@ class TestTwoStageFinalPhaseProcessing:
                 original_file_path=original_file,
                 book_name="Test Book",
                 author_name="Test Author",
-                identify_model=identify_model,
-                implement_model=implement_model,
-                identify_system_prompt_path=prompts_dir / "final_identify_system.md",
-                identify_user_prompt_path=prompts_dir / "final_identify_user.md",
-                implement_system_prompt_path=prompts_dir / "final_implement_system.md",
-                implement_user_prompt_path=prompts_dir / "final_implement_user.md",
+                identify_config=identify_config,
+                implement_config=implement_config,
             )
 
             yield {
@@ -313,7 +329,7 @@ class TestTwoStageFinalPhaseProcessing:
             }
 
     def test_process_block_calls_both_models(self, phase_with_mocks):
-        """Test that _process_block calls both identify and implement models."""
+        """Test that _process_single_block calls both identify and implement models."""
         phase = phase_with_mocks["phase"]
         identify_model = phase_with_mocks["identify_model"]
         implement_model = phase_with_mocks["implement_model"]
@@ -321,8 +337,8 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Chapter 1\n\nThis is the content."
         original_block = "## Chapter 1\n\nThis is the original content."
 
-        with patch("src.llm_phase.add_generation_id"):
-            result = phase._process_block(current_block, original_block)
+        with patch("src.final_two_stage_phase.add_generation_id"):
+            result = phase._process_single_block(current_block, original_block, block_index=0)
 
         # Both models should have been called
         assert identify_model.chat_completion.called
@@ -340,7 +356,7 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Empty Chapter\n\n"
         original_block = "## Empty Chapter\n\n"
 
-        result = phase._process_block(current_block, original_block)
+        result = phase._process_single_block(current_block, original_block, block_index=0)
 
         # Should not call models for empty content
         assert not identify_model.chat_completion.called
@@ -356,7 +372,7 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Preface\n\n{preface}"
         original_block = "## Preface\n\n{preface}"
 
-        result = phase._process_block(current_block, original_block)
+        result = phase._process_single_block(current_block, original_block, block_index=0)
 
         # Should not call models for special-tag-only content
         assert not identify_model.chat_completion.called
@@ -371,15 +387,15 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Chapter 1\n\nThis is the content."
         original_block = "## Chapter 1\n\nThis is the original content."
 
-        with patch("src.llm_phase.add_generation_id"):
-            phase._process_block(current_block, original_block, block_index=0)
+        with patch("src.final_two_stage_phase.add_generation_id"):
+            phase._process_single_block(current_block, original_block, block_index=0)
 
         # Debug data should be collected
-        assert len(phase._identify_debug_data) == 1
-        assert phase._identify_debug_data[0]["block_index"] == 0
-        assert phase._identify_debug_data[0]["block_header"] == "## Chapter 1"
-        assert "### No Changes" in phase._identify_debug_data[0]["identify_response"]
-        assert phase._identify_debug_data[0]["generation_id"] == "gen-identify-123"
+        assert len(phase._debug_data) == 1
+        assert phase._debug_data[0]["block_index"] == 0
+        assert phase._debug_data[0]["header"] == "## Chapter 1"
+        assert "### No Changes" in phase._debug_data[0]["identify_response"]
+        assert phase._debug_data[0]["generation_id"] == "gen-identify-123"
 
 
 class TestTwoStageFinalPhaseRun:
@@ -425,7 +441,25 @@ class TestTwoStageFinalPhaseRun:
             implement_model.supports_batch.return_value = False
             implement_model.__str__ = lambda self: "implement-model"
 
-            from src.llm_phase import TwoStageFinalPhase
+            from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+            # Load prompts from files
+            identify_system = (prompts_dir / "final_identify_system.md").read_text()
+            identify_user = (prompts_dir / "final_identify_user.md").read_text()
+            implement_system = (prompts_dir / "final_implement_system.md").read_text()
+            implement_user = (prompts_dir / "final_implement_user.md").read_text()
+
+            # Create stage configs
+            identify_config = StageConfig(
+                model=identify_model,
+                system_prompt=identify_system,
+                user_prompt_template=identify_user,
+            )
+            implement_config = StageConfig(
+                model=implement_model,
+                system_prompt=implement_system,
+                user_prompt_template=implement_user,
+            )
 
             phase = TwoStageFinalPhase(
                 name="final_two_stage",
@@ -434,12 +468,8 @@ class TestTwoStageFinalPhaseRun:
                 original_file_path=original_file,
                 book_name="Test Book",
                 author_name="Test Author",
-                identify_model=identify_model,
-                implement_model=implement_model,
-                identify_system_prompt_path=prompts_dir / "final_identify_system.md",
-                identify_user_prompt_path=prompts_dir / "final_identify_user.md",
-                implement_system_prompt_path=prompts_dir / "final_implement_system.md",
-                implement_user_prompt_path=prompts_dir / "final_implement_user.md",
+                identify_config=identify_config,
+                implement_config=implement_config,
                 max_workers=1,
             )
 
@@ -454,7 +484,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_file = full_phase_setup["output_file"]
 
-        with patch("src.llm_phase.add_generation_id"):
+        with patch("src.final_two_stage_phase.add_generation_id"):
             phase.run()
 
         assert output_file.exists()
@@ -467,7 +497,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_dir = full_phase_setup["output_dir"]
 
-        with patch("src.llm_phase.add_generation_id"):
+        with patch("src.final_two_stage_phase.add_generation_id"):
             phase.run()
 
         # Find the debug file
@@ -488,7 +518,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_dir = full_phase_setup["output_dir"]
 
-        with patch("src.llm_phase.add_generation_id"):
+        with patch("src.final_two_stage_phase.add_generation_id"):
             phase.run()
 
         debug_files = list(output_dir.glob("final_identify_debug_*.json"))
@@ -503,7 +533,7 @@ class TestTwoStageFinalPhaseRun:
         # Check block structure
         for block in debug_data["blocks"]:
             assert "block_index" in block
-            assert "block_header" in block
+            assert "header" in block
             assert "identify_response" in block
             assert "generation_id" in block
 
@@ -564,7 +594,26 @@ class TestTwoStageFinalPhaseBatchMode:
         ]
         implement_model.__str__ = lambda self: "impl-model"
 
-        from src.llm_phase import TwoStageFinalPhase
+        from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+        # Load prompts from files
+        prompts_dir = batch_phase_setup["prompts_dir"]
+        identify_system = (prompts_dir / "final_identify_system.md").read_text()
+        identify_user = (prompts_dir / "final_identify_user.md").read_text()
+        implement_system = (prompts_dir / "final_implement_system.md").read_text()
+        implement_user = (prompts_dir / "final_implement_user.md").read_text()
+
+        # Create stage configs
+        identify_config = StageConfig(
+            model=identify_model,
+            system_prompt=identify_system,
+            user_prompt_template=identify_user,
+        )
+        implement_config = StageConfig(
+            model=implement_model,
+            system_prompt=implement_system,
+            user_prompt_template=implement_user,
+        )
 
         phase = TwoStageFinalPhase(
             name="batch_test",
@@ -573,16 +622,12 @@ class TestTwoStageFinalPhaseBatchMode:
             original_file_path=batch_phase_setup["original_file"],
             book_name="Test",
             author_name="Author",
-            identify_model=identify_model,
-            implement_model=implement_model,
-            identify_system_prompt_path=batch_phase_setup["prompts_dir"] / "final_identify_system.md",
-            identify_user_prompt_path=batch_phase_setup["prompts_dir"] / "final_identify_user.md",
-            implement_system_prompt_path=batch_phase_setup["prompts_dir"] / "final_implement_system.md",
-            implement_user_prompt_path=batch_phase_setup["prompts_dir"] / "final_implement_user.md",
+            identify_config=identify_config,
+            implement_config=implement_config,
             use_batch=True,
         )
 
-        with patch("src.llm_phase.add_generation_id"):
+        with patch("src.final_two_stage_phase.add_generation_id"):
             phase.run()
 
         # Both batch APIs should have been called
@@ -602,7 +647,26 @@ class TestTwoStageFinalPhaseBatchMode:
         implement_model.chat_completion.return_value = ("Refined", "impl-1")
         implement_model.__str__ = lambda self: "impl-model"
 
-        from src.llm_phase import TwoStageFinalPhase
+        from src.final_two_stage_phase import StageConfig, TwoStageFinalPhase
+
+        # Load prompts from files
+        prompts_dir = batch_phase_setup["prompts_dir"]
+        identify_system = (prompts_dir / "final_identify_system.md").read_text()
+        identify_user = (prompts_dir / "final_identify_user.md").read_text()
+        implement_system = (prompts_dir / "final_implement_system.md").read_text()
+        implement_user = (prompts_dir / "final_implement_user.md").read_text()
+
+        # Create stage configs
+        identify_config = StageConfig(
+            model=identify_model,
+            system_prompt=identify_system,
+            user_prompt_template=identify_user,
+        )
+        implement_config = StageConfig(
+            model=implement_model,
+            system_prompt=implement_system,
+            user_prompt_template=implement_user,
+        )
 
         phase = TwoStageFinalPhase(
             name="mixed_test",
@@ -611,17 +675,13 @@ class TestTwoStageFinalPhaseBatchMode:
             original_file_path=batch_phase_setup["original_file"],
             book_name="Test",
             author_name="Author",
-            identify_model=identify_model,
-            implement_model=implement_model,
-            identify_system_prompt_path=batch_phase_setup["prompts_dir"] / "final_identify_system.md",
-            identify_user_prompt_path=batch_phase_setup["prompts_dir"] / "final_identify_user.md",
-            implement_system_prompt_path=batch_phase_setup["prompts_dir"] / "final_implement_system.md",
-            implement_user_prompt_path=batch_phase_setup["prompts_dir"] / "final_implement_user.md",
+            identify_config=identify_config,
+            implement_config=implement_config,
             use_batch=True,
             max_workers=1,
         )
 
-        with patch("src.llm_phase.add_generation_id"):
+        with patch("src.final_two_stage_phase.add_generation_id"):
             phase.run()
 
         # Should fall back to individual calls
@@ -688,8 +748,8 @@ class TestPhaseFactoryTwoStage:
             )
 
             assert phase.name == "final_two_stage"
-            assert phase.identify_model == identify_model
-            assert phase.implement_model == implement_model
+            assert phase.identify_config.model == identify_model
+            assert phase.implement_config.model == implement_model
 
     def test_factory_requires_two_stage_config(self):
         """Test that factory raises error when two_stage_config is missing."""

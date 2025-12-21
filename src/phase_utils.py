@@ -1,0 +1,277 @@
+"""Shared utilities for phase implementations.
+
+This module provides common functionality used by both LlmPhase and
+TwoStageFinalPhase, including token counting, file I/O, retry logic,
+and markdown block processing.
+"""
+
+import re
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import tiktoken
+from loguru import logger
+
+from src.llm_model import (
+    GenerationFailedError,
+    LlmModel,
+    MaxRetriesExceededError,
+    ResponseTruncatedError,
+    is_failed_response,
+)
+
+
+class TokenCounter:
+    """Utility for counting tokens in text using tiktoken."""
+
+    def __init__(self, encoding: str = "cl100k_base"):
+        """Initialize token counter with specified encoding.
+
+        Args:
+            encoding: The tiktoken encoding to use (default: cl100k_base for GPT-4)
+        """
+        self._tokenizer = tiktoken.get_encoding(encoding)
+
+    def count(self, text: str) -> int:
+        """Count approximate number of tokens in text.
+
+        Args:
+            text: The text to count tokens for
+
+        Returns:
+            The approximate number of tokens
+        """
+        try:
+            return len(self._tokenizer.encode(text))
+        except Exception as e:
+            logger.warning(f"Token counting error: {e}, using char/4 fallback")
+            # Fallback: rough approximation of 1 token per 4 characters
+            return len(text) // 4
+
+
+def read_file(path: Path) -> str:
+    """Read a file with proper error handling and logging.
+
+    Args:
+        path: Path to the file to read
+
+    Returns:
+        The file contents as a string
+
+    Raises:
+        FileNotFoundError: If the file does not exist
+        Exception: If there's an error reading the file
+    """
+    if not path.exists():
+        logger.error(f"File not found: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
+
+    try:
+        with path.open(mode="r", encoding="utf-8") as f:
+            content = f.read()
+        logger.debug(f"Successfully read file: {path}")
+        return content
+    except Exception as e:
+        logger.error(f"Error reading file {path}: {e}")
+        raise
+
+
+def write_file(path: Path, content: str) -> None:
+    """Write content to a file, creating parent directories if needed.
+
+    Args:
+        path: Path to write to
+        content: Content to write
+
+    Raises:
+        Exception: If there's an error writing the file
+    """
+    try:
+        # Ensure parent directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open(mode="w", encoding="utf-8") as f:
+            f.write(content)
+        logger.debug(f"Successfully wrote file: {path} ({len(content)} chars)")
+    except Exception as e:
+        logger.error(f"Error writing file {path}: {e}")
+        raise
+
+
+def make_llm_call_with_retry(
+    model: LlmModel,
+    system_prompt: str,
+    user_prompt: str,
+    enable_retry: bool,
+    max_retries: int,
+    block_info: Optional[str] = None,
+    **kwargs,
+) -> Tuple[str, str]:
+    """Make an LLM call with optional retry logic.
+
+    This function handles retries for failed LLM calls according to the
+    configuration. If enable_retry is False, any failure immediately raises
+    an error. If True, failures are retried up to max_retries times.
+
+    Args:
+        model: The LLM model instance to use
+        system_prompt: System prompt for the call
+        user_prompt: User prompt for the call
+        enable_retry: Whether to retry on failure
+        max_retries: Maximum retry attempts (only used if enable_retry=True)
+        block_info: Optional context string for error messages (e.g., "header: Introduction")
+        **kwargs: Additional arguments for the LLM call (reasoning, llm_kwargs, etc.)
+
+    Returns:
+        Tuple of (response_content, generation_id)
+
+    Raises:
+        GenerationFailedError: If retry is disabled and the call fails
+        MaxRetriesExceededError: If all retry attempts are exhausted
+    """
+    max_attempts = (max_retries + 1) if enable_retry else 1
+    last_error: Optional[Exception] = None
+    last_content: str = ""
+
+    for attempt in range(max_attempts):
+        try:
+            content, generation_id = model.chat_completion(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                **kwargs,
+            )
+
+            # Check if the response indicates a failure
+            if is_failed_response(content):
+                last_content = content
+                error_msg = f"LLM returned failed response: {content[:100]}..."
+                if enable_retry and attempt < max_retries:
+                    logger.warning(
+                        f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying..."
+                    )
+                    continue
+                else:
+                    # No retry or retries exhausted
+                    if enable_retry:
+                        raise MaxRetriesExceededError(
+                            message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                            attempts=max_attempts,
+                            block_info=block_info,
+                        )
+                    else:
+                        raise GenerationFailedError(
+                            message=error_msg,
+                            block_info=block_info,
+                        )
+
+            # Success!
+            return content, generation_id
+
+        except (GenerationFailedError, MaxRetriesExceededError):
+            # Re-raise our custom exceptions (these are terminal failures)
+            raise
+        except ResponseTruncatedError as e:
+            # Truncation is retryable - model may use fewer reasoning tokens on retry
+            last_error = e
+            error_msg = f"Response truncated: {e}"
+            if enable_retry and attempt < max_retries:
+                logger.warning(f"Response truncated (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying...")
+                continue
+            else:
+                # No retry or retries exhausted
+                if enable_retry:
+                    raise MaxRetriesExceededError(
+                        message=f"Response truncated after {max_attempts} attempts: {error_msg}",
+                        attempts=max_attempts,
+                        block_info=block_info,
+                    ) from e
+                else:
+                    raise GenerationFailedError(
+                        message=error_msg,
+                        block_info=block_info,
+                    ) from e
+        except Exception as e:
+            last_error = e
+            error_msg = f"LLM call failed: {e}"
+            if enable_retry and attempt < max_retries:
+                logger.warning(f"Generation failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. Retrying...")
+                continue
+            else:
+                # No retry or retries exhausted
+                if enable_retry:
+                    raise MaxRetriesExceededError(
+                        message=f"Generation failed after {max_attempts} attempts: {error_msg}",
+                        attempts=max_attempts,
+                        block_info=block_info,
+                    ) from e
+                else:
+                    raise GenerationFailedError(
+                        message=error_msg,
+                        block_info=block_info,
+                    ) from e
+
+    # Fallback (should never reach here, but provide safe handling)
+    if last_error:
+        raise GenerationFailedError(
+            message=f"LLM call failed: {last_error}",
+            block_info=block_info,
+        ) from last_error
+    else:
+        raise GenerationFailedError(
+            message=f"LLM returned failed response: {last_content[:100]}...",
+            block_info=block_info,
+        )
+
+
+def extract_markdown_blocks(text: str) -> List[str]:
+    """Extract markdown blocks (headers + content) from text.
+
+    This function identifies markdown headers (# through ######) and extracts
+    each header with its associated content as a separate block. It also
+    preserves any preamble content that appears before the first header.
+
+    Args:
+        text: The markdown text to process
+
+    Returns:
+        List of extracted blocks, each containing a header and its content
+    """
+    pattern = r"(?:^|\n)(#{1,6}\s+.*?)(?=\n#{1,6}\s+|\n*$)"
+    matches = list(re.finditer(pattern, text, flags=re.DOTALL))
+
+    blocks = []
+    if not matches:
+        # No headers found - return entire text as single block if not empty
+        if text.strip():
+            blocks.append(text)
+        return blocks
+
+    # Check for preamble (content before first header)
+    first_match = matches[0]
+    if first_match.start() > 0:
+        preamble = text[: first_match.start()]
+        if preamble.strip():
+            blocks.append(preamble)
+
+    # Add matched blocks
+    for match in matches:
+        blocks.append(match.group(1))
+
+    return blocks
+
+
+def get_header_and_body(block: str) -> Tuple[str, str]:
+    """Split a markdown block into header and body components.
+
+    This method separates the first line (header) from the rest of the
+    content (body) in a markdown block.
+
+    Args:
+        block: The markdown block to split
+
+    Returns:
+        Tuple containing (header, body)
+    """
+    lines = block.strip().split("\n", 1)
+    header = lines[0].strip()
+    body = lines[1].strip() if len(lines) > 1 else ""
+    return header, body
