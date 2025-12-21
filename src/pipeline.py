@@ -65,8 +65,12 @@ class Pipeline:
         Get or create a cached LlmModel instance for connection pooling.
 
         This method implements model instance caching to reuse connection pools
-        across phases. Models are cached based on their configuration to ensure
-        connection pool reuse when the same model is used in multiple phases.
+        across phases. Models are cached based on their configuration (provider:model_id).
+
+        Generation parameters (such as temperature) are passed during generation
+        and do not affect caching. This allows model instances (which manage
+        connection pools) to be reused across phases that use the same provider
+        and model, even if they use different generation parameters.
 
         Args:
             model_config: Configuration for the model to create
