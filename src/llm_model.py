@@ -1146,7 +1146,22 @@ class GeminiClient(ProviderClient):
                     candidate = candidates[0]
                     content_parts = candidate.get("content", {}).get("parts", [])
                     if content_parts:
-                        content = content_parts[0].get("text", "")
+                        # Collect all text parts (skip non-text parts like thought_signature)
+                        text_parts = []
+                        for part in content_parts:
+                            if isinstance(part, dict) and part.get("text"):
+                                text_parts.append(part["text"])
+
+                        # Use only the first text part to avoid duplication
+                        # If there are multiple text parts, they may be duplicates or the LLM may have
+                        # split the response incorrectly
+                        if text_parts:
+                            if len(text_parts) > 1:
+                                module_logger.warning(
+                                    f"Found {len(text_parts)} text parts in Gemini batch response, "
+                                    f"using only the first to avoid duplication"
+                                )
+                            content = text_parts[0]
 
                 # Generate a unique ID
                 generation_id = f"gemini_batch_{int(time.time())}_{key}"
