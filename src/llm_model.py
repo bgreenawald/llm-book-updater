@@ -963,8 +963,33 @@ class GeminiClient(ProviderClient):
 
             response = client.models.generate_content(model=model_name, contents=contents, config=config)
 
-            if not response.text:
-                raise ValueError("Empty response from Gemini")
+            # Extract text from the first text part only, filtering out non-text parts like 'thought_signature'
+            # This avoids duplication that can occur when response.text concatenates all parts
+            # The warning indicates response.text may concatenate text incorrectly when non-text parts exist
+            content = ""
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if (
+                    hasattr(candidate, "content")
+                    and candidate.content is not None
+                    and hasattr(candidate.content, "parts")
+                ):
+                    parts = candidate.content.parts
+                    if parts:
+                        # Find the first part that has text (skip non-text parts like thought_signature)
+                        for part in parts:
+                            if hasattr(part, "text") and part.text:
+                                content = part.text
+                                break
+                            elif isinstance(part, dict) and part.get("text"):
+                                content = part["text"]
+                                break
+
+            # Fallback to response.text if explicit extraction didn't work
+            if not content:
+                if not response.text:
+                    raise ValueError("Empty response from Gemini")
+                content = response.text
 
             # Gemini doesn't provide a completion ID in the same way, so we'll generate one
             generation_id = f"gemini_{int(time.time())}"
@@ -987,7 +1012,7 @@ class GeminiClient(ProviderClient):
                 # Log but don't fail if we can't extract usage metadata
                 module_logger.debug(f"Could not extract Gemini usage metadata: {e}")
 
-            return response.text, generation_id
+            return content, generation_id
 
         except Exception as e:
             module_logger.error(f"Gemini API call failed: {e}")
