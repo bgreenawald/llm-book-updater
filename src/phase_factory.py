@@ -457,6 +457,8 @@ class PhaseFactory:
             "no_new_headers": NoNewHeadersPostProcessor,
             "revert_removed_block_lines": RevertRemovedBlockLines,
             "remove_blank_lines_in_list": RemoveBlankLinesInListProcessor,
+            "preserve_fstring_tags": PreserveFStringTagsProcessor,
+            "validate_non_empty_section": ValidateNonEmptySectionProcessor,
         }
 
         processor_class = processors.get(processor_name.lower())
