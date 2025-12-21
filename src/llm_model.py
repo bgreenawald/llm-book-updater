@@ -1002,8 +1002,10 @@ class GeminiClient(ProviderClient):
                         if text_parts:
                             if len(text_parts) > 1:
                                 module_logger.warning(
-                                    f"Found {len(text_parts)} text parts in Gemini response, "
-                                    f"using only the first to avoid duplication"
+                                    f"Found {len(text_parts)} text parts in Gemini response. "
+                                    f"Part lengths: {[len(p) for p in text_parts]}. "
+                                    f"Using only first part to avoid duplication. "
+                                    f"If content appears truncated, consider concatenating all parts."
                                 )
                             content = text_parts[0]
 
@@ -1171,8 +1173,10 @@ class GeminiClient(ProviderClient):
                         if text_parts:
                             if len(text_parts) > 1:
                                 module_logger.warning(
-                                    f"Found {len(text_parts)} text parts in Gemini batch response, "
-                                    f"using only the first to avoid duplication"
+                                    f"Found {len(text_parts)} text parts in Gemini batch response. "
+                                    f"Part lengths: {[len(p) for p in text_parts]}. "
+                                    f"Using only first part to avoid duplication. "
+                                    f"If content appears truncated, consider concatenating all parts."
                                 )
                             content = text_parts[0]
 
