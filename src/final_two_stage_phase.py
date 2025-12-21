@@ -574,15 +574,28 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
+        # Create mapping from block index to response
+        # This handles cases where providers return results out of order
+        response_by_index: Dict[int, Dict[str, Any]] = {}
+        for response in batch_responses:
+            metadata = response.get("metadata", {})
+            block_index = metadata.get("index")
+            if block_index is not None:
+                response_by_index[block_index] = response
+
         # Reconstruct results with placeholders for skipped blocks
         results: List[Dict[str, Any]] = []
-        response_idx = 0
         for req in requests:
             if req is None:
                 results.append({"content": "", "skipped": True})
             else:
-                results.append(batch_responses[response_idx])
-                response_idx += 1
+                block_index = req["metadata"]["index"]
+                if block_index in response_by_index:
+                    results.append(response_by_index[block_index])
+                else:
+                    # Defensive: should not happen, but handle missing response
+                    logger.error(f"Missing response for block index {block_index} in IDENTIFY batch")
+                    results.append({"content": "", "failed": True, "metadata": req["metadata"]})
 
         return results
 
@@ -635,15 +648,28 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
+        # Create mapping from block index to response
+        # This handles cases where providers return results out of order
+        response_by_index: Dict[int, Dict[str, Any]] = {}
+        for response in batch_responses:
+            metadata = response.get("metadata", {})
+            block_index = metadata.get("index")
+            if block_index is not None:
+                response_by_index[block_index] = response
+
         # Reconstruct results
         results: List[Dict[str, Any]] = []
-        response_idx = 0
         for req in requests:
             if req is None:
                 results.append({"content": "", "skipped": True})
             else:
-                results.append(batch_responses[response_idx])
-                response_idx += 1
+                block_index = req["metadata"]["index"]
+                if block_index in response_by_index:
+                    results.append(response_by_index[block_index])
+                else:
+                    # Defensive: should not happen, but handle missing response
+                    logger.error(f"Missing response for block index {block_index} in IMPLEMENT batch")
+                    results.append({"content": "", "failed": True, "metadata": req["metadata"]})
 
         return results
 
