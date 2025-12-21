@@ -14,7 +14,7 @@ from pydantic import Field
 from src.common.provider import Provider
 from src.cost_tracker import CostTracker, RunCosts
 from src.pydantic_config import BaseConfig
-from src.settings import Settings
+from src.settings import settings
 
 # Initialize module-level logger
 module_logger = logger
@@ -47,7 +47,7 @@ class CostTrackingWrapper:
             api_key: OpenRouter API key. If None, will try to get from environment.
         """
         if api_key is None:
-            api_key = Settings().get_api_key("openrouter")  # type: ignore[call-arg]
+            api_key = settings.get_api_key("openrouter")
 
         if api_key:
             self.cost_tracker: CostTracker | None = CostTracker(api_key=api_key)

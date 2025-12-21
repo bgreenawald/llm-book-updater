@@ -1,5 +1,7 @@
 """Pydantic models for LLM provider API responses."""
 
+from typing import Any
+
 from pydantic import ConfigDict, Field
 
 from src.pydantic_config import BaseConfig
@@ -25,7 +27,7 @@ class OpenRouterChoice(ApiBaseModel):
     """Response choice from OpenRouter."""
 
     index: int
-    message: dict[str, str]
+    message: dict[str, Any]
     finish_reason: str | None = None
 
 
