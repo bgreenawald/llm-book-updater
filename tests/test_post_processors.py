@@ -1052,14 +1052,14 @@ class TestPostProcessorChain:
         assert tracker2.order == ["second"]
 
     def test_chain_with_error_handling(self, post_processor_chain):
-        """Test chain continues processing when a processor fails."""
+        """Test chain fails fast when a processor raises an exception."""
 
         class ErrorProcessor(PostProcessor):
             def __init__(self, name):
                 super().__init__(name=name)
 
             def process(self, original_block, llm_block, **kwargs):
-                raise Exception(f"Error in {self.name}")
+                raise ValueError(f"Error in {self.name}")
 
         class SafeProcessor(PostProcessor):
             def __init__(self, name):
@@ -1077,10 +1077,13 @@ class TestPostProcessorChain:
         original_block = "Original"
         llm_block = "LLM"
 
-        # Should not raise an exception, should return original llm_block
-        result = post_processor_chain.process(original_block=original_block, llm_block=llm_block)
+        # Should raise RuntimeError when error processor fails
+        with pytest.raises(RuntimeError) as exc_info:
+            post_processor_chain.process(original_block=original_block, llm_block=llm_block)
 
-        assert result == llm_block
+        assert "Post-processing failed at processor error" in str(exc_info.value)
+        # Verify the safe processor never runs
+        assert "safe" not in str(exc_info.value)
 
     def test_chain_string_representation(self, post_processor_chain):
         """Test string representation of chain."""

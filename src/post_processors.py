@@ -415,16 +415,12 @@ class PostProcessorChain(PostProcessor):
                 # EmptySectionError is a critical validation error that should stop the pipeline
                 logger.error(f"EmptySectionError in post-processor {processor.name} - propagating to stop pipeline")
                 raise
-            except (ValueError, KeyError, AttributeError, TypeError, IndexError) as e:
-                # Common post-processor errors are logged but non-fatal
-                logger.error(f"Error in post-processor {processor.name}: {str(e)}")
-                logger.exception("Post-processor error stack trace")
-                continue
             except Exception as e:
-                # Catch-all for unexpected errors; log and continue with chain
-                logger.error(f"Unexpected error in post-processor {processor.name}: {str(e)}")
-                logger.exception("Unexpected post-processor error stack trace")
-                continue
+                # All post-processor errors are critical and should stop the pipeline
+                # to prevent producing corrupt output
+                logger.error(f"Post-processor {processor.name} failed: {str(e)}")
+                logger.exception("Post-processor error stack trace")
+                raise RuntimeError(f"Post-processing failed at processor {processor.name}. ") from e
 
         logger.debug(f"Post-processing chain completed. Final block length: {len(current_block)} characters")
         return current_block
