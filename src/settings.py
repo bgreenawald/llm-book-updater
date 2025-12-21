@@ -29,13 +29,21 @@ class Settings(BaseSettings):
     llm_enable_prompt_logging: bool = Field(False, alias="LLM_ENABLE_PROMPT_LOGGING")
 
     def get_api_key(self, provider: str) -> str | None:
-        """Get the API key for a provider name."""
+        """Get the API key for a provider name.
+
+        Args:
+            provider: Provider name (openrouter, openai, gemini, anthropic, or claude)
+
+        Returns:
+            API key string if found, None otherwise
+        """
         provider_key = provider.lower()
         key_map = {
             "openrouter": ("OPENROUTER_API_KEY", self.openrouter_api_key),
             "openai": ("OPENAI_API_KEY", self.openai_api_key),
             "gemini": ("GEMINI_API_KEY", self.gemini_api_key),
             "anthropic": ("ANTHROPIC_API_KEY", self.anthropic_api_key),
+            "claude": ("ANTHROPIC_API_KEY", self.anthropic_api_key),
         }
         env_name, secret_value = key_map.get(provider_key, (None, None))
         if secret_value:

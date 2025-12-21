@@ -1722,20 +1722,10 @@ class LlmModel:
     def _validate_api_key(self) -> None:
         """Validate that the required API key is available for the provider."""
         provider = self.model_config.provider
+        api_key = settings.get_api_key(provider.value)
 
-        if provider == Provider.OPENROUTER:
-            api_key_env = self._config["openrouter"]["api_key_env"]
-        elif provider == Provider.OPENAI:
-            api_key_env = self._config["openai"]["api_key_env"]
-        elif provider == Provider.GEMINI:
-            api_key_env = self._config["gemini"]["api_key_env"]
-        elif provider == Provider.CLAUDE:
-            api_key_env = self._config["claude"]["api_key_env"]
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
-
-        if not settings.get_env(api_key_env):
-            msg = f"Missing environment variable: {api_key_env}"
+        if not api_key:
+            msg = f"Missing API key for provider: {provider.value}"
             module_logger.error(msg)
             raise ValueError(msg)
 
@@ -1744,11 +1734,12 @@ class LlmModel:
         provider = self.model_config.provider
 
         if provider not in self._clients:
+            api_key = settings.get_api_key(provider.value)
+            if api_key is None:
+                raise ValueError(f"Missing API key for provider: {provider.value}")
+
             if provider == Provider.OPENROUTER:
                 config = self._config["openrouter"]
-                api_key = settings.get_env(config["api_key_env"])
-                if api_key is None:
-                    raise ValueError(f"Missing environment variable: {config['api_key_env']}")
                 self._clients[provider] = OpenRouterClient(
                     api_key=api_key,
                     base_url=config["base_url"],
@@ -1757,19 +1748,10 @@ class LlmModel:
                     backoff_factor=config["backoff_factor"],
                 )
             elif provider == Provider.OPENAI:
-                api_key = settings.get_env(self._config["openai"]["api_key_env"])
-                if api_key is None:
-                    raise ValueError(f"Missing environment variable: {self._config['openai']['api_key_env']}")
                 self._clients[provider] = OpenAIClient(api_key=api_key)
             elif provider == Provider.GEMINI:
-                api_key = settings.get_env(self._config["gemini"]["api_key_env"])
-                if api_key is None:
-                    raise ValueError(f"Missing environment variable: {self._config['gemini']['api_key_env']}")
                 self._clients[provider] = GeminiClient(api_key=api_key)
             elif provider == Provider.CLAUDE:
-                api_key = settings.get_env(self._config["claude"]["api_key_env"])
-                if api_key is None:
-                    raise ValueError(f"Missing environment variable: {self._config['claude']['api_key_env']}")
                 self._clients[provider] = ClaudeClient(api_key=api_key)
             else:
                 raise ValueError(f"Unsupported provider: {provider}")
