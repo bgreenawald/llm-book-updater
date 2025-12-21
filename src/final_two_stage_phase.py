@@ -486,7 +486,7 @@ class TwoStageFinalPhase:
 
         # Store debug data
         for bd, id_result in zip(block_data, identify_results):
-            if not bd["skip"] and not id_result.get("skipped"):
+            if not bd["skip"] and not id_result.get("skipped") and not id_result.get("failed"):
                 with self._debug_lock:
                     self._debug_data.append(
                         {
@@ -504,7 +504,7 @@ class TwoStageFinalPhase:
         # Assemble final blocks
         processed_blocks = []
         for bd, impl_result in zip(block_data, implement_results):
-            if bd["skip"] or impl_result.get("skipped"):
+            if bd["skip"] or impl_result.get("skipped") or impl_result.get("failed"):
                 processed_blocks.append(f"{bd['current_header']}\n\n{bd['current_body']}\n\n")
             else:
                 processed_body = impl_result.get("content", "")
@@ -523,6 +523,51 @@ class TwoStageFinalPhase:
                     processed_blocks.append(f"{bd['current_header']}\n\n")
 
         return processed_blocks
+
+    def _map_batch_responses_to_requests(
+        self,
+        batch_responses: List[Dict[str, Any]],
+        requests: List[Optional[Dict[str, Any]]],
+        stage_name: str,
+    ) -> List[Dict[str, Any]]:
+        """Map batch responses back to original request order.
+
+        This helper method handles cases where providers return results out of order
+        by creating a mapping from block index to response, then reconstructing
+        results in the original request order with placeholders for skipped/failed blocks.
+
+        Args:
+            batch_responses: List of response dictionaries from batch API
+            requests: List of request dictionaries (None for skipped blocks)
+            stage_name: Name of the stage (for error logging)
+
+        Returns:
+            List of response dictionaries in the same order as requests
+        """
+        # Create mapping from block index to response
+        # This handles cases where providers return results out of order
+        response_by_index: Dict[int, Dict[str, Any]] = {}
+        for response in batch_responses:
+            metadata = response.get("metadata", {})
+            block_index = metadata.get("index")
+            if block_index is not None:
+                response_by_index[block_index] = response
+
+        # Reconstruct results with placeholders for skipped blocks
+        results: List[Dict[str, Any]] = []
+        for req in requests:
+            if req is None:
+                results.append({"content": "", "skipped": True})
+            else:
+                block_index = req["metadata"]["index"]
+                if block_index in response_by_index:
+                    results.append(response_by_index[block_index])
+                else:
+                    # Defensive: should not happen, but handle missing response
+                    logger.error(f"Missing response for block index {block_index} in {stage_name.upper()} batch")
+                    results.append({"content": "", "failed": True, "metadata": req["metadata"]})
+
+        return results
 
     def _run_identify_batch(self, block_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run IDENTIFY stage as a batch API call.
@@ -574,17 +619,7 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
-        # Reconstruct results with placeholders for skipped blocks
-        results: List[Dict[str, Any]] = []
-        response_idx = 0
-        for req in requests:
-            if req is None:
-                results.append({"content": "", "skipped": True})
-            else:
-                results.append(batch_responses[response_idx])
-                response_idx += 1
-
-        return results
+        return self._map_batch_responses_to_requests(batch_responses, requests, "identify")
 
     def _run_implement_batch(
         self, block_data: List[Dict[str, Any]], identify_results: List[Dict[str, Any]]
@@ -600,7 +635,7 @@ class TwoStageFinalPhase:
         """
         requests: List[Optional[Dict[str, Any]]] = []
         for bd, id_result in zip(block_data, identify_results):
-            if bd["skip"] or id_result.get("skipped"):
+            if bd["skip"] or id_result.get("skipped") or id_result.get("failed"):
                 requests.append(None)
             else:
                 user_message = self._format_implement_prompt(
@@ -635,17 +670,7 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
-        # Reconstruct results
-        results: List[Dict[str, Any]] = []
-        response_idx = 0
-        for req in requests:
-            if req is None:
-                results.append({"content": "", "skipped": True})
-            else:
-                results.append(batch_responses[response_idx])
-                response_idx += 1
-
-        return results
+        return self._map_batch_responses_to_requests(batch_responses, requests, "implement")
 
     def _handle_failed_batch_responses(
         self,

@@ -581,16 +581,16 @@ class TestTwoStageFinalPhaseBatchMode:
         identify_model = MagicMock()
         identify_model.supports_batch.return_value = True
         identify_model.batch_chat_completion.return_value = [
-            {"content": "Changes 1", "generation_id": "id-1"},
-            {"content": "Changes 2", "generation_id": "id-2"},
+            {"content": "Changes 1", "generation_id": "id-1", "metadata": {"index": 0}},
+            {"content": "Changes 2", "generation_id": "id-2", "metadata": {"index": 1}},
         ]
         identify_model.__str__ = lambda self: "id-model"
 
         implement_model = MagicMock()
         implement_model.supports_batch.return_value = True
         implement_model.batch_chat_completion.return_value = [
-            {"content": "Refined 1", "generation_id": "impl-1"},
-            {"content": "Refined 2", "generation_id": "impl-2"},
+            {"content": "Refined 1", "generation_id": "impl-1", "metadata": {"index": 0}},
+            {"content": "Refined 2", "generation_id": "impl-2", "metadata": {"index": 1}},
         ]
         implement_model.__str__ = lambda self: "impl-model"
 
