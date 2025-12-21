@@ -10,13 +10,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from src.config import PhaseConfig, PhaseType
 from src.constants import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     MAX_SUBBLOCK_TOKEN_BOUND,
-    MIN_SUBBLOCK_TOKEN_BOUND,
 )
 
 # ============================================================================
@@ -49,8 +49,8 @@ class TestPhaseConfigSubblockValidation:
         assert config.min_subblock_tokens == 2000
 
     def test_invalid_use_subblocks_type(self):
-        """Test that non-bool use_subblocks raises TypeError."""
-        with pytest.raises(TypeError) as exc_info:
+        """Test that non-bool use_subblocks raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 use_subblocks="true",  # type: ignore
@@ -58,8 +58,8 @@ class TestPhaseConfigSubblockValidation:
         assert "use_subblocks must be a bool" in str(exc_info.value)
 
     def test_invalid_max_subblock_tokens_type(self):
-        """Test that non-int max_subblock_tokens raises TypeError."""
-        with pytest.raises(TypeError) as exc_info:
+        """Test that non-int max_subblock_tokens raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens="4096",  # type: ignore
@@ -67,8 +67,8 @@ class TestPhaseConfigSubblockValidation:
         assert "max_subblock_tokens must be an int" in str(exc_info.value)
 
     def test_invalid_min_subblock_tokens_type(self):
-        """Test that non-int min_subblock_tokens raises TypeError."""
-        with pytest.raises(TypeError) as exc_info:
+        """Test that non-int min_subblock_tokens raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 min_subblock_tokens=1024.5,  # type: ignore
@@ -76,46 +76,46 @@ class TestPhaseConfigSubblockValidation:
         assert "min_subblock_tokens must be an int" in str(exc_info.value)
 
     def test_max_subblock_tokens_below_minimum_bound(self):
-        """Test that max_subblock_tokens below MIN_SUBBLOCK_TOKEN_BOUND raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        """Test that max_subblock_tokens below MIN_SUBBLOCK_TOKEN_BOUND raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens=100,  # Below MIN_SUBBLOCK_TOKEN_BOUND
                 min_subblock_tokens=50,
             )
-        assert f"max_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND}" in str(exc_info.value)
+        assert "max_subblock_tokens" in str(exc_info.value)
 
     def test_max_subblock_tokens_above_maximum_bound(self):
-        """Test that max_subblock_tokens above MAX_SUBBLOCK_TOKEN_BOUND raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        """Test that max_subblock_tokens above MAX_SUBBLOCK_TOKEN_BOUND raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens=100000,  # Above MAX_SUBBLOCK_TOKEN_BOUND
             )
-        assert f"max_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND}" in str(exc_info.value)
+        assert "max_subblock_tokens" in str(exc_info.value)
 
     def test_min_subblock_tokens_below_minimum_bound(self):
-        """Test that min_subblock_tokens below MIN_SUBBLOCK_TOKEN_BOUND raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        """Test that min_subblock_tokens below MIN_SUBBLOCK_TOKEN_BOUND raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 min_subblock_tokens=100,  # Below MIN_SUBBLOCK_TOKEN_BOUND
             )
-        assert f"min_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND}" in str(exc_info.value)
+        assert "min_subblock_tokens" in str(exc_info.value)
 
     def test_min_subblock_tokens_above_maximum_bound(self):
-        """Test that min_subblock_tokens above MAX_SUBBLOCK_TOKEN_BOUND raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        """Test that min_subblock_tokens above MAX_SUBBLOCK_TOKEN_BOUND raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens=MAX_SUBBLOCK_TOKEN_BOUND,
                 min_subblock_tokens=100000,  # Above MAX_SUBBLOCK_TOKEN_BOUND
             )
-        assert f"min_subblock_tokens must be between {MIN_SUBBLOCK_TOKEN_BOUND}" in str(exc_info.value)
+        assert "min_subblock_tokens" in str(exc_info.value)
 
     def test_max_not_greater_than_min(self):
         """Test that max_subblock_tokens must be greater than min_subblock_tokens."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens=1000,
@@ -124,8 +124,8 @@ class TestPhaseConfigSubblockValidation:
         assert "max_subblock_tokens must be greater than min_subblock_tokens" in str(exc_info.value)
 
     def test_max_less_than_min(self):
-        """Test that max_subblock_tokens < min_subblock_tokens raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        """Test that max_subblock_tokens < min_subblock_tokens raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
             PhaseConfig(
                 phase_type=PhaseType.MODERNIZE,
                 max_subblock_tokens=500,

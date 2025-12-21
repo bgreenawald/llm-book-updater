@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import requests
+import requests  # type: ignore[import-untyped]
 from loguru import logger
 
 from src.config import PhaseType, RunConfig
