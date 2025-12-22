@@ -14,10 +14,10 @@ from typing import List
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import GROK_3_MINI, ModelConfig
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.api.provider import Provider
+from src.core.pipeline import run_pipeline
+from src.models import GROK_3_MINI, ModelConfig
 
 
 def main() -> None:

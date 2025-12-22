@@ -12,8 +12,8 @@ from typing import List
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.models import GEMINI_PRO, OPENAI_04_MINI
 
 
 def main() -> None:
