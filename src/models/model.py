@@ -5,8 +5,8 @@ from loguru import logger
 from src.core.constants import (
     PROMPT_PREVIEW_MAX_LENGTH,
 )
-from src.llm.base import ProviderClient
-from src.llm.config import (
+from src.models.base import ProviderClient
+from src.models.config import (
     CLAUDE_4_SONNET,
     CLAUDE_HAIKU_4_5,
     CLAUDE_OPUS_4_5,
@@ -20,14 +20,14 @@ from src.llm.config import (
     OPENAI_04_MINI,
     ModelConfig,
 )
-from src.llm.exceptions import (
+from src.models.exceptions import (
     GenerationFailedError,
     LlmModelError,
     MaxRetriesExceededError,
     ResponseTruncatedError,
 )
-from src.llm.providers import ClaudeClient, GeminiClient, OpenAIClient, OpenRouterClient
-from src.llm.utils import is_failed_response
+from src.models.providers import ClaudeClient, GeminiClient, OpenAIClient, OpenRouterClient
+from src.models.utils import is_failed_response
 
 __all__ = [
     "LlmModel",
@@ -51,7 +51,7 @@ __all__ = [
     "CLAUDE_HAIKU_4_5",
 ]
 
-from src.models.provider import Provider
+from src.api.provider import Provider
 from src.utils.settings import settings
 
 # Initialize module-level logger

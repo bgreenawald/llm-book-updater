@@ -21,8 +21,8 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
+from src.api.config import RunConfig
 from src.core.pipeline import Pipeline
-from src.models.config import RunConfig
 from src.processing.post_processors import (
     EnsureBlankLineProcessor,
     OrderQuoteAnnotationProcessor,

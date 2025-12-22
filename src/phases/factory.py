@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Any, List, Optional, TypedDict, Union
 
-from src.llm.model import LlmModel
-from src.models.config import PhaseConfig, PhaseType, PostProcessorType
+from src.api.config import PhaseConfig, PhaseType, PostProcessorType
+from src.models.model import LlmModel
 from src.phases.annotation import IntroductionAnnotationPhase, SummaryAnnotationPhase
 from src.phases.standard import StandardLlmPhase
 from src.phases.two_stage import StageConfig, TwoStageFinalPhase

@@ -7,6 +7,7 @@ from loguru import logger
 from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
 from urllib3.util.retry import Retry
 
+from src.api.api_models import OpenRouterResponse
 from src.core.constants import (
     DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     DEFAULT_OPENROUTER_MAX_RETRIES,
@@ -15,9 +16,8 @@ from src.core.constants import (
     OPENROUTER_POOL_MAXSIZE,
     OPENROUTER_REQUEST_TIMEOUT,
 )
-from src.llm.base import ProviderClient
-from src.llm.exceptions import LlmModelError, ResponseTruncatedError
-from src.models.api_models import OpenRouterResponse
+from src.models.base import ProviderClient
+from src.models.exceptions import LlmModelError, ResponseTruncatedError
 
 module_logger = logger
 

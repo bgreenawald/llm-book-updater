@@ -18,9 +18,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from src.llm.model import ModelConfig
-from src.models.config import PhaseConfig, PhaseType, TwoStageModelConfig
-from src.models.provider import Provider
+from src.api.config import PhaseConfig, PhaseType, TwoStageModelConfig
+from src.api.provider import Provider
+from src.models.model import ModelConfig
 
 
 class TestTwoStageModelConfig:

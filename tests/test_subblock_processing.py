@@ -12,12 +12,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from src.api.config import PhaseConfig, PhaseType
 from src.core.constants import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     MAX_SUBBLOCK_TOKEN_BOUND,
 )
-from src.models.config import PhaseConfig, PhaseType
 
 # ============================================================================
 # PhaseConfig Sub-block Validation Tests
@@ -463,7 +463,7 @@ class TestPhaseFactorySubblockParams:
 
     def test_factory_passes_subblock_params(self):
         """Test that PhaseFactory passes sub-block parameters to phase."""
-        from src.models.config import PhaseConfig, PhaseType
+        from src.api.config import PhaseConfig, PhaseType
         from src.phases.factory import PhaseFactory
 
         with tempfile.TemporaryDirectory() as temp_dir:

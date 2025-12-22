@@ -12,8 +12,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+from src.api.config import PhaseConfig, PhaseType, RunConfig
 from src.core.pipeline import Pipeline
-from src.models.config import PhaseConfig, PhaseType, RunConfig
 from src.processing.post_processors import (
     PostProcessorChain,
     PreserveFStringTagsProcessor,
