@@ -47,8 +47,9 @@ class TestTwoStageModelConfig:
         assert config.identify_model == identify_model
         assert config.implement_model == implement_model
         assert config.identify_reasoning is None
+        assert config.implement_reasoning is None
 
-    def test_config_with_reasoning(self):
+    def test_config_with_identify_reasoning(self):
         """Test creating config with identify_reasoning set."""
         identify_model = ModelConfig(
             provider=Provider.OPENROUTER,
@@ -68,6 +69,52 @@ class TestTwoStageModelConfig:
         )
 
         assert config.identify_reasoning == {"effort": "high"}
+        assert config.implement_reasoning is None
+
+    def test_config_with_implement_reasoning(self):
+        """Test creating config with implement_reasoning set."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
+
+        config = TwoStageModelConfig(
+            identify_model=identify_model,
+            implement_model=implement_model,
+            implement_reasoning={"effort": "medium"},
+        )
+
+        assert config.identify_reasoning is None
+        assert config.implement_reasoning == {"effort": "medium"}
+
+    def test_config_with_both_reasoning(self):
+        """Test creating config with both identify and implement reasoning set."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
+
+        config = TwoStageModelConfig(
+            identify_model=identify_model,
+            implement_model=implement_model,
+            identify_reasoning={"effort": "high"},
+            implement_reasoning={"effort": "low"},
+        )
+
+        assert config.identify_reasoning == {"effort": "high"}
+        assert config.implement_reasoning == {"effort": "low"}
 
     def test_invalid_identify_model_type(self):
         """Test that invalid identify_model type raises ValidationError."""
@@ -97,7 +144,7 @@ class TestTwoStageModelConfig:
                 implement_model="not_a_model_config",  # type: ignore
             )
 
-    def test_invalid_reasoning_type(self):
+    def test_invalid_identify_reasoning_type(self):
         """Test that non-dict identify_reasoning raises ValidationError."""
         identify_model = ModelConfig(
             provider=Provider.OPENROUTER,
@@ -117,7 +164,27 @@ class TestTwoStageModelConfig:
                 identify_reasoning="not_a_dict",  # type: ignore
             )
 
-    def test_invalid_reasoning_key_type(self):
+    def test_invalid_implement_reasoning_type(self):
+        """Test that non-dict implement_reasoning raises ValidationError."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
+
+        with pytest.raises(ValidationError):
+            TwoStageModelConfig(
+                identify_model=identify_model,
+                implement_model=implement_model,
+                implement_reasoning="not_a_dict",  # type: ignore
+            )
+
+    def test_invalid_identify_reasoning_key_type(self):
         """Test that non-string keys in identify_reasoning raise ValidationError."""
         identify_model = ModelConfig(
             provider=Provider.OPENROUTER,
@@ -135,6 +202,26 @@ class TestTwoStageModelConfig:
                 identify_model=identify_model,
                 implement_model=implement_model,
                 identify_reasoning={123: "value"},  # type: ignore
+            )
+
+    def test_invalid_implement_reasoning_key_type(self):
+        """Test that non-string keys in implement_reasoning raise ValidationError."""
+        identify_model = ModelConfig(
+            provider=Provider.OPENROUTER,
+            model_id="deepseek/deepseek-r1",
+            provider_model_name="deepseek-r1",
+        )
+        implement_model = ModelConfig(
+            provider=Provider.GEMINI,
+            model_id="google/gemini-2.5-flash",
+            provider_model_name="gemini-2.5-flash",
+        )
+
+        with pytest.raises(ValidationError):
+            TwoStageModelConfig(
+                identify_model=identify_model,
+                implement_model=implement_model,
+                implement_reasoning={123: "value"},  # type: ignore
             )
 
 
