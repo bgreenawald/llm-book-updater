@@ -2,15 +2,14 @@ import sys
 from pathlib import Path
 from typing import List
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
-from src.llm_model import ModelConfig
-from src.logging_config import setup_logging
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from src.api.provider import Provider
+from src.core.pipeline import run_pipeline
+from src.models.model import ModelConfig
+from src.utils.logging_config import setup_logging
 
 DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
 GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
-GPT_52 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5.2")
 KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
@@ -22,24 +21,24 @@ run_phases: List[PhaseConfig] = [
         min_subblock_tokens=4096,
         max_subblock_tokens=8192,
         use_subblocks=True,
-        use_batch=False,
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
         model=KIMI_K2,
         reasoning={"effort": "high"},
         enable_retry=True,
-        use_batch=False,
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL_TWO_STAGE,
         two_stage_config=TwoStageModelConfig(
-            identify_model=KIMI_K2,
+            identify_model=GEMINI_3_FLASH,
             implement_model=GEMINI_3_FLASH,
             identify_reasoning={"effort": "high"},
+            implement_reasoning={"effort": "high"},
         ),
         enable_retry=True,
-        use_batch=False,
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
@@ -61,7 +60,7 @@ run_phases: List[PhaseConfig] = [
         min_subblock_tokens=4096,
         max_subblock_tokens=8192,
         use_subblocks=True,
-        use_batch=False,
+        use_batch=True,
     ),
 ]
 
@@ -70,9 +69,9 @@ config = RunConfig(
     book_id="on_liberty",
     book_name="On Liberty",
     author_name="John Stuart Mill",
-    input_file=Path(r"books/on_liberty/input_small.md"),
+    input_file=Path(r"books/on_liberty/input_transformed.md"),
     output_dir=Path(r"books/on_liberty/output"),
-    original_file=Path(r"books/on_liberty/input_small.md"),
+    original_file=Path(r"books/on_liberty/input_transformed.md"),
     phases=run_phases,
     max_workers=10,
 )
