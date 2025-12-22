@@ -12,8 +12,8 @@ from pathlib import Path
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, PostProcessorType
-from src.post_processors import EnsureBlankLineProcessor, RemoveXmlTagsProcessor
+from src.api.config import PhaseConfig, PhaseType, PostProcessorType
+from src.processing.post_processors import EnsureBlankLineProcessor, RemoveXmlTagsProcessor
 
 
 def main():

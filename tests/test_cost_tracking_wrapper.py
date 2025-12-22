@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.llm import cost_tracking
-from src.llm.cost_tracking import (
+from src.models import cost_tracking
+from src.models.cost_tracking import (
     CostTrackingWrapper,
     get_cost_tracking_wrapper,
 )

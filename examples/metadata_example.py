@@ -11,8 +11,8 @@ from pathlib import Path
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.pipeline import Pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import Pipeline
 
 
 def main():

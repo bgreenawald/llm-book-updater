@@ -8,10 +8,10 @@ from typing import Any, Dict, List, Optional
 import requests  # type: ignore[import-untyped]
 from loguru import logger
 
+from src.api.config import PhaseType, RunConfig
 from src.core.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
-from src.llm.cost_tracking import calculate_and_log_costs
-from src.llm.model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
-from src.models.config import PhaseType, RunConfig
+from src.models.cost_tracking import calculate_and_log_costs
+from src.models.model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
 from src.phases.factory import PhaseFactory
 from src.phases.protocol import Phase
 

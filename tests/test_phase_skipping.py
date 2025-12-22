@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from src.api.config import PhaseConfig, PhaseType, RunConfig
 from src.core.pipeline import Pipeline
-from src.models.config import PhaseConfig, PhaseType, RunConfig
 
 
 class TestPhaseSkipping:
