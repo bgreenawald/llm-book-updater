@@ -1,5 +1,6 @@
 import json
 import time
+import uuid
 from typing import Any, Tuple
 
 from loguru import logger
@@ -130,7 +131,8 @@ class GeminiClient(ProviderClient):
                 content = response.text
 
             # Gemini doesn't provide a completion ID in the same way, so we'll generate one
-            generation_id = f"gemini_{int(time.time())}"
+            # Use UUID to ensure uniqueness even when multiple calls occur within the same second
+            generation_id = f"gemini_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
             # Extract and register token usage for cost tracking if available
             try:
@@ -273,7 +275,8 @@ class GeminiClient(ProviderClient):
                         content = self._extract_text_from_parts(content_parts)
 
                 # Generate a unique ID
-                generation_id = f"gemini_batch_{int(time.time())}_{key}"
+                # Use UUID to ensure uniqueness even when multiple calls occur within the same second
+                generation_id = f"gemini_batch_{int(time.time())}_{uuid.uuid4().hex[:8]}_{key}"
 
                 # Get original metadata
                 metadata = key_to_metadata.get(key, {})
