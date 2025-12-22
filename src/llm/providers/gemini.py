@@ -184,7 +184,7 @@ class GeminiClient(ProviderClient):
         Args:
             client: GenAI client
             job_name: Name of the batch job
-            timeout_seconds: Maximum time to wait for completion (default 1 hour)
+            timeout_seconds: Maximum time to wait for completion (default 24 hours / 3600*24)
 
         Returns:
             bool: True if job completed successfully, False otherwise
