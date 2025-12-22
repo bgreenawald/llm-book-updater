@@ -90,6 +90,9 @@ class ClaudeClient(ProviderClient):
 
             return content, response.id
 
+        except ResponseTruncatedError:
+            # Re-raise retryable exceptions unchanged to preserve exception type
+            raise
         except Exception as e:
             module_logger.error(f"Claude API call failed: {e}")
             raise LlmModelError(f"Claude API call failed: {e}") from e
