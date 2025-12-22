@@ -2,15 +2,15 @@ import sys
 from pathlib import Path
 from typing import List
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
-from src.llm_model import ModelConfig
-from src.logging_config import setup_logging
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from src.api.provider import Provider
+from src.core.pipeline import run_pipeline
+from src.models.model import ModelConfig
+from src.utils.logging_config import setup_logging
 
 DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
 GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
-GPT_52 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5.2")
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
@@ -18,26 +18,26 @@ run_phases: List[PhaseConfig] = [
         model=GEMINI_3_FLASH,
         reasoning={"effort": "high"},
         enable_retry=True,
-        min_subblock_tokens=2048,
-        max_subblock_tokens=4096,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
         use_subblocks=True,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GPT_52,
+        model=KIMI_K2,
         reasoning={"effort": "high"},
         enable_retry=True,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.FINAL_TWO_STAGE,
-        model=GEMINI_3_FLASH,
         two_stage_config=TwoStageModelConfig(
             identify_model=GEMINI_3_FLASH,
             implement_model=GEMINI_3_FLASH,
+            identify_reasoning={"effort": "high"},
+            implement_reasoning={"effort": "high"},
         ),
-        reasoning={"effort": "high"},
         enable_retry=True,
         use_batch=True,
     ),
@@ -46,12 +46,14 @@ run_phases: List[PhaseConfig] = [
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
         enable_retry=True,
+        skip_if_less_than_tokens=1024,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
         model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
         enable_retry=True,
+        skip_if_less_than_tokens=1024,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
@@ -64,7 +66,6 @@ run_phases: List[PhaseConfig] = [
         use_batch=True,
     ),
 ]
-
 # Main configuration object for the pipeline run.
 config = RunConfig(
     book_id="the_federalist_papers",
