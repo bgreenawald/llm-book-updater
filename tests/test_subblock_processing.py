@@ -522,10 +522,21 @@ class TestBatchModeWithSubblocks:
 
             mock_model = MagicMock()
             mock_model.supports_batch.return_value = True
-            mock_model.batch_chat_completion.return_value = [
-                {"content": "OUT-1", "generation_id": "gen-1"},
-                {"content": "OUT-2", "generation_id": "gen-2"},
-            ]
+
+            # Mock batch_chat_completion to preserve metadata from requests (realistic behavior)
+            def mock_batch_completion(requests, **kwargs):
+                responses = []
+                for i, req in enumerate(requests):
+                    responses.append(
+                        {
+                            "content": f"OUT-{i + 1}",
+                            "generation_id": f"gen-{i + 1}",
+                            "metadata": req.get("metadata", {}),  # Preserve metadata like real batch API
+                        }
+                    )
+                return responses
+
+            mock_model.batch_chat_completion.side_effect = mock_batch_completion
 
             phase = StandardLlmPhase(
                 name="test_phase",
