@@ -330,6 +330,7 @@ class PhaseFactory:
             model=implement_model,
             system_prompt=implement_system,
             user_prompt_template=implement_user,
+            reasoning=config.two_stage_config.implement_reasoning,
         )
 
         # Create post-processor chain (applies to IMPLEMENT output only)

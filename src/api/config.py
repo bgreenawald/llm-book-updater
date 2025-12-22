@@ -60,18 +60,19 @@ class TwoStageModelConfig(BaseConfig):
     identify_model: ModelConfig
     implement_model: ModelConfig
     identify_reasoning: dict[str, str] | None = None
+    implement_reasoning: dict[str, str] | None = None
 
-    @field_validator("identify_reasoning")
+    @field_validator("identify_reasoning", "implement_reasoning")
     @classmethod
-    def validate_identify_reasoning(cls, value: dict[str, str] | None) -> dict[str, str] | None:
+    def validate_reasoning_fields(cls, value: dict[str, str] | None, info: ValidationInfo) -> dict[str, str] | None:
         if value is None:
             return value
         if not isinstance(value, dict):
-            raise ValueError(f"identify_reasoning must be a dict[str, str] or None, got {type(value).__name__}")
+            raise ValueError(f"{info.field_name} must be a dict[str, str] or None, got {type(value).__name__}")
         for key, item in value.items():
             if not isinstance(key, str) or not isinstance(item, str):
                 raise ValueError(
-                    "identify_reasoning must be a dict[str, str]; "
+                    f"{info.field_name} must be a dict[str, str]; "
                     f"found key/value types ({type(key).__name__}, {type(item).__name__})"
                 )
         return value
