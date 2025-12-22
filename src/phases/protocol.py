@@ -8,7 +8,7 @@ any class with these attributes/methods works, no inheritance required.
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
-from src.post_processors import PostProcessorChain
+from src.processing.post_processors import PostProcessorChain
 
 
 @runtime_checkable

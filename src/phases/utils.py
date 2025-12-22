@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import tiktoken
 from loguru import logger
 
-from src.llm_model import (
+from src.llm.model import (
     GenerationFailedError,
     LlmModel,
     MaxRetriesExceededError,
