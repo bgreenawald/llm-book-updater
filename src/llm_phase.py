@@ -23,11 +23,13 @@ from src.llm_model import (
 )
 from src.phase_utils import (
     TokenCounter,
+    contains_only_special_tags,
     extract_markdown_blocks,
     get_header_and_body,
     make_llm_call_with_retry,
     map_batch_responses_to_requests,
     read_file,
+    should_skip_by_token_count,
     write_file,
 )
 from src.post_processors import EmptySectionError, PostProcessorChain
@@ -207,27 +209,6 @@ class LlmPhase(ABC):
         """
         return self._token_counter.count(text)
 
-    def _should_skip_block_by_tokens(self, current_block: str) -> bool:
-        """
-        Check if a block should be skipped based on token count threshold.
-
-        Args:
-            current_block (str): The block to check
-
-        Returns:
-            bool: True if the block should be skipped, False otherwise
-        """
-        if self.skip_if_less_than_tokens is None:
-            return False
-
-        token_count = self._count_tokens(current_block)
-        should_skip = token_count < self.skip_if_less_than_tokens
-
-        if should_skip:
-            logger.debug(f"Skipping block with {token_count} tokens (threshold: {self.skip_if_less_than_tokens})")
-
-        return should_skip
-
     @abstractmethod
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
@@ -364,12 +345,7 @@ class LlmPhase(ABC):
             format_params = {}
 
             # Get tags to preserve from post-processor chain if available
-            tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
-            if self.post_processor_chain:
-                for processor in self.post_processor_chain.processors:
-                    if hasattr(processor, "tags_to_preserve"):
-                        tags_to_preserve = processor.tags_to_preserve
-                        break
+            tags_to_preserve = self._get_tags_to_preserve()
 
             # Add all tags_to_preserve as format parameters with their original values
             for tag in tags_to_preserve:
@@ -454,36 +430,15 @@ class LlmPhase(ABC):
         # Delegate to shared utility function
         return get_header_and_body(block)
 
-    def _contains_only_special_tags(self, body: str) -> bool:
-        """
-        Check if a body contains only special tags (like {preface}, {license}) after removing blank lines.
-
-        Args:
-            body (str): The body content to check
-
-        Returns:
-            bool: True if the body contains only special tags, False otherwise
-        """
-        if not body.strip():
-            return True
-
-        # Get the tags to preserve from the post-processor chain if available
-        tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+    def _get_tags_to_preserve(self) -> List[str]:
+        """Return the configured tags to preserve for this phase."""
+        tags_to_preserve = list(DEFAULT_TAGS_TO_PRESERVE)
         if self.post_processor_chain:
             for processor in self.post_processor_chain.processors:
                 if hasattr(processor, "tags_to_preserve"):
                     tags_to_preserve = processor.tags_to_preserve
                     break
-
-        # Split into lines and remove blank lines
-        lines = [line.strip() for line in body.split("\n") if line.strip()]
-
-        # Check if all non-blank lines are special tags
-        for line in lines:
-            if line not in tags_to_preserve:
-                return False
-
-        return len(lines) > 0  # Must have at least one tag to be considered "only tags"
+        return tags_to_preserve
 
     def _split_body_into_paragraphs(self, body: str) -> List[str]:
         """
@@ -667,13 +622,16 @@ class LlmPhase(ABC):
                 if self.use_subblocks:
                     block_entries: List[Dict[str, Any]] = []
                     valid_requests: List[Dict[str, Any]] = []
+                    tags_to_preserve = self._get_tags_to_preserve()
 
                     for block_index, (current_block, original_block) in enumerate(batch):
                         current_header, current_body = self._get_header_and_body(block=current_block)
                         original_header, original_body = self._get_header_and_body(block=original_block)
 
                         # Skip blocks based on token count threshold (before subblock processing)
-                        if self._should_skip_block_by_tokens(current_block):
+                        if should_skip_by_token_count(
+                            current_block, self.skip_if_less_than_tokens, self._token_counter
+                        ):
                             block_entries.append(
                                 {
                                     "skipped": True,
@@ -685,8 +643,8 @@ class LlmPhase(ABC):
 
                         # Skip empty blocks or blocks with only special tags
                         if (not current_body.strip() and not original_body.strip()) or (
-                            self._contains_only_special_tags(current_body)
-                            and self._contains_only_special_tags(original_body)
+                            contains_only_special_tags(current_body, tags_to_preserve)
+                            and contains_only_special_tags(original_body, tags_to_preserve)
                         ):
                             block_entries.append(
                                 {
@@ -913,19 +871,20 @@ class LlmPhase(ABC):
 
                 # Prepare batch requests (non-subblock batching: one request per block)
                 batch_requests: List[Optional[Dict[str, Any]]] = []
+                tags_to_preserve = self._get_tags_to_preserve()
                 for block_index, (current_block, original_block) in enumerate(batch):
                     current_header, current_body = self._get_header_and_body(block=current_block)
                     original_header, original_body = self._get_header_and_body(block=original_block)
 
                     # Skip blocks based on token count threshold (before processing)
-                    if self._should_skip_block_by_tokens(current_block):
+                    if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
                         batch_requests.append(None)  # Mark as skip
                         continue
 
                     # Skip empty blocks or blocks with only special tags
                     if (not current_body.strip() and not original_body.strip()) or (
-                        self._contains_only_special_tags(current_body)
-                        and self._contains_only_special_tags(original_body)
+                        contains_only_special_tags(current_body, tags_to_preserve)
+                        and contains_only_special_tags(original_body, tags_to_preserve)
                     ):
                         batch_requests.append(None)  # Mark as skip
                         continue
@@ -1344,10 +1303,12 @@ class StandardLlmPhase(LlmPhase):
         # Extract header and body from both blocks
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1443,7 +1404,7 @@ class StandardLlmPhase(LlmPhase):
             EmptySectionError: If post-processing detects an invalid empty section
         """
         # Check if block should be skipped based on token count (before subblock processing)
-        if self._should_skip_block_by_tokens(current_block):
+        if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
             # Extract header and body to return block in proper format
             current_header, current_body = self._get_header_and_body(block=current_block)
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1455,10 +1416,12 @@ class StandardLlmPhase(LlmPhase):
         # Extract header and body from both blocks
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1553,16 +1516,18 @@ class AnnotationPhase(LlmPhase):
             EmptySectionError: If post-processing detects an invalid empty section
         """
         # Check if block should be skipped based on token count (before processing)
-        if self._should_skip_block_by_tokens(current_block):
+        if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
             current_header, current_body = self._get_header_and_body(current_block)
             return f"{current_header}\n\n{current_body}\n\n"
 
         current_header, current_body = self._get_header_and_body(current_block)
         original_header, original_body = self._get_header_and_body(original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"

@@ -49,6 +49,90 @@ class TokenCounter:
             return len(text) // 4
 
 
+def should_skip_by_token_count(
+    block: str,
+    threshold: Optional[int],
+    counter: TokenCounter,
+) -> bool:
+    """Check if block should be skipped based on token count.
+
+    Args:
+        block: The block to check
+        threshold: Minimum token count (None to skip check)
+        counter: Token counter instance
+
+    Returns:
+        True if block should be skipped
+    """
+    if threshold is None:
+        return False
+
+    token_count = counter.count(block)
+    should_skip = token_count < threshold
+
+    if should_skip:
+        logger.debug(f"Skipping block with {token_count} tokens (threshold: {threshold})")
+
+    return should_skip
+
+
+def contains_only_special_tags(body: str, tags_to_preserve: List[str]) -> bool:
+    """Check if body contains only special tags after removing blank lines.
+
+    Args:
+        body: Body content to check
+        tags_to_preserve: List of special tags (e.g., ["{preface}", "{license}"])
+
+    Returns:
+        True if body contains only special tags
+    """
+    if not body.strip():
+        return True
+
+    lines = [line.strip() for line in body.split("\n") if line.strip()]
+
+    for line in lines:
+        if line not in tags_to_preserve:
+            return False
+
+    return len(lines) > 0
+
+
+def should_skip_block(
+    current_body: str,
+    original_body: str,
+    full_block: str,
+    token_threshold: Optional[int],
+    token_counter: TokenCounter,
+    tags_to_preserve: List[str],
+) -> bool:
+    """Comprehensive check if a block should be skipped.
+
+    Args:
+        current_body: Current block body
+        original_body: Original block body
+        full_block: Full block text (for token counting)
+        token_threshold: Minimum token count (None to skip check)
+        token_counter: Token counter instance
+        tags_to_preserve: List of special tags to check
+
+    Returns:
+        True if block should be skipped
+    """
+    if should_skip_by_token_count(full_block, token_threshold, token_counter):
+        return True
+
+    if not current_body.strip() and not original_body.strip():
+        return True
+
+    if contains_only_special_tags(current_body, tags_to_preserve) and contains_only_special_tags(
+        original_body, tags_to_preserve
+    ):
+        return True
+
+    return False
+
+
 def read_file(path: Path) -> str:
     """Read a file with proper error handling and logging.
 
