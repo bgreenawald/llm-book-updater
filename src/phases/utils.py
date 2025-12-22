@@ -319,26 +319,33 @@ def extract_markdown_blocks(text: str) -> List[str]:
     Returns:
         List of extracted blocks, each containing a header and its content
     """
-    pattern = r"(?:^|\n)(#{1,6}\s+.*?)(?=\n#{1,6}\s+|\n*$)"
-    matches = list(re.finditer(pattern, text, flags=re.DOTALL))
+    header_pattern = re.compile(r"^#{1,6}\s+")
+    blocks: List[str] = []
+    preamble_parts: List[str] = []
+    current_parts: List[str] = []
+    seen_header = False
 
-    blocks = []
-    if not matches:
-        # No headers found - return entire text as single block if not empty
-        if text.strip():
-            blocks.append(text)
-        return blocks
+    for line in text.splitlines(keepends=True):
+        if header_pattern.match(line):
+            if not seen_header:
+                preamble = "".join(preamble_parts)
+                if preamble.strip():
+                    blocks.append(preamble)
+                seen_header = True
+            elif current_parts:
+                blocks.append("".join(current_parts))
+            current_parts = [line]
+        else:
+            if seen_header:
+                current_parts.append(line)
+            else:
+                preamble_parts.append(line)
 
-    # Check for preamble (content before first header)
-    first_match = matches[0]
-    if first_match.start() > 0:
-        preamble = text[: first_match.start()]
-        if preamble.strip():
-            blocks.append(preamble)
+    if current_parts:
+        blocks.append("".join(current_parts))
 
-    # Add matched blocks
-    for match in matches:
-        blocks.append(match.group(1))
+    if not blocks and text.strip():
+        blocks.append(text)
 
     return blocks
 
