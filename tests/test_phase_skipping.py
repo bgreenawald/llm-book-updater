@@ -361,3 +361,43 @@ class TestPhaseSkipping:
             assert pipeline._phase_metadata[1]["reason"] == "skipped"
             # Phase 2 should be marked as disabled
             assert pipeline._phase_metadata[2]["reason"] == "disabled"
+
+    def test_disabled_intermediate_phase_raises_error_on_missing_input(self):
+        """Test that disabling an intermediate phase causes next phase to raise error if input is missing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            input_file = temp_path / "test_input.md"
+            input_file.write_text("# Test Content")
+            output_dir = temp_path / "output"
+            output_dir.mkdir()
+
+            # Create output from phase 0 only (phase 1 is disabled, so phase 2 won't have input)
+            phase_0_output = output_dir / "01-test_input Modernize_1.md"
+            phase_0_output.write_text("# Test Content (modernized)")
+
+            config = RunConfig(
+                book_id="test_book",
+                book_name="Test Book",
+                author_name="Test Author",
+                input_file=input_file,
+                output_dir=output_dir,
+                original_file=input_file,
+                phases=[
+                    PhaseConfig(phase_type=PhaseType.MODERNIZE, enabled=True),
+                    PhaseConfig(phase_type=PhaseType.EDIT, enabled=False),  # Disabled
+                    PhaseConfig(phase_type=PhaseType.FINAL, enabled=True),  # Will fail - no input from phase 1
+                ],
+            )
+
+            pipeline = Pipeline(config=config)
+
+            # Try to initialize phase 2 directly - it should fail because phase 1's output doesn't exist
+            with pytest.raises(ValueError) as exc_info:
+                pipeline._initialize_phase(phase_index=2)
+
+            # Verify the error message is helpful
+            error_message = str(exc_info.value)
+            assert "required input file not found" in error_message
+            assert "disabled" in error_message.lower()
+            assert "phase 1" in error_message or "EDIT" in error_message
