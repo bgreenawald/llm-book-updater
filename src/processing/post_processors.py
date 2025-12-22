@@ -333,7 +333,19 @@ class NoNewHeadersPostProcessor(PostProcessor):
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         original_lines = original_block.splitlines()
         original_lines_set = set(original_lines)
-        original_content_map = {line.strip(): line for line in original_lines}
+
+        # Create a map from header content (text only) to original header line
+        # This allows us to find original headers even when the level has changed
+        original_header_map: Dict[str, str] = {}
+        for line in original_lines:
+            match = self.header_pattern.match(line)
+            if match:
+                header_content = match.group(2).strip()
+                original_header_map[header_content] = line
+
+        # Create a map from stripped line content to original line
+        # This allows us to revert non-header lines that were converted to headers
+        original_content_map: Dict[str, str] = {line.strip(): line for line in original_lines}
 
         llm_lines = llm_block.splitlines()
         processed_lines = []
@@ -351,7 +363,13 @@ class NoNewHeadersPostProcessor(PostProcessor):
 
             header_content = match.group(2).strip()
 
-            if header_content in original_content_map:
+            # First check if this header content matches an original header (for level changes)
+            if header_content in original_header_map:
+                original_line = original_header_map[header_content]
+                logger.info(f"Reverting converted header: '{line}' to '{original_line}'")
+                processed_lines.append(original_line)
+            # Then check if this header content matches any original line (for non-header conversions)
+            elif header_content in original_content_map:
                 original_line = original_content_map[header_content]
                 logger.info(f"Reverting converted header: '{line}' to '{original_line}'")
                 processed_lines.append(original_line)
