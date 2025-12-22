@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 from tqdm import tqdm
 
-from src.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_TAGS_TO_PRESERVE
-from src.cost_tracking_wrapper import add_generation_id
-from src.llm_model import GenerationFailedError, LlmModel
-from src.phase_utils import (
+from src.core.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_TAGS_TO_PRESERVE
+from src.llm.cost_tracking import add_generation_id
+from src.llm.model import GenerationFailedError, LlmModel
+from src.phases.utils import (
     TokenCounter,
     extract_markdown_blocks,
     get_header_and_body,
@@ -29,7 +29,7 @@ from src.phase_utils import (
     should_skip_block,
     write_file,
 )
-from src.post_processors import PostProcessorChain
+from src.processing.post_processors import PostProcessorChain
 
 
 @dataclass

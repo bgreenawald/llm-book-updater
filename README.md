@@ -168,6 +168,9 @@ phase_config = PhaseConfig(
 )
 ```
 
+Configuration models are Pydantic v2 models, so invalid inputs raise
+`pydantic.ValidationError` during instantiation.
+
 ### Benefits of Direct SDK Integration
 
 - **Performance**: Direct SDK calls are faster than OpenRouter proxy
