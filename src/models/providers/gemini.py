@@ -4,12 +4,12 @@ from typing import Any, Tuple
 
 from loguru import logger
 
+from src.api.api_models import GeminiResponse
 from src.core.constants import OPENAI_BATCH_POLLING_INTERVAL
-from src.llm.base import ProviderClient
-from src.llm.cost_tracking import register_generation_model_info
-from src.llm.exceptions import LlmModelError
-from src.llm.utils import is_failed_response
-from src.models.api_models import GeminiResponse
+from src.models.base import ProviderClient
+from src.models.cost_tracking import register_generation_model_info
+from src.models.exceptions import LlmModelError
+from src.models.utils import is_failed_response
 
 module_logger = logger
 
@@ -36,6 +36,40 @@ class GeminiClient(ProviderClient):
             except ImportError as e:
                 raise LlmModelError(f"Google GenAI SDK not available: {e}") from e
         return self._client
+
+    def _extract_text_from_parts(self, parts: list) -> str:
+        """
+        Extract text from response parts, handling both object attributes and dictionaries.
+
+        Collects text from part.text or dict["text"], skips non-text parts, logs a warning
+        when more than one text part is found, and returns the first text part or empty string if none.
+
+        Args:
+            parts: List of parts from Gemini response (can be objects with .text attribute or dicts with "text" key)
+
+        Returns:
+            str: The first text part found, or empty string if no text parts exist
+        """
+        text_parts = []
+        for part in parts:
+            if hasattr(part, "text") and part.text:
+                text_parts.append(part.text)
+            elif isinstance(part, dict) and part.get("text"):
+                text_parts.append(part["text"])
+
+        # Use only the first text part to avoid duplication
+        # If there are multiple text parts, they may be duplicates or the LLM may have
+        # split the response incorrectly
+        if text_parts:
+            if len(text_parts) > 1:
+                module_logger.warning(
+                    f"Found {len(text_parts)} text parts in Gemini response. "
+                    f"Part lengths: {[len(p) for p in text_parts]}. "
+                    f"Using only first part to avoid duplication. "
+                    f"If content appears truncated, consider concatenating all parts."
+                )
+            return text_parts[0]
+        return ""
 
     def chat_completion(
         self,
@@ -76,7 +110,6 @@ class GeminiClient(ProviderClient):
             # This avoids duplication that can occur when response.text concatenates all parts incorrectly
             # The warning indicates response.text may concatenate text incorrectly when non-text parts exist
             content = ""
-            text_parts = []
             if hasattr(response, "candidates") and response.candidates:
                 candidate = response.candidates[0]
                 if (
@@ -86,25 +119,7 @@ class GeminiClient(ProviderClient):
                 ):
                     parts = candidate.content.parts
                     if parts:
-                        # Collect all text parts (skip non-text parts like thought_signature)
-                        for part in parts:
-                            if hasattr(part, "text") and part.text:
-                                text_parts.append(part.text)
-                            elif isinstance(part, dict) and part.get("text"):
-                                text_parts.append(part["text"])
-
-                        # Use only the first text part to avoid duplication
-                        # If there are multiple text parts, they may be duplicates or the LLM may have
-                        # split the response incorrectly
-                        if text_parts:
-                            if len(text_parts) > 1:
-                                module_logger.warning(
-                                    f"Found {len(text_parts)} text parts in Gemini response. "
-                                    f"Part lengths: {[len(p) for p in text_parts]}. "
-                                    f"Using only first part to avoid duplication. "
-                                    f"If content appears truncated, consider concatenating all parts."
-                                )
-                            content = text_parts[0]
+                        content = self._extract_text_from_parts(parts)
 
             # Fallback to response.text if explicit extraction didn't work
             if not content:
@@ -255,24 +270,7 @@ class GeminiClient(ProviderClient):
                     candidate = response.candidates[0]
                     content_parts = candidate.content.parts if candidate.content else []
                     if content_parts:
-                        # Collect all text parts (skip non-text parts like thought_signature)
-                        text_parts = []
-                        for part in content_parts:
-                            if isinstance(part, dict) and part.get("text"):
-                                text_parts.append(part["text"])
-
-                        # Use only the first text part to avoid duplication
-                        # If there are multiple text parts, they may be duplicates or the LLM may have
-                        # split the response incorrectly
-                        if text_parts:
-                            if len(text_parts) > 1:
-                                module_logger.warning(
-                                    f"Found {len(text_parts)} text parts in Gemini batch response. "
-                                    f"Part lengths: {[len(p) for p in text_parts]}. "
-                                    f"Using only first part to avoid duplication. "
-                                    f"If content appears truncated, consider concatenating all parts."
-                                )
-                            content = text_parts[0]
+                        content = self._extract_text_from_parts(content_parts)
 
                 # Generate a unique ID
                 generation_id = f"gemini_batch_{int(time.time())}_{key}"

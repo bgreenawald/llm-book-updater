@@ -2,10 +2,10 @@ from typing import Any, Tuple
 
 from loguru import logger
 
-from src.llm.base import ProviderClient
-from src.llm.cost_tracking import register_generation_model_info
-from src.llm.exceptions import LlmModelError, ResponseTruncatedError
-from src.llm.utils import is_failed_response
+from src.models.base import ProviderClient
+from src.models.cost_tracking import register_generation_model_info
+from src.models.exceptions import LlmModelError, ResponseTruncatedError
+from src.models.utils import is_failed_response
 
 module_logger = logger
 

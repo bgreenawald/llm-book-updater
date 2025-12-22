@@ -15,8 +15,8 @@ from src.core.constants import (
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     DEFAULT_TAGS_TO_PRESERVE,
 )
-from src.llm.cost_tracking import add_generation_id
-from src.llm.model import (
+from src.models.cost_tracking import add_generation_id
+from src.models.model import (
     GenerationFailedError,
     LlmModel,
     MaxRetriesExceededError,

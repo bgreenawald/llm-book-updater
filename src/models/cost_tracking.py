@@ -31,6 +31,7 @@ import requests  # type: ignore[import-untyped]
 from loguru import logger
 from pydantic import Field, model_validator
 
+from src.api.provider import Provider
 from src.core.constants import (
     BATCH_PROCESSING_DISCOUNT_RATE,
     GEMINI_FLASH_INPUT_PRICE_PER_1M,
@@ -50,7 +51,6 @@ from src.core.constants import (
     OPENROUTER_MODELS_API_TIMEOUT,
     TOKENS_PER_MILLION,
 )
-from src.models.provider import Provider
 from src.utils.pydantic_config import BaseConfig
 
 # Initialize module-level logger

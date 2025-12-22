@@ -17,8 +17,8 @@ from loguru import logger
 from tqdm import tqdm
 
 from src.core.constants import DEFAULT_GENERATION_MAX_RETRIES, DEFAULT_TAGS_TO_PRESERVE
-from src.llm.cost_tracking import add_generation_id
-from src.llm.model import GenerationFailedError, LlmModel
+from src.models.cost_tracking import add_generation_id
+from src.models.model import GenerationFailedError, LlmModel
 from src.phases.utils import (
     TokenCounter,
     extract_markdown_blocks,

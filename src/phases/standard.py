@@ -5,7 +5,7 @@ from typing import Tuple
 
 from loguru import logger
 
-from src.llm.cost_tracking import add_generation_id
+from src.models.cost_tracking import add_generation_id
 from src.phases.base import LlmPhase
 from src.phases.utils import contains_only_special_tags, should_skip_by_token_count
 
