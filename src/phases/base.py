@@ -411,8 +411,9 @@ class LlmPhase(ABC):
             ret = self.user_prompt.format(**context)
             return ret
         except KeyError as e:
-            logger.warning(f"User prompt contains undefined parameter: {e}")
-            return self.user_prompt
+            raise ValueError(
+                f"User prompt contains undefined parameter: {e}. Available context keys: {list(context.keys())}"
+            ) from e
 
     def _get_header_and_body(self, block: str) -> Tuple[str, str]:
         """
