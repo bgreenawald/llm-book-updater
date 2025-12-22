@@ -436,10 +436,30 @@ class Pipeline:
         input_path = self._get_phase_input_path(phase_index=phase_index)
         output_path = self._get_phase_output_path(phase_index=phase_index)
 
-        # For the first phase, check if input file exists
-        if phase_index == 0 and not input_path.exists():
-            logger.error(f"Input file not found for initial phase {phase_config.phase_type.name}: {input_path}")
-            return None
+        # Validate that input file exists for all phases
+        if not input_path.exists():
+            if phase_index == 0:
+                logger.error(f"Input file not found for initial phase {phase_config.phase_type.name}: {input_path}")
+                return None
+            else:
+                # For non-zero phases, check if previous phase was disabled
+                previous_phase_index = phase_index - 1
+                previous_phase_config = self.config.phases[previous_phase_index]
+                if not previous_phase_config.enabled:
+                    raise ValueError(
+                        f"Cannot initialize phase {phase_index} ({phase_config.phase_type.name}): "
+                        f"required input file not found: {input_path}. "
+                        f"The previous phase (index {previous_phase_index}, {previous_phase_config.phase_type.name}) "
+                        f"is disabled and did not produce an output file. "
+                        f"Either enable the previous phase or ensure the required input file exists."
+                    )
+                else:
+                    raise ValueError(
+                        f"Cannot initialize phase {phase_index} ({phase_config.phase_type.name}): "
+                        f"required input file not found: {input_path}. "
+                        f"The previous phase (index {previous_phase_index}, {previous_phase_config.phase_type.name}) "
+                        f"must have completed successfully to produce this input file."
+                    )
 
         logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
