@@ -11,10 +11,10 @@ This example shows how to:
 
 from pathlib import Path
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import ModelConfig
-from src.pipeline import Pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.api.provider import Provider
+from src.core.pipeline import Pipeline
+from src.models import ModelConfig
 
 
 def main():

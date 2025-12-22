@@ -11,8 +11,8 @@ from pathlib import Path
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, PostProcessorType
-from src.phase_factory import PhaseFactory
+from src.api.config import PhaseConfig, PhaseType, PostProcessorType
+from src.phases.factory import PhaseFactory
 
 
 def main():
@@ -121,7 +121,7 @@ def main():
     print()
 
     # Example 3: Mixing different approaches
-    from src.post_processors import RemoveTrailingWhitespaceProcessor
+    from src.processing.post_processors import RemoveTrailingWhitespaceProcessor
 
     mixed_config = PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
