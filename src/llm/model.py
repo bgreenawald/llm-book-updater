@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import json
 <<<<<<< HEAD
 import os
@@ -12,14 +13,14 @@ from src.core.constants import (
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Tuple
+=======
+from typing import Any, Optional, Tuple
+>>>>>>> 198d509 (LLM model file refactor)
 
-import requests  # type: ignore[import-untyped]
 from loguru import logger
-from pydantic import model_validator
-from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
-from urllib3.util.retry import Retry
 
 from src.core.constants import (
+<<<<<<< HEAD
     DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     DEFAULT_OPENROUTER_MAX_RETRIES,
     DEFAULT_OPENROUTER_RETRY_DELAY,
@@ -48,8 +49,57 @@ from src.settings import settings
 =======
 from src.llm.cost_tracking import register_generation_model_info
 from src.models.api_models import GeminiResponse, OpenRouterResponse
+=======
+    PROMPT_PREVIEW_MAX_LENGTH,
+)
+from src.llm.base import ProviderClient
+from src.llm.config import (
+    CLAUDE_4_SONNET,
+    CLAUDE_HAIKU_4_5,
+    CLAUDE_OPUS_4_5,
+    CLAUDE_SONNET_4_5,
+    DEEPSEEK,
+    GEMINI_FLASH,
+    GEMINI_FLASH_LITE,
+    GEMINI_PRO,
+    GROK_3_MINI,
+    KIMI_K2,
+    OPENAI_04_MINI,
+    ModelConfig,
+)
+from src.llm.exceptions import (
+    GenerationFailedError,
+    LlmModelError,
+    MaxRetriesExceededError,
+    ResponseTruncatedError,
+)
+from src.llm.providers import ClaudeClient, GeminiClient, OpenAIClient, OpenRouterClient
+from src.llm.utils import is_failed_response
+
+__all__ = [
+    "LlmModel",
+    "ModelConfig",
+    "ProviderClient",
+    "LlmModelError",
+    "GenerationFailedError",
+    "MaxRetriesExceededError",
+    "ResponseTruncatedError",
+    "is_failed_response",
+    "GROK_3_MINI",
+    "GEMINI_FLASH",
+    "GEMINI_PRO",
+    "DEEPSEEK",
+    "OPENAI_04_MINI",
+    "CLAUDE_4_SONNET",
+    "GEMINI_FLASH_LITE",
+    "KIMI_K2",
+    "CLAUDE_OPUS_4_5",
+    "CLAUDE_SONNET_4_5",
+    "CLAUDE_HAIKU_4_5",
+]
+
+>>>>>>> 198d509 (LLM model file refactor)
 from src.models.provider import Provider
-from src.utils.pydantic_config import BaseConfig
 from src.utils.settings import settings
 >>>>>>> 0c2bb22 (src refactor):src/llm/model.py
 
@@ -57,6 +107,7 @@ from src.utils.settings import settings
 module_logger = logger
 
 
+<<<<<<< HEAD
 class ModelConfig(BaseConfig):
 >>>>>>> 13571dc (Initial migration)
     """Configuration for a model, including provider and model identifier."""
@@ -1643,6 +1694,8 @@ class ClaudeClient(ProviderClient):
             return super().batch_chat_completion(requests, model_name, **kwargs)
 
 
+=======
+>>>>>>> 198d509 (LLM model file refactor)
 class LlmModel:
     """
     Unified LLM client that supports multiple providers (OpenRouter, OpenAI, Gemini, Claude).
