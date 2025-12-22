@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple, cast
 
 from loguru import logger
 from tqdm import tqdm
@@ -23,9 +23,14 @@ from src.llm_model import (
 )
 from src.phase_utils import (
     TokenCounter,
+    contains_only_special_tags,
     extract_markdown_blocks,
     get_header_and_body,
     make_llm_call_with_retry,
+    map_batch_responses_to_requests,
+    read_file,
+    should_skip_by_token_count,
+    write_file,
 )
 from src.post_processors import EmptySectionError, PostProcessorChain
 
@@ -204,27 +209,6 @@ class LlmPhase(ABC):
         """
         return self._token_counter.count(text)
 
-    def _should_skip_block_by_tokens(self, current_block: str) -> bool:
-        """
-        Check if a block should be skipped based on token count threshold.
-
-        Args:
-            current_block (str): The block to check
-
-        Returns:
-            bool: True if the block should be skipped, False otherwise
-        """
-        if self.skip_if_less_than_tokens is None:
-            return False
-
-        token_count = self._count_tokens(current_block)
-        should_skip = token_count < self.skip_if_less_than_tokens
-
-        if should_skip:
-            logger.debug(f"Skipping block with {token_count} tokens (threshold: {self.skip_if_less_than_tokens})")
-
-        return should_skip
-
     @abstractmethod
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
@@ -323,88 +307,17 @@ class LlmPhase(ABC):
         )
 
     def _read_input_file(self) -> str:
-        """
-        Read the input markdown file.
-
-        This method reads the input file that contains the markdown content
-        to be processed by the LLM phase.
-
-        Returns:
-            str: The content of the input file
-
-        Raises:
-            FileNotFoundError: If the input file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.input_file_path.exists():
-                logger.error(f"Input file not found: {self.input_file_path}")
-                raise FileNotFoundError(f"Input file not found: {self.input_file_path}")
-
-            with self.input_file_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Successfully read input file: {self.input_file_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"Input file not found: {self.input_file_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading input file {self.input_file_path}: {str(e)}")
-            raise
+        """Read the input markdown file."""
+        return read_file(self.input_file_path)
 
     def _read_original_file(self) -> str:
-        """
-        Read the original markdown file.
-
-        This method reads the original file that serves as a reference
-        for the markdown content being processed.
-
-        Returns:
-            str: The content of the original file
-
-        Raises:
-            FileNotFoundError: If the original file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.original_file_path.exists():
-                logger.error(f"Original file not found: {self.original_file_path}")
-                raise FileNotFoundError(f"Original file not found: {self.original_file_path}")
-
-            with self.original_file_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Successfully read original file: {self.original_file_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"Original file not found: {self.original_file_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading original file {self.original_file_path}: {str(e)}")
-            raise
+        """Read the original markdown file."""
+        return read_file(self.original_file_path)
 
     def _write_output_file(self, content: str) -> None:
-        """
-        Write the processed content to the output file.
-
-        This method writes the final processed content to the output file,
-        creating the output directory if it doesn't exist.
-
-        Args:
-            content (str): The content to write to the output file
-
-        Raises:
-            Exception: If there's an error writing the file
-        """
-        try:
-            # Ensure output directory exists
-            self.output_file_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.output_file_path.open(mode="w", encoding="utf-8") as f:
-                f.write(content)
-            logger.info(f"Successfully wrote output to: {self.output_file_path}")
-            logger.debug(f"Wrote {len(content)} characters to output file")
-        except Exception as e:
-            logger.error(f"Error writing to output file {self.output_file_path}: {str(e)}")
-            raise
+        """Write processed content to output file."""
+        write_file(self.output_file_path, content)
+        logger.info(f"Successfully wrote output to: {self.output_file_path}")
 
     def _read_system_prompt(self) -> str:
         """
@@ -425,20 +338,14 @@ class LlmPhase(ABC):
                 logger.error(f"System prompt file not found: {self.system_prompt_path}")
                 raise FileNotFoundError(f"System prompt file not found: {self.system_prompt_path}")
 
-            with self.system_prompt_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
+            content = read_file(self.system_prompt_path)
             logger.debug(f"Read system prompt from {self.system_prompt_path}")
 
             # Format the system prompt with parameters if needed
             format_params = {}
 
             # Get tags to preserve from post-processor chain if available
-            tags_to_preserve = DEFAULT_TAGS_TO_PRESERVE
-            if self.post_processor_chain:
-                for processor in self.post_processor_chain.processors:
-                    if hasattr(processor, "tags_to_preserve"):
-                        tags_to_preserve = processor.tags_to_preserve
-                        break
+            tags_to_preserve = self._get_tags_to_preserve()
 
             # Add all tags_to_preserve as format parameters with their original values
             for tag in tags_to_preserve:
@@ -468,34 +375,10 @@ class LlmPhase(ABC):
             raise
 
     def _read_user_prompt(self) -> str:
-        """
-        Read the user prompt file.
-
-        This method reads the user prompt file that will be used to
-        format user messages for the LLM.
-
-        Returns:
-            str: The content of the user prompt file
-
-        Raises:
-            FileNotFoundError: If the user prompt file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.user_prompt_path or not self.user_prompt_path.exists():
-                logger.error(f"User prompt file not found: {self.user_prompt_path}")
-                raise FileNotFoundError(f"User prompt file not found: {self.user_prompt_path}")
-
-            with self.user_prompt_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Read user prompt from {self.user_prompt_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"User prompt file not found: {self.user_prompt_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading user prompt file {self.user_prompt_path}: {str(e)}")
-            raise
+        """Read the user prompt file."""
+        if not self.user_prompt_path or not self.user_prompt_path.exists():
+            raise FileNotFoundError(f"User prompt file not found: {self.user_prompt_path}")
+        return read_file(self.user_prompt_path)
 
     def _format_user_message(
         self, current_body: str, original_body: str, current_header: str, original_header: str
@@ -547,36 +430,15 @@ class LlmPhase(ABC):
         # Delegate to shared utility function
         return get_header_and_body(block)
 
-    def _contains_only_special_tags(self, body: str) -> bool:
-        """
-        Check if a body contains only special tags (like {preface}, {license}) after removing blank lines.
-
-        Args:
-            body (str): The body content to check
-
-        Returns:
-            bool: True if the body contains only special tags, False otherwise
-        """
-        if not body.strip():
-            return True
-
-        # Get the tags to preserve from the post-processor chain if available
-        tags_to_preserve = ["{preface}", "{license}"]  # Default tags
+    def _get_tags_to_preserve(self) -> List[str]:
+        """Return the configured tags to preserve for this phase."""
+        tags_to_preserve = list(DEFAULT_TAGS_TO_PRESERVE)
         if self.post_processor_chain:
             for processor in self.post_processor_chain.processors:
                 if hasattr(processor, "tags_to_preserve"):
                     tags_to_preserve = processor.tags_to_preserve
                     break
-
-        # Split into lines and remove blank lines
-        lines = [line.strip() for line in body.split("\n") if line.strip()]
-
-        # Check if all non-blank lines are special tags
-        for line in lines:
-            if line not in tags_to_preserve:
-                return False
-
-        return len(lines) > 0  # Must have at least one tag to be considered "only tags"
+        return tags_to_preserve
 
     def _split_body_into_paragraphs(self, body: str) -> List[str]:
         """
@@ -722,8 +584,7 @@ class LlmPhase(ABC):
         Assemble the final processed block from components.
 
         This method can be overridden by subclasses to customize how the block is assembled.
-        For example, IntroductionAnnotationPhase prepends the LLM response, while
-        SummaryAnnotationPhase appends it.
+        For example, AnnotationPhase can prepend or append the LLM response.
 
         Args:
             current_header: The header of the current block
@@ -741,51 +602,6 @@ class LlmPhase(ABC):
         else:
             return f"{current_header}\n\n"
 
-    def _map_batch_responses_to_requests(
-        self,
-        batch_responses: List[Dict[str, Any]],
-        requests: List[Optional[Dict[str, Any]]],
-        stage_name: str = "batch",
-    ) -> List[Dict[str, Any]]:
-        """Map batch responses back to original request order.
-
-        This helper method handles cases where providers return results out of order
-        by creating a mapping from block index to response, then reconstructing
-        results in the original request order with placeholders for skipped/failed blocks.
-
-        Args:
-            batch_responses: List of response dictionaries from batch API
-            requests: List of request dictionaries (None for skipped blocks)
-            stage_name: Name of the stage (for error logging)
-
-        Returns:
-            List of response dictionaries in the same order as requests
-        """
-        # Create mapping from block index to response
-        # This handles cases where providers return results out of order
-        response_by_index: Dict[int, Dict[str, Any]] = {}
-        for response in batch_responses:
-            metadata = response.get("metadata", {})
-            block_index = metadata.get("block_index")
-            if block_index is not None:
-                response_by_index[int(block_index)] = response
-
-        # Reconstruct results with placeholders for skipped blocks
-        results: List[Dict[str, Any]] = []
-        for req in requests:
-            if req is None:
-                results.append({"content": "", "skipped": True})
-            else:
-                block_index = req["metadata"].get("block_index")
-                if block_index is not None and int(block_index) in response_by_index:
-                    results.append(response_by_index[int(block_index)])
-                else:
-                    # Defensive: should not happen, but handle missing response
-                    logger.error(f"Missing response for block index {block_index} in {stage_name.upper()} batch")
-                    results.append({"content": "", "failed": True, "metadata": req.get("metadata", {})})
-
-        return results
-
     def _process_batch(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
         """
         Process a batch of markdown blocks using batch API if available.
@@ -798,440 +614,405 @@ class LlmPhase(ABC):
             List of processed block strings
         """
         try:
-            # Check if the model supports batch processing
-            if hasattr(self.model, "supports_batch") and self.model.supports_batch():
-                logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
-
-                # Sub-block aware batching: when enabled, each block can expand to multiple batch requests.
-                if self.use_subblocks:
-                    block_entries: List[Dict[str, Any]] = []
-                    valid_requests: List[Dict[str, Any]] = []
-
-                    for block_index, (current_block, original_block) in enumerate(batch):
-                        current_header, current_body = self._get_header_and_body(block=current_block)
-                        original_header, original_body = self._get_header_and_body(block=original_block)
-
-                        # Skip blocks based on token count threshold (before subblock processing)
-                        if self._should_skip_block_by_tokens(current_block):
-                            block_entries.append(
-                                {
-                                    "skipped": True,
-                                    "current_header": current_header,
-                                    "current_body": current_body,
-                                }
-                            )
-                            continue
-
-                        # Skip empty blocks or blocks with only special tags
-                        if (not current_body.strip() and not original_body.strip()) or (
-                            self._contains_only_special_tags(current_body)
-                            and self._contains_only_special_tags(original_body)
-                        ):
-                            block_entries.append(
-                                {
-                                    "skipped": True,
-                                    "current_header": current_header,
-                                    "current_body": current_body,
-                                }
-                            )
-                            continue
-
-                        current_paragraphs = self._split_body_into_paragraphs(current_body)
-
-                        # If no paragraphs, treat as a single request (preserves previous batch behavior).
-                        if not current_paragraphs:
-                            user_message = self._format_user_message(
-                                current_body=current_body,
-                                original_body=original_body,
-                                current_header=current_header,
-                                original_header=original_header,
-                            )
-                            req = {
-                                "system_prompt": self.system_prompt,
-                                "user_prompt": user_message,
-                                "metadata": {
-                                    "block_index": block_index,
-                                    "subblock_index": 0,
-                                    "subblock_count": 1,
-                                    "current_header": current_header,
-                                    "current_body_full": current_body,
-                                    "original_body_full": original_body,
-                                    "original_header": original_header,
-                                },
-                            }
-                            block_entries.append(
-                                {
-                                    "skipped": False,
-                                    "block_index": block_index,
-                                    "current_header": current_header,
-                                    "current_body_full": current_body,
-                                    "original_body_full": original_body,
-                                    "original_header": original_header,
-                                    "subblock_count": 1,
-                                }
-                            )
-                            valid_requests.append(req)
-                            continue
-
-                        current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
-
-                        with self._subblock_stats_lock:
-                            self._subblock_blocks_processed_total += 1
-                            self._subblocks_processed_total += len(current_subblocks)
-                            if len(current_subblocks) > self._max_subblocks_in_single_block:
-                                self._max_subblocks_in_single_block = len(current_subblocks)
-
-                        logger.debug(
-                            f"Batch mode: split block '{current_header[:30]}...' "
-                            f"into {len(current_subblocks)} sub-blocks"
-                        )
-
-                        block_entries.append(
-                            {
-                                "skipped": False,
-                                "block_index": block_index,
-                                "current_header": current_header,
-                                "current_body_full": current_body,
-                                "original_body_full": original_body,
-                                "original_header": original_header,
-                                "subblock_count": len(current_subblocks),
-                            }
-                        )
-
-                        for subblock_index, curr_sb in enumerate(current_subblocks):
-                            user_message = self._format_user_message(
-                                current_body=curr_sb,
-                                original_body=original_body,
-                                current_header=current_header,
-                                original_header=original_header,
-                            )
-                            valid_requests.append(
-                                {
-                                    "system_prompt": self.system_prompt,
-                                    "user_prompt": user_message,
-                                    "metadata": {
-                                        "block_index": block_index,
-                                        "subblock_index": subblock_index,
-                                        "subblock_count": len(current_subblocks),
-                                        "current_header": current_header,
-                                        "current_body_full": current_body,
-                                        "original_body_full": original_body,
-                                        "original_header": original_header,
-                                    },
-                                }
-                            )
-
-                    if valid_requests:
-                        call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                        batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
-                    else:
-                        batch_responses = []
-
-                    # Build mapping from metadata to request for retry logic
-                    request_by_metadata: Dict[Tuple[int, int], Dict[str, Any]] = {}
-                    for req in valid_requests:
-                        subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
-                        subblock_req_metadata: Dict[str, Any] = cast(
-                            Dict[str, Any], subblock_req_dict.get("metadata", {})
-                        )
-                        block_idx = subblock_req_metadata.get("block_index")
-                        subblock_idx = subblock_req_metadata.get("subblock_index")
-                        if block_idx is not None and subblock_idx is not None:
-                            request_by_metadata[(int(block_idx), int(subblock_idx))] = req
-
-                    # Find failed responses using metadata
-                    failed_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
-                    for resp_idx, response in enumerate(batch_responses):
-                        if response.get("failed", False):
-                            failed_subblock_responses.append((resp_idx, response))
-
-                    if failed_subblock_responses:
-                        logger.warning(
-                            f"Batch processing had {len(failed_subblock_responses)} failed responses out of "
-                            f"{len(batch_responses)}"
-                        )
-
-                        if not self.enable_retry:
-                            _, first_failed = failed_subblock_responses[0]
-                            failed_content = first_failed.get("content", "Unknown error")
-                            failed_metadata = first_failed.get("metadata", {})
-                            block_index = failed_metadata.get("block_index", "unknown")
-                            block_info = f"block index {block_index}"
-                            raise GenerationFailedError(
-                                message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
-                                block_info=block_info,
-                            )
-
-                        logger.info(f"Retrying {len(failed_subblock_responses)} failed batch responses individually")
-                        for resp_idx, failed_response in failed_subblock_responses:
-                            failed_metadata = failed_response.get("metadata", {})
-                            block_idx = failed_metadata.get("block_index")
-                            subblock_idx = failed_metadata.get("subblock_index")
-
-                            if block_idx is None or subblock_idx is None:
-                                logger.error(f"Failed response at position {resp_idx} missing metadata, skipping retry")
-                                continue
-
-                            original_request = request_by_metadata.get((int(block_idx), int(subblock_idx)))
-                            if original_request is None:
-                                logger.error(
-                                    f"No request found for block_index={block_idx}, subblock_index={subblock_idx}, "
-                                    "skipping retry"
-                                )
-                                continue
-
-                            header = original_request["metadata"].get("current_header", "unknown")[:50]
-                            block_info = f"block index {block_idx}, subblock {subblock_idx}, header: {header}"
-
-                            call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                            retried_content, retried_gen_id = self._make_llm_call_with_retry(
-                                system_prompt=original_request["system_prompt"],
-                                user_prompt=original_request["user_prompt"],
-                                block_info=block_info,
-                                **call_kwargs_retry,
-                            )
-
-                            # Update the response IN-PLACE, preserving original metadata
-                            batch_responses[resp_idx] = {
-                                "content": retried_content,
-                                "generation_id": retried_gen_id,
-                                "metadata": failed_metadata,  # Preserve original metadata
-                                "failed": False,
-                            }
-
-                    # Group responses back into blocks using metadata-based mapping
-                    # This handles cases where providers return results out of order
-                    # Batch API should preserve metadata from requests to responses
-                    subblock_outputs: Dict[int, List[Optional[str]]] = {}
-                    for resp in batch_responses:
-                        resp_metadata: Dict[str, Any] = cast(Dict[str, Any], resp.get("metadata", {}))
-                        block_index = int(resp_metadata.get("block_index", -1))
-                        subblock_index = int(resp_metadata.get("subblock_index", -1))
-                        subblock_count = int(resp_metadata.get("subblock_count", 1))
-
-                        if block_index < 0 or subblock_index < 0:
-                            logger.error(
-                                f"Invalid metadata in batch response: {resp_metadata}. "
-                                "Batch API should preserve metadata from requests."
-                            )
-                            continue
-
-                        if block_index not in subblock_outputs:
-                            subblock_outputs[block_index] = [None] * subblock_count
-                        subblock_outputs[block_index][subblock_index] = resp.get("content", "")
-
-                        generation_id = resp.get("generation_id")
-                        if generation_id:
-                            add_generation_id(phase_name=self.name, generation_id=generation_id)
-
-                    # Reconstruct processed blocks maintaining original order
-                    processed_blocks: List[str] = []
-                    for entry in block_entries:
-                        if entry.get("skipped", False):
-                            processed_blocks.append(f"{entry['current_header']}\n\n{entry['current_body']}\n\n")
-                            continue
-
-                        block_index = int(entry["block_index"])
-                        parts = subblock_outputs.get(block_index, [])
-                        # Defensive: fill any missing subblocks with empty strings.
-                        processed_body_raw = "\n".join([(p if p is not None else "") for p in parts])
-
-                        processed_body = self._apply_post_processing(
-                            original_block=entry["current_body_full"], llm_block=processed_body_raw, **kwargs
-                        )
-                        processed_block = self._assemble_processed_block(
-                            current_header=entry["current_header"],
-                            current_body=entry["current_body_full"],
-                            llm_response=processed_body,
-                            original_body=entry["original_body_full"],
-                            **kwargs,
-                        )
-                        processed_blocks.append(processed_block)
-
-                    return processed_blocks
-
-                # Prepare batch requests (non-subblock batching: one request per block)
-                batch_requests: List[Optional[Dict[str, Any]]] = []
-                for block_index, (current_block, original_block) in enumerate(batch):
-                    current_header, current_body = self._get_header_and_body(block=current_block)
-                    original_header, original_body = self._get_header_and_body(block=original_block)
-
-                    # Skip blocks based on token count threshold (before processing)
-                    if self._should_skip_block_by_tokens(current_block):
-                        batch_requests.append(None)  # Mark as skip
-                        continue
-
-                    # Skip empty blocks or blocks with only special tags
-                    if (not current_body.strip() and not original_body.strip()) or (
-                        self._contains_only_special_tags(current_body)
-                        and self._contains_only_special_tags(original_body)
-                    ):
-                        batch_requests.append(None)  # Mark as skip
-                        continue
-
-                    # Format the user message
-                    user_message = self._format_user_message(
-                        current_body=current_body,
-                        original_body=original_body,
-                        current_header=current_header,
-                        original_header=original_header,
-                    )
-
-                    batch_requests.append(
-                        {
-                            "system_prompt": self.system_prompt,
-                            "user_prompt": user_message,
-                            "metadata": {
-                                "block_index": block_index,
-                                "current_header": current_header,
-                                "current_body": current_body,
-                                "original_body": original_body,
-                                "original_header": original_header,
-                            },
-                        }
-                    )
-
-                # Process non-None requests through batch API
-                valid_requests = [req for req in batch_requests if req is not None]
-                if valid_requests:
-                    # Merge reasoning and llm_kwargs
-                    call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                    batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
-                else:
-                    batch_responses = []
-
-                # Map responses back to requests using metadata (handles out-of-order responses)
-                mapped_responses = self._map_batch_responses_to_requests(
-                    batch_responses=batch_responses, requests=batch_requests, stage_name="non-subblock"
-                )
-
-                # Build mapping from block_index to request for retry logic
-                request_by_index: Dict[int, Dict[str, Any]] = {}
-                for req in valid_requests:
-                    non_subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
-                    non_subblock_req_metadata: Dict[str, Any] = cast(
-                        Dict[str, Any], non_subblock_req_dict.get("metadata", {})
-                    )
-                    block_idx = non_subblock_req_metadata.get("block_index")
-                    if block_idx is not None:
-                        request_by_index[int(block_idx)] = req
-
-                # Check for failed responses and handle according to retry configuration
-                failed_non_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
-                for resp_idx, response in enumerate(mapped_responses):
-                    if response.get("failed", False):
-                        failed_non_subblock_responses.append((resp_idx, response))
-
-                if failed_non_subblock_responses:
-                    logger.warning(
-                        f"Batch processing had {len(failed_non_subblock_responses)} failed responses "
-                        f"out of {len(mapped_responses)}"
-                    )
-
-                    if not self.enable_retry:
-                        # No retry allowed - fail immediately
-                        _, first_failed = failed_non_subblock_responses[0]
-                        failed_content = first_failed.get("content", "Unknown error")
-                        failed_metadata = first_failed.get("metadata", {})
-                        block_index = failed_metadata.get("block_index", "unknown")
-                        block_info = f"block index {block_index}"
-                        raise GenerationFailedError(
-                            message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
-                            block_info=block_info,
-                        )
-
-                    # Retry failed responses individually using metadata-based lookup
-                    logger.info(f"Retrying {len(failed_non_subblock_responses)} failed batch responses individually")
-                    for resp_idx, failed_response in failed_non_subblock_responses:
-                        failed_metadata = failed_response.get("metadata", {})
-                        block_idx = failed_metadata.get("block_index")
-
-                        if block_idx is None:
-                            logger.error(f"Failed response at position {resp_idx} missing block_index, skipping retry")
-                            continue
-
-                        original_request = request_by_index.get(int(block_idx))
-                        if original_request is None:
-                            logger.error(f"No request found for block_index={block_idx}, skipping retry")
-                            continue
-
-                        header = original_request["metadata"].get("current_header", "unknown")[:50]
-                        block_info = f"block index {block_idx}, header: {header}"
-
-                        # Retry using the retry method
-                        call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                        retried_content, retried_gen_id = self._make_llm_call_with_retry(
-                            system_prompt=original_request["system_prompt"],
-                            user_prompt=original_request["user_prompt"],
-                            block_info=block_info,
-                            **call_kwargs_retry,
-                        )
-
-                        # Update the response IN-PLACE, preserving original metadata
-                        mapped_responses[resp_idx] = {
-                            "content": retried_content,
-                            "generation_id": retried_gen_id,
-                            "metadata": failed_metadata,  # Preserve original metadata
-                            "failed": False,
-                        }
-
-                # Reconstruct results maintaining original order
-                processed_blocks = []
-                for i, (current_block, original_block) in enumerate(batch):
-                    if batch_requests[i] is None:
-                        # This was a skipped block
-                        current_header, current_body = self._get_header_and_body(block=current_block)
-                        processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
-                    else:
-                        # Get the mapped response for this block
-                        response = mapped_responses[i]
-
-                        # Skip if this was a skipped response placeholder
-                        if response.get("skipped", False):
-                            current_header, current_body = self._get_header_and_body(block=current_block)
-                            processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
-                            continue
-
-                        request = batch_requests[i]
-                        assert request is not None  # Type guard for mypy
-                        request_dict: Dict[str, Any] = cast(Dict[str, Any], request)
-                        metadata: Dict[str, Any] = cast(Dict[str, Any], request_dict.get("metadata", {}))
-                        processed_body = response["content"]
-                        generation_id = response.get("generation_id")
-
-                        # Track generation ID for cost calculation
-                        if generation_id:
-                            add_generation_id(phase_name=self.name, generation_id=generation_id)
-
-                        # Apply post-processing
-                        processed_body = self._apply_post_processing(
-                            original_block=metadata["current_body"], llm_block=processed_body, **kwargs
-                        )
-
-                        # Use the subclass-specific assembly method
-                        processed_block = self._assemble_processed_block(
-                            current_header=metadata["current_header"],
-                            current_body=metadata["current_body"],
-                            llm_response=processed_body,
-                            original_body=metadata["original_body"],
-                            **kwargs,
-                        )
-                        processed_blocks.append(processed_block)
-
-                return processed_blocks
-
-            else:
-                # Fall back to sequential processing
-                logger.debug("Model does not support batch processing, falling back to sequential processing")
+            if not (hasattr(self.model, "supports_batch") and self.model.supports_batch()):
+                logger.debug("Model doesn't support batch, using sequential")
                 return self._process_batch_sequential(batch, **kwargs)
+
+            logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
+
+            if self.use_subblocks:
+                return self._process_batch_with_subblocks(batch, **kwargs)
+            return self._process_batch_standard(batch, **kwargs)
 
         except (GenerationFailedError, MaxRetriesExceededError):
             # Let our retry-related exceptions propagate to stop the pipeline
             raise
         except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Batch processing errors trigger fallback to sequential processing
-            logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
+            logger.warning(f"Batch processing failed: {e}, using sequential")
             return self._process_batch_sequential(batch, **kwargs)
+
+    def _process_batch_with_subblocks(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        block_entries: List[Dict[str, Any]] = []
+        valid_requests: List[Dict[str, Any]] = []
+        tags_to_preserve = self._get_tags_to_preserve()
+
+        for block_index, (current_block, original_block) in enumerate(batch):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            original_header, original_body = self._get_header_and_body(block=original_block)
+
+            # Skip blocks based on token count threshold (before subblock processing)
+            if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
+                block_entries.append(
+                    {
+                        "skipped": True,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                    }
+                )
+                continue
+
+            # Skip empty blocks or blocks with only special tags
+            if (not current_body.strip() and not original_body.strip()) or (
+                contains_only_special_tags(current_body, tags_to_preserve)
+                and contains_only_special_tags(original_body, tags_to_preserve)
+            ):
+                block_entries.append(
+                    {
+                        "skipped": True,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                    }
+                )
+                continue
+
+            current_paragraphs = self._split_body_into_paragraphs(current_body)
+
+            # If no paragraphs, treat as a single request (preserves previous batch behavior).
+            if not current_paragraphs:
+                user_message = self._format_user_message(
+                    current_body=current_body,
+                    original_body=original_body,
+                    current_header=current_header,
+                    original_header=original_header,
+                )
+                req = {
+                    "system_prompt": self.system_prompt,
+                    "user_prompt": user_message,
+                    "metadata": {
+                        "block_index": block_index,
+                        "subblock_index": 0,
+                        "subblock_count": 1,
+                        "current_header": current_header,
+                        "current_body_full": current_body,
+                        "original_body_full": original_body,
+                        "original_header": original_header,
+                    },
+                }
+                block_entries.append(
+                    {
+                        "skipped": False,
+                        "block_index": block_index,
+                        "current_header": current_header,
+                        "current_body_full": current_body,
+                        "original_body_full": original_body,
+                        "original_header": original_header,
+                        "subblock_count": 1,
+                    }
+                )
+                valid_requests.append(req)
+                continue
+
+            current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
+
+            with self._subblock_stats_lock:
+                self._subblock_blocks_processed_total += 1
+                self._subblocks_processed_total += len(current_subblocks)
+                if len(current_subblocks) > self._max_subblocks_in_single_block:
+                    self._max_subblocks_in_single_block = len(current_subblocks)
+
+            logger.debug(f"Batch mode: split block '{current_header[:30]}...' into {len(current_subblocks)} sub-blocks")
+
+            block_entries.append(
+                {
+                    "skipped": False,
+                    "block_index": block_index,
+                    "current_header": current_header,
+                    "current_body_full": current_body,
+                    "original_body_full": original_body,
+                    "original_header": original_header,
+                    "subblock_count": len(current_subblocks),
+                }
+            )
+
+            for subblock_index, curr_sb in enumerate(current_subblocks):
+                user_message = self._format_user_message(
+                    current_body=curr_sb,
+                    original_body=original_body,
+                    current_header=current_header,
+                    original_header=original_header,
+                )
+                valid_requests.append(
+                    {
+                        "system_prompt": self.system_prompt,
+                        "user_prompt": user_message,
+                        "metadata": {
+                            "block_index": block_index,
+                            "subblock_index": subblock_index,
+                            "subblock_count": len(current_subblocks),
+                            "current_header": current_header,
+                            "current_body_full": current_body,
+                            "original_body_full": original_body,
+                            "original_header": original_header,
+                        },
+                    }
+                )
+
+        if valid_requests:
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
+        else:
+            batch_responses = []
+
+        request_by_metadata: Dict[Any, Dict[str, Any]] = {}
+        for req in valid_requests:
+            subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+            subblock_req_metadata: Dict[str, Any] = cast(Dict[str, Any], subblock_req_dict.get("metadata", {}))
+            block_idx = subblock_req_metadata.get("block_index")
+            subblock_idx = subblock_req_metadata.get("subblock_index")
+            if block_idx is not None and subblock_idx is not None:
+                request_by_metadata[(int(block_idx), int(subblock_idx))] = req
+
+        self._retry_failed_batch_responses(
+            batch_responses=batch_responses,
+            request_lookup=request_by_metadata,
+            stage_name="subblock",
+            **kwargs,
+        )
+
+        # Group responses back into blocks using metadata-based mapping
+        # This handles cases where providers return results out of order
+        # Batch API should preserve metadata from requests to responses
+        subblock_outputs: Dict[int, List[Optional[str]]] = {}
+        for resp in batch_responses:
+            resp_metadata: Dict[str, Any] = cast(Dict[str, Any], resp.get("metadata", {}))
+            block_index = int(resp_metadata.get("block_index", -1))
+            subblock_index = int(resp_metadata.get("subblock_index", -1))
+            subblock_count = int(resp_metadata.get("subblock_count", 1))
+
+            if block_index < 0 or subblock_index < 0:
+                logger.error(
+                    f"Invalid metadata in batch response: {resp_metadata}. "
+                    "Batch API should preserve metadata from requests."
+                )
+                continue
+
+            if block_index not in subblock_outputs:
+                subblock_outputs[block_index] = [None] * subblock_count
+            subblock_outputs[block_index][subblock_index] = resp.get("content", "")
+
+            generation_id = resp.get("generation_id")
+            if generation_id:
+                add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+        # Reconstruct processed blocks maintaining original order
+        processed_blocks: List[str] = []
+        for entry in block_entries:
+            if entry.get("skipped", False):
+                processed_blocks.append(f"{entry['current_header']}\n\n{entry['current_body']}\n\n")
+                continue
+
+            block_index = int(entry["block_index"])
+            parts = subblock_outputs.get(block_index, [])
+            # Defensive: fill any missing subblocks with empty strings.
+            processed_body_raw = "\n".join([(p if p is not None else "") for p in parts])
+
+            processed_body = self._apply_post_processing(
+                original_block=entry["current_body_full"], llm_block=processed_body_raw, **kwargs
+            )
+            processed_block = self._assemble_processed_block(
+                current_header=entry["current_header"],
+                current_body=entry["current_body_full"],
+                llm_response=processed_body,
+                original_body=entry["original_body_full"],
+                **kwargs,
+            )
+            processed_blocks.append(processed_block)
+
+        return processed_blocks
+
+    def _process_batch_standard(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        # Prepare batch requests (non-subblock batching: one request per block)
+        batch_requests: List[Optional[Dict[str, Any]]] = []
+        tags_to_preserve = self._get_tags_to_preserve()
+        for block_index, (current_block, original_block) in enumerate(batch):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            original_header, original_body = self._get_header_and_body(block=original_block)
+
+            # Skip blocks based on token count threshold (before processing)
+            if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
+                batch_requests.append(None)  # Mark as skip
+                continue
+
+            # Skip empty blocks or blocks with only special tags
+            if (not current_body.strip() and not original_body.strip()) or (
+                contains_only_special_tags(current_body, tags_to_preserve)
+                and contains_only_special_tags(original_body, tags_to_preserve)
+            ):
+                batch_requests.append(None)  # Mark as skip
+                continue
+
+            # Format the user message
+            user_message = self._format_user_message(
+                current_body=current_body,
+                original_body=original_body,
+                current_header=current_header,
+                original_header=original_header,
+            )
+
+            batch_requests.append(
+                {
+                    "system_prompt": self.system_prompt,
+                    "user_prompt": user_message,
+                    "metadata": {
+                        "block_index": block_index,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                        "original_body": original_body,
+                        "original_header": original_header,
+                    },
+                }
+            )
+
+        # Process non-None requests through batch API
+        valid_requests = [req for req in batch_requests if req is not None]
+        if valid_requests:
+            # Merge reasoning and llm_kwargs
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
+        else:
+            batch_responses = []
+
+        # Map responses back to requests using metadata (handles out-of-order responses)
+        mapped_responses = map_batch_responses_to_requests(
+            batch_responses=batch_responses, requests=batch_requests, stage_name="non-subblock"
+        )
+
+        request_by_index: Dict[Any, Dict[str, Any]] = {}
+        for req in valid_requests:
+            non_subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+            non_subblock_req_metadata: Dict[str, Any] = cast(Dict[str, Any], non_subblock_req_dict.get("metadata", {}))
+            block_idx = non_subblock_req_metadata.get("block_index")
+            if block_idx is not None:
+                request_by_index[int(block_idx)] = req
+
+        self._retry_failed_batch_responses(
+            batch_responses=mapped_responses,
+            request_lookup=request_by_index,
+            stage_name="non-subblock",
+            **kwargs,
+        )
+
+        # Reconstruct results maintaining original order
+        processed_blocks = []
+        for i, (current_block, original_block) in enumerate(batch):
+            if batch_requests[i] is None:
+                # This was a skipped block
+                current_header, current_body = self._get_header_and_body(block=current_block)
+                processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+            else:
+                # Get the mapped response for this block
+                response = mapped_responses[i]
+
+                # Skip if this was a skipped response placeholder
+                if response.get("skipped", False):
+                    current_header, current_body = self._get_header_and_body(block=current_block)
+                    processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+                    continue
+
+                request = batch_requests[i]
+                assert request is not None  # Type guard for mypy
+                request_dict: Dict[str, Any] = cast(Dict[str, Any], request)
+                metadata: Dict[str, Any] = cast(Dict[str, Any], request_dict.get("metadata", {}))
+                processed_body = response["content"]
+                generation_id = response.get("generation_id")
+
+                # Track generation ID for cost calculation
+                if generation_id:
+                    add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+                # Apply post-processing
+                processed_body = self._apply_post_processing(
+                    original_block=metadata["current_body"], llm_block=processed_body, **kwargs
+                )
+
+                # Use the subclass-specific assembly method
+                processed_block = self._assemble_processed_block(
+                    current_header=metadata["current_header"],
+                    current_body=metadata["current_body"],
+                    llm_response=processed_body,
+                    original_body=metadata["original_body"],
+                    **kwargs,
+                )
+                processed_blocks.append(processed_block)
+
+        return processed_blocks
+
+    def _retry_failed_batch_responses(
+        self,
+        batch_responses: List[Dict[str, Any]],
+        request_lookup: Dict[Any, Dict[str, Any]],
+        stage_name: str,
+        **kwargs,
+    ) -> None:
+        """Retry failed batch responses individually.
+
+        Modifies batch_responses in-place, replacing failed responses with
+        retry results while preserving metadata.
+        """
+        failed_responses = [(idx, resp) for idx, resp in enumerate(batch_responses) if resp.get("failed", False)]
+
+        if not failed_responses:
+            return
+
+        logger.warning(f"{stage_name} batch had {len(failed_responses)} failures out of {len(batch_responses)}")
+
+        if not self.enable_retry:
+            _, first_failed = failed_responses[0]
+            failed_content = first_failed.get("content", "Unknown error")
+            failed_metadata = first_failed.get("metadata", {})
+            block_index = failed_metadata.get("block_index", "unknown")
+            subblock_index = failed_metadata.get("subblock_index")
+            if subblock_index is not None:
+                block_info = f"block index {block_index}, subblock {subblock_index}"
+            else:
+                block_info = f"block index {block_index}"
+            raise GenerationFailedError(
+                message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
+                block_info=block_info,
+            )
+
+        logger.info(f"Retrying {len(failed_responses)} failed responses individually")
+
+        for resp_idx, failed_response in failed_responses:
+            failed_metadata = failed_response.get("metadata", {})
+            block_idx = failed_metadata.get("block_index")
+            subblock_idx = failed_metadata.get("subblock_index")
+
+            if block_idx is None:
+                logger.error(f"Failed response at {resp_idx} missing block_index")
+                continue
+
+            lookup_key: Any
+            block_info = f"block index {block_idx}"
+            if subblock_idx is not None:
+                lookup_key = (int(block_idx), int(subblock_idx))
+                block_info = f"{block_info}, subblock {subblock_idx}"
+            else:
+                lookup_key = int(block_idx)
+
+            original_request = request_lookup.get(lookup_key)
+            if original_request is None:
+                logger.error(f"No request for block_index={block_idx}")
+                continue
+
+            header = original_request["metadata"].get("current_header", "unknown")[:50]
+            block_info = f"{block_info}, header: {header}"
+
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            retried_content, retried_gen_id = self._make_llm_call_with_retry(
+                system_prompt=original_request["system_prompt"],
+                user_prompt=original_request["user_prompt"],
+                block_info=block_info,
+                **call_kwargs,
+            )
+
+            batch_responses[resp_idx] = {
+                "content": retried_content,
+                "generation_id": retried_gen_id,
+                "metadata": failed_metadata,
+                "failed": False,
+            }
 
     def _process_batch_sequential(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
         """
@@ -1483,10 +1264,12 @@ class StandardLlmPhase(LlmPhase):
         # Extract header and body from both blocks
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1582,7 +1365,7 @@ class StandardLlmPhase(LlmPhase):
             EmptySectionError: If post-processing detects an invalid empty section
         """
         # Check if block should be skipped based on token count (before subblock processing)
-        if self._should_skip_block_by_tokens(current_block):
+        if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
             # Extract header and body to return block in proper format
             current_header, current_body = self._get_header_and_body(block=current_block)
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1594,10 +1377,12 @@ class StandardLlmPhase(LlmPhase):
         # Extract header and body from both blocks
         current_header, current_body = self._get_header_and_body(block=current_block)
         original_header, original_body = self._get_header_and_body(block=original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
@@ -1634,34 +1419,48 @@ class StandardLlmPhase(LlmPhase):
         return f"{current_header}\n\n"
 
 
-class IntroductionAnnotationPhase(LlmPhase):
+class AnnotationPhase(LlmPhase):
     """
-    LLM phase that adds introduction annotations to the beginning of each block.
-    Uses the block content as input to generate an introduction, then prepends it to the block.
+    LLM phase that adds annotations to blocks.
+
+    Can prepend (introduction) or append (summary) based on position parameter.
     """
+
+    def __init__(self, name: str, position: Literal["before", "after"] = "after", **kwargs) -> None:
+        """
+        Initialize annotation phase.
+
+        Args:
+            name: Phase name
+            position: Where to place annotation ("before" or "after")
+            **kwargs: All other LlmPhase parameters
+        """
+        super().__init__(name=name, **kwargs)
+        self.position = position
 
     def _assemble_processed_block(
         self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
     ) -> str:
         """
-        Assemble the block with the introduction prepended to the original content.
+        Assemble the block with annotation at configured position.
 
         Args:
             current_header: The header of the current block
             current_body: The body of the current block
-            llm_response: The introduction generated by the LLM
+            llm_response: The annotation generated by the LLM
             original_body: The original body for reference
             **kwargs: Additional context
 
         Returns:
-            The block with introduction prepended
+            The block with annotation placed at the configured position
         """
-        # Prepend the introduction to the current body
-        return f"{current_header}\n\n{llm_response}\n\n{current_body}\n\n"
+        if self.position == "before":
+            return f"{current_header}\n\n{llm_response}\n\n{current_body}\n\n"
+        return f"{current_header}\n\n{current_body}\n\n{llm_response}\n\n"
 
     def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
         """
-        Process a single Markdown block by adding an introduction annotation at the beginning.
+        Process a single Markdown block by adding an annotation at the configured position.
 
         Args:
             current_block (str): The markdown block currently being processed
@@ -1678,28 +1477,30 @@ class IntroductionAnnotationPhase(LlmPhase):
             EmptySectionError: If post-processing detects an invalid empty section
         """
         # Check if block should be skipped based on token count (before processing)
-        if self._should_skip_block_by_tokens(current_block):
+        if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
             current_header, current_body = self._get_header_and_body(current_block)
             return f"{current_header}\n\n{current_body}\n\n"
 
         current_header, current_body = self._get_header_and_body(current_block)
         original_header, original_body = self._get_header_and_body(original_block)
+        tags_to_preserve = self._get_tags_to_preserve()
 
         # Check if there's any content to process (not empty and not just special tags)
         if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
+            contains_only_special_tags(current_body, tags_to_preserve)
+            and contains_only_special_tags(original_body, tags_to_preserve)
         ):
             logger.debug("Empty block content or content with only special tags, returning block as-is")
             return f"{current_header}\n\n{current_body}\n\n"
 
-        # Use the block content as the user prompt for generating the introduction
+        # Use the block content as the user prompt for generating the annotation
         user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
 
         if user_prompt:
             # Merge reasoning and llm_kwargs
             call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
             block_info = f"header: {current_header[:50]}"
-            introduction, generation_id = self._make_llm_call_with_retry(
+            annotation, generation_id = self._make_llm_call_with_retry(
                 system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 block_info=block_info,
@@ -1709,96 +1510,24 @@ class IntroductionAnnotationPhase(LlmPhase):
             # Track generation ID for cost calculation
             add_generation_id(phase_name=self.name, generation_id=generation_id)
 
-            # Apply post-processing to the introduction
-            introduction = self._apply_post_processing(current_body, introduction, **kwargs)
+            # Apply post-processing to the annotation
+            annotation = self._apply_post_processing(current_body, annotation, **kwargs)
 
-            # Combine the introduction with the original block
-            return f"{current_header}\n\n{introduction}\n\n{current_body}\n\n"
+            return self._assemble_processed_block(current_header, current_body, annotation, original_body, **kwargs)
         else:
             logger.debug("Empty block body, returning header only")
             return f"{current_header}\n\n"
 
 
-class SummaryAnnotationPhase(LlmPhase):
-    """
-    LLM phase that adds summary annotations to the end of each block.
-    Uses the block content as input to generate a summary, then appends it to the block.
-    """
+class IntroductionAnnotationPhase(AnnotationPhase):
+    """Adds introduction annotations before block content."""
 
-    def _assemble_processed_block(
-        self, current_header: str, current_body: str, llm_response: str, original_body: str, **kwargs
-    ) -> str:
-        """
-        Assemble the block with the summary appended to the original content.
+    def __init__(self, **kwargs) -> None:
+        super().__init__(position="before", **kwargs)
 
-        Args:
-            current_header: The header of the current block
-            current_body: The body of the current block
-            llm_response: The summary generated by the LLM
-            original_body: The original body for reference
-            **kwargs: Additional context
 
-        Returns:
-            The block with summary appended
-        """
-        # Append the summary to the current body
-        return f"{current_header}\n\n{current_body}\n\n{llm_response}\n\n"
+class SummaryAnnotationPhase(AnnotationPhase):
+    """Adds summary annotations after block content."""
 
-    def _process_block(self, current_block: str, original_block: str, **kwargs) -> str:
-        """
-        Process a single Markdown block by adding a summary annotation at the end.
-
-        Args:
-            current_block (str): The markdown block currently being processed
-                (may contain content from previous phases)
-            original_block (str): The completely unedited block from the original text
-            **kwargs: Additional arguments to pass to the chat completion
-
-        Returns:
-            str: The processed markdown block with summary annotation
-
-        Raises:
-            GenerationFailedError: If generation fails and retry is disabled
-            MaxRetriesExceededError: If all retry attempts are exhausted
-            EmptySectionError: If post-processing detects an invalid empty section
-        """
-        # Check if block should be skipped based on token count (before processing)
-        if self._should_skip_block_by_tokens(current_block):
-            current_header, current_body = self._get_header_and_body(current_block)
-            return f"{current_header}\n\n{current_body}\n\n"
-
-        current_header, current_body = self._get_header_and_body(current_block)
-        original_header, original_body = self._get_header_and_body(original_block)
-
-        # Check if there's any content to process (not empty and not just special tags)
-        if (not current_body.strip() and not original_body.strip()) or (
-            self._contains_only_special_tags(current_body) and self._contains_only_special_tags(original_body)
-        ):
-            logger.debug("Empty block content or content with only special tags, returning block as-is")
-            return f"{current_header}\n\n{current_body}\n\n"
-
-        # Use the block content as the user prompt for generating the summary
-        user_prompt = self._format_user_message(current_body, original_body, current_header, original_header)
-
-        if user_prompt:
-            # Merge reasoning and llm_kwargs
-            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-            block_info = f"header: {current_header[:50]}"
-            summary, generation_id = self._make_llm_call_with_retry(
-                system_prompt=self.system_prompt,
-                user_prompt=user_prompt,
-                block_info=block_info,
-                **call_kwargs,
-            )
-
-            # Track generation ID for cost calculation
-            add_generation_id(phase_name=self.name, generation_id=generation_id)
-
-            # Apply post-processing to the summary
-            summary = self._apply_post_processing(current_body, summary, **kwargs)
-
-            # Combine the original block with the summary
-            return f"{current_header}\n\n{current_body}\n\n{summary}\n\n"
-        else:
-            logger.debug("Empty block body, returning header only")
-            return f"{current_header}\n\n"
+    def __init__(self, **kwargs) -> None:
+        super().__init__(position="after", **kwargs)

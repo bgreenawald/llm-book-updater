@@ -24,7 +24,9 @@ from src.phase_utils import (
     extract_markdown_blocks,
     get_header_and_body,
     make_llm_call_with_retry,
+    map_batch_responses_to_requests,
     read_file,
+    should_skip_block,
     write_file,
 )
 from src.post_processors import PostProcessorChain
@@ -346,36 +348,14 @@ class TwoStageFinalPhase:
         Returns:
             True if block should be skipped
         """
-        # Token threshold
-        if self.skip_if_less_than_tokens:
-            tokens = self._token_counter.count(full_block)
-            if tokens < self.skip_if_less_than_tokens:
-                logger.debug(f"Skipping block with {tokens} tokens (threshold: {self.skip_if_less_than_tokens})")
-                return True
-
-        # Empty content
-        if not current_body.strip() and not original_body.strip():
-            return True
-
-        # Only special tags
-        if self._is_only_tags(current_body) and self._is_only_tags(original_body):
-            return True
-
-        return False
-
-    def _is_only_tags(self, body: str) -> bool:
-        """Check if body contains only preserved tags.
-
-        Args:
-            body: Body text to check
-
-        Returns:
-            True if body contains only special tags
-        """
-        if not body.strip():
-            return True
-        lines = [line.strip() for line in body.split("\n") if line.strip()]
-        return all(line in self.tags_to_preserve for line in lines) and len(lines) > 0
+        return should_skip_block(
+            current_body=current_body,
+            original_body=original_body,
+            full_block=full_block,
+            token_threshold=self.skip_if_less_than_tokens,
+            token_counter=self._token_counter,
+            tags_to_preserve=self.tags_to_preserve,
+        )
 
     def _format_identify_prompt(self, current_body: str, original_body: str, header: str) -> str:
         """Format the IDENTIFY stage user prompt.
@@ -524,51 +504,6 @@ class TwoStageFinalPhase:
 
         return processed_blocks
 
-    def _map_batch_responses_to_requests(
-        self,
-        batch_responses: List[Dict[str, Any]],
-        requests: List[Optional[Dict[str, Any]]],
-        stage_name: str,
-    ) -> List[Dict[str, Any]]:
-        """Map batch responses back to original request order.
-
-        This helper method handles cases where providers return results out of order
-        by creating a mapping from block index to response, then reconstructing
-        results in the original request order with placeholders for skipped/failed blocks.
-
-        Args:
-            batch_responses: List of response dictionaries from batch API
-            requests: List of request dictionaries (None for skipped blocks)
-            stage_name: Name of the stage (for error logging)
-
-        Returns:
-            List of response dictionaries in the same order as requests
-        """
-        # Create mapping from block index to response
-        # This handles cases where providers return results out of order
-        response_by_index: Dict[int, Dict[str, Any]] = {}
-        for response in batch_responses:
-            metadata = response.get("metadata", {})
-            block_index = metadata.get("index")
-            if block_index is not None:
-                response_by_index[block_index] = response
-
-        # Reconstruct results with placeholders for skipped blocks
-        results: List[Dict[str, Any]] = []
-        for req in requests:
-            if req is None:
-                results.append({"content": "", "skipped": True})
-            else:
-                block_index = req["metadata"]["index"]
-                if block_index in response_by_index:
-                    results.append(response_by_index[block_index])
-                else:
-                    # Defensive: should not happen, but handle missing response
-                    logger.error(f"Missing response for block index {block_index} in {stage_name.upper()} batch")
-                    results.append({"content": "", "failed": True, "metadata": req["metadata"]})
-
-        return results
-
     def _run_identify_batch(self, block_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Run IDENTIFY stage as a batch API call.
 
@@ -619,7 +554,7 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
-        return self._map_batch_responses_to_requests(batch_responses, requests, "identify")
+        return map_batch_responses_to_requests(batch_responses, requests, "identify", index_key="index")
 
     def _run_implement_batch(
         self, block_data: List[Dict[str, Any]], identify_results: List[Dict[str, Any]]
@@ -670,7 +605,7 @@ class TwoStageFinalPhase:
         else:
             batch_responses = []
 
-        return self._map_batch_responses_to_requests(batch_responses, requests, "implement")
+        return map_batch_responses_to_requests(batch_responses, requests, "implement", index_key="index")
 
     def _handle_failed_batch_responses(
         self,

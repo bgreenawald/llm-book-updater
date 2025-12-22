@@ -7,7 +7,7 @@ and markdown block processing.
 
 import re
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import tiktoken
 from loguru import logger
@@ -47,6 +47,90 @@ class TokenCounter:
             logger.warning(f"Token counting error: {e}, using char/4 fallback")
             # Fallback: rough approximation of 1 token per 4 characters
             return len(text) // 4
+
+
+def should_skip_by_token_count(
+    block: str,
+    threshold: Optional[int],
+    counter: TokenCounter,
+) -> bool:
+    """Check if block should be skipped based on token count.
+
+    Args:
+        block: The block to check
+        threshold: Minimum token count (None to skip check)
+        counter: Token counter instance
+
+    Returns:
+        True if block should be skipped
+    """
+    if threshold is None:
+        return False
+
+    token_count = counter.count(block)
+    should_skip = token_count < threshold
+
+    if should_skip:
+        logger.debug(f"Skipping block with {token_count} tokens (threshold: {threshold})")
+
+    return should_skip
+
+
+def contains_only_special_tags(body: str, tags_to_preserve: List[str]) -> bool:
+    """Check if body contains only special tags after removing blank lines.
+
+    Args:
+        body: Body content to check
+        tags_to_preserve: List of special tags (e.g., ["{preface}", "{license}"])
+
+    Returns:
+        True if body contains only special tags
+    """
+    if not body.strip():
+        return True
+
+    lines = [line.strip() for line in body.split("\n") if line.strip()]
+
+    for line in lines:
+        if line not in tags_to_preserve:
+            return False
+
+    return len(lines) > 0
+
+
+def should_skip_block(
+    current_body: str,
+    original_body: str,
+    full_block: str,
+    token_threshold: Optional[int],
+    token_counter: TokenCounter,
+    tags_to_preserve: List[str],
+) -> bool:
+    """Comprehensive check if a block should be skipped.
+
+    Args:
+        current_body: Current block body
+        original_body: Original block body
+        full_block: Full block text (for token counting)
+        token_threshold: Minimum token count (None to skip check)
+        token_counter: Token counter instance
+        tags_to_preserve: List of special tags to check
+
+    Returns:
+        True if block should be skipped
+    """
+    if should_skip_by_token_count(full_block, token_threshold, token_counter):
+        return True
+
+    if not current_body.strip() and not original_body.strip():
+        return True
+
+    if contains_only_special_tags(current_body, tags_to_preserve) and contains_only_special_tags(
+        original_body, tags_to_preserve
+    ):
+        return True
+
+    return False
 
 
 def read_file(path: Path) -> str:
@@ -275,3 +359,46 @@ def get_header_and_body(block: str) -> Tuple[str, str]:
     header = lines[0].strip()
     body = lines[1].strip() if len(lines) > 1 else ""
     return header, body
+
+
+def map_batch_responses_to_requests(
+    batch_responses: List[Dict[str, Any]],
+    requests: List[Optional[Dict[str, Any]]],
+    stage_name: str,
+    index_key: str = "block_index",
+) -> List[Dict[str, Any]]:
+    """Map batch responses back to original request order.
+
+    Handles cases where providers return results out of order by creating
+    a mapping from block index to response, then reconstructing results
+    in the original request order.
+
+    Args:
+        batch_responses: List of response dictionaries from batch API
+        requests: List of request dictionaries (None for skipped blocks)
+        stage_name: Name of the stage (for error logging)
+        index_key: Key to use for indexing ("block_index" or "index")
+
+    Returns:
+        List of response dictionaries in same order as requests
+    """
+    response_by_index: Dict[int, Dict[str, Any]] = {}
+    for response in batch_responses:
+        metadata = response.get("metadata", {})
+        block_index = metadata.get(index_key)
+        if block_index is not None:
+            response_by_index[int(block_index)] = response
+
+    results: List[Dict[str, Any]] = []
+    for req in requests:
+        if req is None:
+            results.append({"content": "", "skipped": True})
+        else:
+            block_index = req["metadata"].get(index_key)
+            if block_index is not None and int(block_index) in response_by_index:
+                results.append(response_by_index[int(block_index)])
+            else:
+                logger.error(f"Missing response for {index_key} {block_index} in {stage_name.upper()} batch")
+                results.append({"content": "", "failed": True, "metadata": req.get("metadata", {})})
+
+    return results
