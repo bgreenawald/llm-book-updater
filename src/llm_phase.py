@@ -27,6 +27,8 @@ from src.phase_utils import (
     get_header_and_body,
     make_llm_call_with_retry,
     map_batch_responses_to_requests,
+    read_file,
+    write_file,
 )
 from src.post_processors import EmptySectionError, PostProcessorChain
 
@@ -324,88 +326,17 @@ class LlmPhase(ABC):
         )
 
     def _read_input_file(self) -> str:
-        """
-        Read the input markdown file.
-
-        This method reads the input file that contains the markdown content
-        to be processed by the LLM phase.
-
-        Returns:
-            str: The content of the input file
-
-        Raises:
-            FileNotFoundError: If the input file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.input_file_path.exists():
-                logger.error(f"Input file not found: {self.input_file_path}")
-                raise FileNotFoundError(f"Input file not found: {self.input_file_path}")
-
-            with self.input_file_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Successfully read input file: {self.input_file_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"Input file not found: {self.input_file_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading input file {self.input_file_path}: {str(e)}")
-            raise
+        """Read the input markdown file."""
+        return read_file(self.input_file_path)
 
     def _read_original_file(self) -> str:
-        """
-        Read the original markdown file.
-
-        This method reads the original file that serves as a reference
-        for the markdown content being processed.
-
-        Returns:
-            str: The content of the original file
-
-        Raises:
-            FileNotFoundError: If the original file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.original_file_path.exists():
-                logger.error(f"Original file not found: {self.original_file_path}")
-                raise FileNotFoundError(f"Original file not found: {self.original_file_path}")
-
-            with self.original_file_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Successfully read original file: {self.original_file_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"Original file not found: {self.original_file_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading original file {self.original_file_path}: {str(e)}")
-            raise
+        """Read the original markdown file."""
+        return read_file(self.original_file_path)
 
     def _write_output_file(self, content: str) -> None:
-        """
-        Write the processed content to the output file.
-
-        This method writes the final processed content to the output file,
-        creating the output directory if it doesn't exist.
-
-        Args:
-            content (str): The content to write to the output file
-
-        Raises:
-            Exception: If there's an error writing the file
-        """
-        try:
-            # Ensure output directory exists
-            self.output_file_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.output_file_path.open(mode="w", encoding="utf-8") as f:
-                f.write(content)
-            logger.info(f"Successfully wrote output to: {self.output_file_path}")
-            logger.debug(f"Wrote {len(content)} characters to output file")
-        except Exception as e:
-            logger.error(f"Error writing to output file {self.output_file_path}: {str(e)}")
-            raise
+        """Write processed content to output file."""
+        write_file(self.output_file_path, content)
+        logger.info(f"Successfully wrote output to: {self.output_file_path}")
 
     def _read_system_prompt(self) -> str:
         """
@@ -426,8 +357,7 @@ class LlmPhase(ABC):
                 logger.error(f"System prompt file not found: {self.system_prompt_path}")
                 raise FileNotFoundError(f"System prompt file not found: {self.system_prompt_path}")
 
-            with self.system_prompt_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
+            content = read_file(self.system_prompt_path)
             logger.debug(f"Read system prompt from {self.system_prompt_path}")
 
             # Format the system prompt with parameters if needed
@@ -469,34 +399,10 @@ class LlmPhase(ABC):
             raise
 
     def _read_user_prompt(self) -> str:
-        """
-        Read the user prompt file.
-
-        This method reads the user prompt file that will be used to
-        format user messages for the LLM.
-
-        Returns:
-            str: The content of the user prompt file
-
-        Raises:
-            FileNotFoundError: If the user prompt file does not exist
-            Exception: If there's an error reading the file
-        """
-        try:
-            if not self.user_prompt_path or not self.user_prompt_path.exists():
-                logger.error(f"User prompt file not found: {self.user_prompt_path}")
-                raise FileNotFoundError(f"User prompt file not found: {self.user_prompt_path}")
-
-            with self.user_prompt_path.open(mode="r", encoding="utf-8") as f:
-                content = f.read()
-            logger.debug(f"Read user prompt from {self.user_prompt_path}")
-            return content
-        except FileNotFoundError:
-            logger.error(f"User prompt file not found: {self.user_prompt_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error reading user prompt file {self.user_prompt_path}: {str(e)}")
-            raise
+        """Read the user prompt file."""
+        if not self.user_prompt_path or not self.user_prompt_path.exists():
+            raise FileNotFoundError(f"User prompt file not found: {self.user_prompt_path}")
+        return read_file(self.user_prompt_path)
 
     def _format_user_message(
         self, current_body: str, original_body: str, current_header: str, original_header: str
