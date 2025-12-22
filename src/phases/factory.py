@@ -64,80 +64,31 @@ class PhaseFactory:
     without having to manually configure post-processor chains for each phase type.
     """
 
+    # Base post-processor chain used by most phases
+    BASE_POST_PROCESSORS: list[PostProcessorType] = [
+        PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
+        PostProcessorType.NO_NEW_HEADERS,
+        PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+        PostProcessorType.REMOVE_XML_TAGS,
+        PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
+        PostProcessorType.PRESERVE_F_STRING_TAGS,
+        PostProcessorType.ENSURE_BLANK_LINE,
+        PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
+    ]
+
     DEFAULT_POST_PROCESSORS: dict[PhaseType, list[PostProcessorType]] = {
-        PhaseType.MODERNIZE: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
-        PhaseType.EDIT: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
-        PhaseType.FINAL: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
-        PhaseType.FINAL_TWO_STAGE: [
-            # Same as FINAL - post-processing applies to IMPLEMENT output only
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
-        PhaseType.INTRODUCTION: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
-        PhaseType.SUMMARY: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
-        ],
+        PhaseType.MODERNIZE: BASE_POST_PROCESSORS,
+        PhaseType.EDIT: BASE_POST_PROCESSORS,
+        PhaseType.FINAL: BASE_POST_PROCESSORS,
+        # Same as FINAL - post-processing applies to IMPLEMENT output only
+        PhaseType.FINAL_TWO_STAGE: BASE_POST_PROCESSORS,
+        PhaseType.INTRODUCTION: BASE_POST_PROCESSORS,
+        PhaseType.SUMMARY: BASE_POST_PROCESSORS,
+        # ANNOTATE adds ORDER_QUOTE_ANNOTATION after validation
         PhaseType.ANNOTATE: [
-            PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
-            PostProcessorType.REVERT_REMOVED_BLOCK_LINES,
+            BASE_POST_PROCESSORS[0],  # VALIDATE_NON_EMPTY_SECTION
             PostProcessorType.ORDER_QUOTE_ANNOTATION,
-            PostProcessorType.NO_NEW_HEADERS,
-            PostProcessorType.REMOVE_TRAILING_WHITESPACE,
-            PostProcessorType.REMOVE_XML_TAGS,
-            PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
-            PostProcessorType.PRESERVE_F_STRING_TAGS,
-            PostProcessorType.ENSURE_BLANK_LINE,
-            PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
+            *BASE_POST_PROCESSORS[1:],  # Rest of base processors
         ],
     }
 
