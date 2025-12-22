@@ -64,7 +64,7 @@ Next paragraph.
 - **F-String Tags**: Preserve tags like `{preface}`, `{license}` exactly as written
 - **Existing Blockquotes**: Don't modify pre-existing blockquotes (including `> **Annotated introduction:**` or `> **Annotated summary:**`)
 - **Markdown Preservation**: Keep all headers, lists, and original formatting
-- **Sparsity**: Annotate sparingly—only when genuinely obscure
+- **Sparsity**: Annotate sparingly—only when genuinely obscure. You ARE NOT required to add any annotations if the section does not require them. In that case, return the unedited Markdown.
 
 ## Output
 
