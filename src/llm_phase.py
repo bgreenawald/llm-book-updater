@@ -741,6 +741,51 @@ class LlmPhase(ABC):
         else:
             return f"{current_header}\n\n"
 
+    def _map_batch_responses_to_requests(
+        self,
+        batch_responses: List[Dict[str, Any]],
+        requests: List[Optional[Dict[str, Any]]],
+        stage_name: str = "batch",
+    ) -> List[Dict[str, Any]]:
+        """Map batch responses back to original request order.
+
+        This helper method handles cases where providers return results out of order
+        by creating a mapping from block index to response, then reconstructing
+        results in the original request order with placeholders for skipped/failed blocks.
+
+        Args:
+            batch_responses: List of response dictionaries from batch API
+            requests: List of request dictionaries (None for skipped blocks)
+            stage_name: Name of the stage (for error logging)
+
+        Returns:
+            List of response dictionaries in the same order as requests
+        """
+        # Create mapping from block index to response
+        # This handles cases where providers return results out of order
+        response_by_index: Dict[int, Dict[str, Any]] = {}
+        for response in batch_responses:
+            metadata = response.get("metadata", {})
+            block_index = metadata.get("block_index")
+            if block_index is not None:
+                response_by_index[int(block_index)] = response
+
+        # Reconstruct results with placeholders for skipped blocks
+        results: List[Dict[str, Any]] = []
+        for req in requests:
+            if req is None:
+                results.append({"content": "", "skipped": True})
+            else:
+                block_index = req["metadata"].get("block_index")
+                if block_index is not None and int(block_index) in response_by_index:
+                    results.append(response_by_index[int(block_index)])
+                else:
+                    # Defensive: should not happen, but handle missing response
+                    logger.error(f"Missing response for block index {block_index} in {stage_name.upper()} batch")
+                    results.append({"content": "", "failed": True, "metadata": req.get("metadata", {})})
+
+        return results
+
     def _process_batch(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
         """
         Process a batch of markdown blocks using batch API if available.
@@ -882,30 +927,61 @@ class LlmPhase(ABC):
                     else:
                         batch_responses = []
 
-                    failed_response_indices: List[int] = []
-                    for idx, response in enumerate(batch_responses):
+                    # Build mapping from metadata to request for retry logic
+                    request_by_metadata: Dict[Tuple[int, int], Dict[str, Any]] = {}
+                    for req in valid_requests:
+                        subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+                        subblock_req_metadata: Dict[str, Any] = cast(
+                            Dict[str, Any], subblock_req_dict.get("metadata", {})
+                        )
+                        block_idx = subblock_req_metadata.get("block_index")
+                        subblock_idx = subblock_req_metadata.get("subblock_index")
+                        if block_idx is not None and subblock_idx is not None:
+                            request_by_metadata[(int(block_idx), int(subblock_idx))] = req
+
+                    # Find failed responses using metadata
+                    failed_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
+                    for resp_idx, response in enumerate(batch_responses):
                         if response.get("failed", False):
-                            failed_response_indices.append(idx)
-                    if failed_response_indices:
+                            failed_subblock_responses.append((resp_idx, response))
+
+                    if failed_subblock_responses:
                         logger.warning(
-                            f"Batch processing had {len(failed_response_indices)} failed responses out of "
+                            f"Batch processing had {len(failed_subblock_responses)} failed responses out of "
                             f"{len(batch_responses)}"
                         )
 
                         if not self.enable_retry:
-                            first_failed = batch_responses[failed_response_indices[0]]
+                            _, first_failed = failed_subblock_responses[0]
                             failed_content = first_failed.get("content", "Unknown error")
-                            block_info = f"batch index {failed_response_indices[0]}"
+                            failed_metadata = first_failed.get("metadata", {})
+                            block_index = failed_metadata.get("block_index", "unknown")
+                            block_info = f"block index {block_index}"
                             raise GenerationFailedError(
                                 message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
                                 block_info=block_info,
                             )
 
-                        logger.info(f"Retrying {len(failed_response_indices)} failed batch responses individually")
-                        for failed_idx in failed_response_indices:
-                            original_request = valid_requests[failed_idx]
+                        logger.info(f"Retrying {len(failed_subblock_responses)} failed batch responses individually")
+                        for resp_idx, failed_response in failed_subblock_responses:
+                            failed_metadata = failed_response.get("metadata", {})
+                            block_idx = failed_metadata.get("block_index")
+                            subblock_idx = failed_metadata.get("subblock_index")
+
+                            if block_idx is None or subblock_idx is None:
+                                logger.error(f"Failed response at position {resp_idx} missing metadata, skipping retry")
+                                continue
+
+                            original_request = request_by_metadata.get((int(block_idx), int(subblock_idx)))
+                            if original_request is None:
+                                logger.error(
+                                    f"No request found for block_index={block_idx}, subblock_index={subblock_idx}, "
+                                    "skipping retry"
+                                )
+                                continue
+
                             header = original_request["metadata"].get("current_header", "unknown")[:50]
-                            block_info = f"batch index {failed_idx}, header: {header}"
+                            block_info = f"block index {block_idx}, subblock {subblock_idx}, header: {header}"
 
                             call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
                             retried_content, retried_gen_id = self._make_llm_call_with_retry(
@@ -915,21 +991,31 @@ class LlmPhase(ABC):
                                 **call_kwargs_retry,
                             )
 
-                            batch_responses[failed_idx] = {
+                            # Update the response IN-PLACE, preserving original metadata
+                            batch_responses[resp_idx] = {
                                 "content": retried_content,
                                 "generation_id": retried_gen_id,
-                                "metadata": original_request["metadata"],
+                                "metadata": failed_metadata,  # Preserve original metadata
                                 "failed": False,
                             }
 
-                    # Group responses back into blocks
+                    # Group responses back into blocks using metadata-based mapping
+                    # This handles cases where providers return results out of order
+                    # Batch API should preserve metadata from requests to responses
                     subblock_outputs: Dict[int, List[Optional[str]]] = {}
-                    for req, resp in zip(valid_requests, batch_responses):
-                        req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
-                        subblock_metadata: Dict[str, Any] = cast(Dict[str, Any], req_dict.get("metadata", {}))
-                        block_index = int(subblock_metadata["block_index"])
-                        subblock_index = int(subblock_metadata["subblock_index"])
-                        subblock_count = int(subblock_metadata["subblock_count"])
+                    for resp in batch_responses:
+                        resp_metadata: Dict[str, Any] = cast(Dict[str, Any], resp.get("metadata", {}))
+                        block_index = int(resp_metadata.get("block_index", -1))
+                        subblock_index = int(resp_metadata.get("subblock_index", -1))
+                        subblock_count = int(resp_metadata.get("subblock_count", 1))
+
+                        if block_index < 0 or subblock_index < 0:
+                            logger.error(
+                                f"Invalid metadata in batch response: {resp_metadata}. "
+                                "Batch API should preserve metadata from requests."
+                            )
+                            continue
+
                         if block_index not in subblock_outputs:
                             subblock_outputs[block_index] = [None] * subblock_count
                         subblock_outputs[block_index][subblock_index] = resp.get("content", "")
@@ -966,7 +1052,7 @@ class LlmPhase(ABC):
 
                 # Prepare batch requests (non-subblock batching: one request per block)
                 batch_requests: List[Optional[Dict[str, Any]]] = []
-                for current_block, original_block in batch:
+                for block_index, (current_block, original_block) in enumerate(batch):
                     current_header, current_body = self._get_header_and_body(block=current_block)
                     original_header, original_body = self._get_header_and_body(block=original_block)
 
@@ -996,6 +1082,7 @@ class LlmPhase(ABC):
                             "system_prompt": self.system_prompt,
                             "user_prompt": user_message,
                             "metadata": {
+                                "block_index": block_index,
                                 "current_header": current_header,
                                 "current_body": current_body,
                                 "original_body": original_body,
@@ -1013,34 +1100,63 @@ class LlmPhase(ABC):
                 else:
                     batch_responses = []
 
-                # Check for failed responses and handle according to retry configuration
-                failed_indices: List[int] = []
-                for idx, response in enumerate(batch_responses):
-                    if response.get("failed", False):
-                        failed_indices.append(idx)
+                # Map responses back to requests using metadata (handles out-of-order responses)
+                mapped_responses = self._map_batch_responses_to_requests(
+                    batch_responses=batch_responses, requests=batch_requests, stage_name="non-subblock"
+                )
 
-                if failed_indices:
+                # Build mapping from block_index to request for retry logic
+                request_by_index: Dict[int, Dict[str, Any]] = {}
+                for req in valid_requests:
+                    non_subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+                    non_subblock_req_metadata: Dict[str, Any] = cast(
+                        Dict[str, Any], non_subblock_req_dict.get("metadata", {})
+                    )
+                    block_idx = non_subblock_req_metadata.get("block_index")
+                    if block_idx is not None:
+                        request_by_index[int(block_idx)] = req
+
+                # Check for failed responses and handle according to retry configuration
+                failed_non_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
+                for resp_idx, response in enumerate(mapped_responses):
+                    if response.get("failed", False):
+                        failed_non_subblock_responses.append((resp_idx, response))
+
+                if failed_non_subblock_responses:
                     logger.warning(
-                        f"Batch processing had {len(failed_indices)} failed responses out of {len(batch_responses)}"
+                        f"Batch processing had {len(failed_non_subblock_responses)} failed responses "
+                        f"out of {len(mapped_responses)}"
                     )
 
                     if not self.enable_retry:
                         # No retry allowed - fail immediately
-                        first_failed = batch_responses[failed_indices[0]]
+                        _, first_failed = failed_non_subblock_responses[0]
                         failed_content = first_failed.get("content", "Unknown error")
-                        block_info = f"batch index {failed_indices[0]}"
+                        failed_metadata = first_failed.get("metadata", {})
+                        block_index = failed_metadata.get("block_index", "unknown")
+                        block_info = f"block index {block_index}"
                         raise GenerationFailedError(
                             message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
                             block_info=block_info,
                         )
 
-                    # Retry failed responses individually
-                    logger.info(f"Retrying {len(failed_indices)} failed batch responses individually")
-                    for failed_idx in failed_indices:
-                        # Find the corresponding request
-                        original_request = valid_requests[failed_idx]
+                    # Retry failed responses individually using metadata-based lookup
+                    logger.info(f"Retrying {len(failed_non_subblock_responses)} failed batch responses individually")
+                    for resp_idx, failed_response in failed_non_subblock_responses:
+                        failed_metadata = failed_response.get("metadata", {})
+                        block_idx = failed_metadata.get("block_index")
+
+                        if block_idx is None:
+                            logger.error(f"Failed response at position {resp_idx} missing block_index, skipping retry")
+                            continue
+
+                        original_request = request_by_index.get(int(block_idx))
+                        if original_request is None:
+                            logger.error(f"No request found for block_index={block_idx}, skipping retry")
+                            continue
+
                         header = original_request["metadata"].get("current_header", "unknown")[:50]
-                        block_info = f"batch index {failed_idx}, header: {header}"
+                        block_info = f"block index {block_idx}, header: {header}"
 
                         # Retry using the retry method
                         call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
@@ -1051,26 +1167,30 @@ class LlmPhase(ABC):
                             **call_kwargs_retry,
                         )
 
-                        # Update the response with the retried result
-                        batch_responses[failed_idx] = {
+                        # Update the response IN-PLACE, preserving original metadata
+                        mapped_responses[resp_idx] = {
                             "content": retried_content,
                             "generation_id": retried_gen_id,
-                            "metadata": original_request["metadata"],
+                            "metadata": failed_metadata,  # Preserve original metadata
                             "failed": False,
                         }
 
                 # Reconstruct results maintaining original order
                 processed_blocks = []
-                response_idx = 0
                 for i, (current_block, original_block) in enumerate(batch):
                     if batch_requests[i] is None:
                         # This was a skipped block
                         current_header, current_body = self._get_header_and_body(block=current_block)
                         processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
                     else:
-                        # Get the response for this block
-                        response = batch_responses[response_idx]
-                        response_idx += 1
+                        # Get the mapped response for this block
+                        response = mapped_responses[i]
+
+                        # Skip if this was a skipped response placeholder
+                        if response.get("skipped", False):
+                            current_header, current_body = self._get_header_and_body(block=current_block)
+                            processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+                            continue
 
                         request = batch_requests[i]
                         assert request is not None  # Type guard for mypy
