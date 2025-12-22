@@ -11,8 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.config import RunConfig
-from src.pipeline import Pipeline
+from src.core.pipeline import Pipeline
+from src.models.config import RunConfig
 
 
 class TestInputFileCopying:

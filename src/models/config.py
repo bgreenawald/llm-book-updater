@@ -6,8 +6,7 @@ from typing import Any, Union
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
-from src.common.provider import Provider
-from src.constants import (
+from src.core.constants import (
     DEFAULT_GENERATION_MAX_RETRIES,
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
@@ -15,9 +14,10 @@ from src.constants import (
     MAX_SUBBLOCK_TOKEN_BOUND,
     MIN_SUBBLOCK_TOKEN_BOUND,
 )
-from src.llm_model import ModelConfig
-from src.post_processors import PostProcessor
-from src.pydantic_config import BaseConfig
+from src.llm.model import ModelConfig
+from src.models.provider import Provider
+from src.processing.post_processors import PostProcessor
+from src.utils.pydantic_config import BaseConfig
 
 
 class PhaseType(Enum):

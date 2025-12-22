@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from src.metadata_consolidator import MetadataConsolidator, consolidate_metadata
+from src.processing.metadata_consolidator import MetadataConsolidator, consolidate_metadata
 
 
 class TestMetadataConsolidator:

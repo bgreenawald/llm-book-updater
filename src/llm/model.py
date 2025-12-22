@@ -19,9 +19,7 @@ from pydantic import model_validator
 from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
 from urllib3.util.retry import Retry
 
-from src.api_models import GeminiResponse, OpenRouterResponse
-from src.common.provider import Provider
-from src.constants import (
+from src.core.constants import (
     DEFAULT_OPENROUTER_BACKOFF_FACTOR,
     DEFAULT_OPENROUTER_MAX_RETRIES,
     DEFAULT_OPENROUTER_RETRY_DELAY,
@@ -29,6 +27,7 @@ from src.constants import (
     OPENAI_BATCH_DEFAULT_TIMEOUT,
     OPENAI_BATCH_POLLING_INTERVAL,
 )
+<<<<<<< HEAD:src/llm_model.py
 <<<<<<< HEAD
 from src.models.base import ProviderClient
 from src.models.cost_tracking import register_generation_model_info
@@ -46,6 +45,13 @@ class ModelConfig:
 from src.cost_tracking_wrapper import register_generation_model_info
 from src.pydantic_config import BaseConfig
 from src.settings import settings
+=======
+from src.llm.cost_tracking import register_generation_model_info
+from src.models.api_models import GeminiResponse, OpenRouterResponse
+from src.models.provider import Provider
+from src.utils.pydantic_config import BaseConfig
+from src.utils.settings import settings
+>>>>>>> 0c2bb22 (src refactor):src/llm/model.py
 
 # Initialize module-level logger
 module_logger = logger

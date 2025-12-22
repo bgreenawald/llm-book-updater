@@ -8,12 +8,12 @@ from typing import Any, Dict, List, Optional
 import requests  # type: ignore[import-untyped]
 from loguru import logger
 
-from src.config import PhaseType, RunConfig
-from src.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
-from src.cost_tracking_wrapper import calculate_and_log_costs
-from src.llm_model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
-from src.phase_factory import PhaseFactory
-from src.phase_protocol import Phase
+from src.core.constants import INPUT_FILE_INDEX_PREFIX, OPENROUTER_API_TIMEOUT
+from src.llm.cost_tracking import calculate_and_log_costs
+from src.llm.model import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
+from src.models.config import PhaseType, RunConfig
+from src.phases.factory import PhaseFactory
+from src.phases.protocol import Phase
 
 # Metadata version for compatibility
 METADATA_VERSION = "0.0"

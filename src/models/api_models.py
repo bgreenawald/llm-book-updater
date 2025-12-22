@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-from src.pydantic_config import BaseConfig
+from src.utils.pydantic_config import BaseConfig
 
 
 class ApiBaseModel(BaseConfig):
