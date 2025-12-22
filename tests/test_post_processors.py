@@ -194,6 +194,24 @@ class TestNoNewHeadersPostProcessor:
         assert "\t# Header with leading tab" in result
         assert "Content here." in result
 
+    def test_revert_header_level_change(self, no_new_headers_processor):
+        """
+        Test that when LLM changes a header's level, it should be reverted to original level.
+
+        This test demonstrates issue #137: when the LLM changes # Intro to ## Intro,
+        the processor should revert it back to # Intro, but currently it deletes the header
+        because the lookup fails (header_content is "Intro" but original_content_map has "# Intro" as key).
+        """
+        original_block = "# Intro\n\nSome introductory text."
+        llm_block = "## Intro\n\nSome introductory text."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # The header should be reverted to its original level, not deleted
+        assert "# Intro" in result, "Header should be reverted to original level # Intro"
+        assert "## Intro" not in result, "Modified header level should not be present"
+        assert "Some introductory text." in result, "Content should be preserved"
+
 
 # ============================================================================
 # RemoveMarkdownBlocksProcessor Tests
