@@ -7,7 +7,7 @@ and markdown block processing.
 
 import re
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import tiktoken
 from loguru import logger
@@ -282,3 +282,46 @@ def get_header_and_body(block: str) -> Tuple[str, str]:
     header = lines[0].strip()
     body = lines[1].strip() if len(lines) > 1 else ""
     return header, body
+
+
+def map_batch_responses_to_requests(
+    batch_responses: List[Dict[str, Any]],
+    requests: List[Optional[Dict[str, Any]]],
+    stage_name: str,
+    index_key: str = "block_index",
+) -> List[Dict[str, Any]]:
+    """Map batch responses back to original request order.
+
+    Handles cases where providers return results out of order by creating
+    a mapping from block index to response, then reconstructing results
+    in the original request order.
+
+    Args:
+        batch_responses: List of response dictionaries from batch API
+        requests: List of request dictionaries (None for skipped blocks)
+        stage_name: Name of the stage (for error logging)
+        index_key: Key to use for indexing ("block_index" or "index")
+
+    Returns:
+        List of response dictionaries in same order as requests
+    """
+    response_by_index: Dict[int, Dict[str, Any]] = {}
+    for response in batch_responses:
+        metadata = response.get("metadata", {})
+        block_index = metadata.get(index_key)
+        if block_index is not None:
+            response_by_index[int(block_index)] = response
+
+    results: List[Dict[str, Any]] = []
+    for req in requests:
+        if req is None:
+            results.append({"content": "", "skipped": True})
+        else:
+            block_index = req["metadata"].get(index_key)
+            if block_index is not None and int(block_index) in response_by_index:
+                results.append(response_by_index[int(block_index)])
+            else:
+                logger.error(f"Missing response for {index_key} {block_index} in {stage_name.upper()} batch")
+                results.append({"content": "", "failed": True, "metadata": req.get("metadata", {})})
+
+    return results
