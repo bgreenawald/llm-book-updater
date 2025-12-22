@@ -17,18 +17,12 @@ from src.core.pipeline import Pipeline
 
 
 @patch("src.models.model.LlmModel.create")
-@patch("src.models.cost_tracking.CostTrackingWrapper")
-def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
+def test_pipeline_metadata(mock_llm_create):
     """Test that pipeline metadata is correctly collected and saved."""
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
     mock_llm_create.return_value = mock_model_instance
-
-    # Mock the cost wrapper to avoid API dependencies
-    mock_wrapper_instance = Mock()
-    mock_wrapper_instance.enabled = False
-    mock_cost_wrapper.return_value = mock_wrapper_instance
 
     try:
         # Create temporary directory for test
