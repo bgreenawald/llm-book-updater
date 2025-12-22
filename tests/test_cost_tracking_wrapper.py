@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src import cost_tracking_wrapper
-from src.cost_tracking_wrapper import (
+from src.models import cost_tracking
+from src.models.cost_tracking import (
     CostTrackingWrapper,
     get_cost_tracking_wrapper,
 )
@@ -21,11 +21,11 @@ from src.cost_tracking_wrapper import (
 @pytest.fixture(autouse=True)
 def reset_global_wrapper():
     """Reset the global wrapper instance and lock before each test."""
-    cost_tracking_wrapper._cost_tracking_wrapper = None
-    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
+    cost_tracking._cost_tracking_wrapper = None
+    cost_tracking._cost_tracking_lock = threading.Lock()
     yield
-    cost_tracking_wrapper._cost_tracking_wrapper = None
-    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
+    cost_tracking._cost_tracking_wrapper = None
+    cost_tracking._cost_tracking_lock = threading.Lock()
 
 
 class TestCostTrackingWrapper:
@@ -44,7 +44,7 @@ class TestCostTrackingWrapper:
         # instance may have already loaded the API key at import time
         mock_settings = MagicMock()
         mock_settings.get_api_key.return_value = None
-        with patch("src.cost_tracking_wrapper.settings", mock_settings):
+        with patch("src.utils.settings.settings", mock_settings):
             wrapper = CostTrackingWrapper(api_key=None)
             assert wrapper.enabled is False
             assert wrapper.cost_tracker is None

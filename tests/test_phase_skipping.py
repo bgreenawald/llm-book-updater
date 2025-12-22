@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.pipeline import Pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import Pipeline
 
 
 class TestPhaseSkipping:
@@ -157,7 +157,7 @@ class TestPhaseSkipping:
             assert "required input file not found" in str(exc_info.value)
             assert "previous phase" in str(exc_info.value)
 
-    @patch("src.pipeline.Pipeline._initialize_phase")
+    @patch("src.core.pipeline.Pipeline._initialize_phase")
     def test_start_from_phase_skips_earlier_phases(self, mock_initialize_phase):
         """Test that phases before start_from_phase are skipped."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -204,7 +204,7 @@ class TestPhaseSkipping:
             # Verify the call was for phase 2
             mock_initialize_phase.assert_called_with(phase_index=2)
 
-    @patch("src.pipeline.Pipeline._initialize_phase")
+    @patch("src.core.pipeline.Pipeline._initialize_phase")
     def test_skipped_phases_metadata_has_skipped_reason(self, mock_initialize_phase):
         """Test that skipped phases have 'skipped' in their metadata."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -277,7 +277,7 @@ class TestPhaseSkipping:
             assert copied_file.exists()
             assert copied_file.read_text() == "# Test Content"
 
-    @patch("src.pipeline.Pipeline._initialize_phase")
+    @patch("src.core.pipeline.Pipeline._initialize_phase")
     def test_start_from_phase_nonzero_does_not_copy_input_file(self, mock_initialize_phase):
         """Test that starting from phase > 0 does not copy the input file."""
         with tempfile.TemporaryDirectory() as temp_dir:

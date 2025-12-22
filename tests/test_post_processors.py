@@ -1,6 +1,6 @@
 import pytest
 
-from src.post_processors import (
+from src.processing.post_processors import (
     EmptySectionError,
     NoNewHeadersPostProcessor,
     PostProcessor,
