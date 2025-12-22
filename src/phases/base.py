@@ -786,7 +786,11 @@ class LlmPhase(ABC):
                     f"Invalid metadata in batch response: {resp_metadata}. "
                     "Batch API should preserve metadata from requests."
                 )
-                continue
+                raise ValueError(
+                    f"Invalid metadata in batch response: {resp_metadata}. "
+                    "Cannot reconstruct output safely. This indicates a problem with the batch API "
+                    "preserving metadata from requests to responses."
+                )
 
             if block_index not in subblock_outputs:
                 subblock_outputs[block_index] = [None] * subblock_count
