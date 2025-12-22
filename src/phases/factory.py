@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Optional, TypedDict, Union
+from typing import Any, List, Optional, Type, TypedDict, Union
 
 from src.api.config import PhaseConfig, PhaseType, PostProcessorType
 from src.models.model import LlmModel
@@ -443,8 +443,6 @@ class PhaseFactory:
         Returns:
             Optional[PostProcessor]: The created processor or None if not found
         """
-        from typing import Type
-
         processors: dict[str, Type[PostProcessor]] = {
             "ensure_blank_line": EnsureBlankLineProcessor,
             "remove_xml_tags": RemoveXmlTagsProcessor,
@@ -478,8 +476,6 @@ class PhaseFactory:
         Returns:
             Optional[PostProcessor]: The created processor or None if not found
         """
-        from typing import Type
-
         processor_mapping: dict[PostProcessorType, Type[PostProcessor]] = {
             PostProcessorType.ENSURE_BLANK_LINE: EnsureBlankLineProcessor,
             PostProcessorType.REMOVE_XML_TAGS: RemoveXmlTagsProcessor,
