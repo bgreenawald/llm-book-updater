@@ -614,444 +614,405 @@ class LlmPhase(ABC):
             List of processed block strings
         """
         try:
-            # Check if the model supports batch processing
-            if hasattr(self.model, "supports_batch") and self.model.supports_batch():
-                logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
-
-                # Sub-block aware batching: when enabled, each block can expand to multiple batch requests.
-                if self.use_subblocks:
-                    block_entries: List[Dict[str, Any]] = []
-                    valid_requests: List[Dict[str, Any]] = []
-                    tags_to_preserve = self._get_tags_to_preserve()
-
-                    for block_index, (current_block, original_block) in enumerate(batch):
-                        current_header, current_body = self._get_header_and_body(block=current_block)
-                        original_header, original_body = self._get_header_and_body(block=original_block)
-
-                        # Skip blocks based on token count threshold (before subblock processing)
-                        if should_skip_by_token_count(
-                            current_block, self.skip_if_less_than_tokens, self._token_counter
-                        ):
-                            block_entries.append(
-                                {
-                                    "skipped": True,
-                                    "current_header": current_header,
-                                    "current_body": current_body,
-                                }
-                            )
-                            continue
-
-                        # Skip empty blocks or blocks with only special tags
-                        if (not current_body.strip() and not original_body.strip()) or (
-                            contains_only_special_tags(current_body, tags_to_preserve)
-                            and contains_only_special_tags(original_body, tags_to_preserve)
-                        ):
-                            block_entries.append(
-                                {
-                                    "skipped": True,
-                                    "current_header": current_header,
-                                    "current_body": current_body,
-                                }
-                            )
-                            continue
-
-                        current_paragraphs = self._split_body_into_paragraphs(current_body)
-
-                        # If no paragraphs, treat as a single request (preserves previous batch behavior).
-                        if not current_paragraphs:
-                            user_message = self._format_user_message(
-                                current_body=current_body,
-                                original_body=original_body,
-                                current_header=current_header,
-                                original_header=original_header,
-                            )
-                            req = {
-                                "system_prompt": self.system_prompt,
-                                "user_prompt": user_message,
-                                "metadata": {
-                                    "block_index": block_index,
-                                    "subblock_index": 0,
-                                    "subblock_count": 1,
-                                    "current_header": current_header,
-                                    "current_body_full": current_body,
-                                    "original_body_full": original_body,
-                                    "original_header": original_header,
-                                },
-                            }
-                            block_entries.append(
-                                {
-                                    "skipped": False,
-                                    "block_index": block_index,
-                                    "current_header": current_header,
-                                    "current_body_full": current_body,
-                                    "original_body_full": original_body,
-                                    "original_header": original_header,
-                                    "subblock_count": 1,
-                                }
-                            )
-                            valid_requests.append(req)
-                            continue
-
-                        current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
-
-                        with self._subblock_stats_lock:
-                            self._subblock_blocks_processed_total += 1
-                            self._subblocks_processed_total += len(current_subblocks)
-                            if len(current_subblocks) > self._max_subblocks_in_single_block:
-                                self._max_subblocks_in_single_block = len(current_subblocks)
-
-                        logger.debug(
-                            f"Batch mode: split block '{current_header[:30]}...' "
-                            f"into {len(current_subblocks)} sub-blocks"
-                        )
-
-                        block_entries.append(
-                            {
-                                "skipped": False,
-                                "block_index": block_index,
-                                "current_header": current_header,
-                                "current_body_full": current_body,
-                                "original_body_full": original_body,
-                                "original_header": original_header,
-                                "subblock_count": len(current_subblocks),
-                            }
-                        )
-
-                        for subblock_index, curr_sb in enumerate(current_subblocks):
-                            user_message = self._format_user_message(
-                                current_body=curr_sb,
-                                original_body=original_body,
-                                current_header=current_header,
-                                original_header=original_header,
-                            )
-                            valid_requests.append(
-                                {
-                                    "system_prompt": self.system_prompt,
-                                    "user_prompt": user_message,
-                                    "metadata": {
-                                        "block_index": block_index,
-                                        "subblock_index": subblock_index,
-                                        "subblock_count": len(current_subblocks),
-                                        "current_header": current_header,
-                                        "current_body_full": current_body,
-                                        "original_body_full": original_body,
-                                        "original_header": original_header,
-                                    },
-                                }
-                            )
-
-                    if valid_requests:
-                        call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                        batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
-                    else:
-                        batch_responses = []
-
-                    # Build mapping from metadata to request for retry logic
-                    request_by_metadata: Dict[Tuple[int, int], Dict[str, Any]] = {}
-                    for req in valid_requests:
-                        subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
-                        subblock_req_metadata: Dict[str, Any] = cast(
-                            Dict[str, Any], subblock_req_dict.get("metadata", {})
-                        )
-                        block_idx = subblock_req_metadata.get("block_index")
-                        subblock_idx = subblock_req_metadata.get("subblock_index")
-                        if block_idx is not None and subblock_idx is not None:
-                            request_by_metadata[(int(block_idx), int(subblock_idx))] = req
-
-                    # Find failed responses using metadata
-                    failed_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
-                    for resp_idx, response in enumerate(batch_responses):
-                        if response.get("failed", False):
-                            failed_subblock_responses.append((resp_idx, response))
-
-                    if failed_subblock_responses:
-                        logger.warning(
-                            f"Batch processing had {len(failed_subblock_responses)} failed responses out of "
-                            f"{len(batch_responses)}"
-                        )
-
-                        if not self.enable_retry:
-                            _, first_failed = failed_subblock_responses[0]
-                            failed_content = first_failed.get("content", "Unknown error")
-                            failed_metadata = first_failed.get("metadata", {})
-                            block_index = failed_metadata.get("block_index", "unknown")
-                            block_info = f"block index {block_index}"
-                            raise GenerationFailedError(
-                                message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
-                                block_info=block_info,
-                            )
-
-                        logger.info(f"Retrying {len(failed_subblock_responses)} failed batch responses individually")
-                        for resp_idx, failed_response in failed_subblock_responses:
-                            failed_metadata = failed_response.get("metadata", {})
-                            block_idx = failed_metadata.get("block_index")
-                            subblock_idx = failed_metadata.get("subblock_index")
-
-                            if block_idx is None or subblock_idx is None:
-                                logger.error(f"Failed response at position {resp_idx} missing metadata, skipping retry")
-                                continue
-
-                            original_request = request_by_metadata.get((int(block_idx), int(subblock_idx)))
-                            if original_request is None:
-                                logger.error(
-                                    f"No request found for block_index={block_idx}, subblock_index={subblock_idx}, "
-                                    "skipping retry"
-                                )
-                                continue
-
-                            header = original_request["metadata"].get("current_header", "unknown")[:50]
-                            block_info = f"block index {block_idx}, subblock {subblock_idx}, header: {header}"
-
-                            call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                            retried_content, retried_gen_id = self._make_llm_call_with_retry(
-                                system_prompt=original_request["system_prompt"],
-                                user_prompt=original_request["user_prompt"],
-                                block_info=block_info,
-                                **call_kwargs_retry,
-                            )
-
-                            # Update the response IN-PLACE, preserving original metadata
-                            batch_responses[resp_idx] = {
-                                "content": retried_content,
-                                "generation_id": retried_gen_id,
-                                "metadata": failed_metadata,  # Preserve original metadata
-                                "failed": False,
-                            }
-
-                    # Group responses back into blocks using metadata-based mapping
-                    # This handles cases where providers return results out of order
-                    # Batch API should preserve metadata from requests to responses
-                    subblock_outputs: Dict[int, List[Optional[str]]] = {}
-                    for resp in batch_responses:
-                        resp_metadata: Dict[str, Any] = cast(Dict[str, Any], resp.get("metadata", {}))
-                        block_index = int(resp_metadata.get("block_index", -1))
-                        subblock_index = int(resp_metadata.get("subblock_index", -1))
-                        subblock_count = int(resp_metadata.get("subblock_count", 1))
-
-                        if block_index < 0 or subblock_index < 0:
-                            logger.error(
-                                f"Invalid metadata in batch response: {resp_metadata}. "
-                                "Batch API should preserve metadata from requests."
-                            )
-                            continue
-
-                        if block_index not in subblock_outputs:
-                            subblock_outputs[block_index] = [None] * subblock_count
-                        subblock_outputs[block_index][subblock_index] = resp.get("content", "")
-
-                        generation_id = resp.get("generation_id")
-                        if generation_id:
-                            add_generation_id(phase_name=self.name, generation_id=generation_id)
-
-                    # Reconstruct processed blocks maintaining original order
-                    processed_blocks: List[str] = []
-                    for entry in block_entries:
-                        if entry.get("skipped", False):
-                            processed_blocks.append(f"{entry['current_header']}\n\n{entry['current_body']}\n\n")
-                            continue
-
-                        block_index = int(entry["block_index"])
-                        parts = subblock_outputs.get(block_index, [])
-                        # Defensive: fill any missing subblocks with empty strings.
-                        processed_body_raw = "\n".join([(p if p is not None else "") for p in parts])
-
-                        processed_body = self._apply_post_processing(
-                            original_block=entry["current_body_full"], llm_block=processed_body_raw, **kwargs
-                        )
-                        processed_block = self._assemble_processed_block(
-                            current_header=entry["current_header"],
-                            current_body=entry["current_body_full"],
-                            llm_response=processed_body,
-                            original_body=entry["original_body_full"],
-                            **kwargs,
-                        )
-                        processed_blocks.append(processed_block)
-
-                    return processed_blocks
-
-                # Prepare batch requests (non-subblock batching: one request per block)
-                batch_requests: List[Optional[Dict[str, Any]]] = []
-                tags_to_preserve = self._get_tags_to_preserve()
-                for block_index, (current_block, original_block) in enumerate(batch):
-                    current_header, current_body = self._get_header_and_body(block=current_block)
-                    original_header, original_body = self._get_header_and_body(block=original_block)
-
-                    # Skip blocks based on token count threshold (before processing)
-                    if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
-                        batch_requests.append(None)  # Mark as skip
-                        continue
-
-                    # Skip empty blocks or blocks with only special tags
-                    if (not current_body.strip() and not original_body.strip()) or (
-                        contains_only_special_tags(current_body, tags_to_preserve)
-                        and contains_only_special_tags(original_body, tags_to_preserve)
-                    ):
-                        batch_requests.append(None)  # Mark as skip
-                        continue
-
-                    # Format the user message
-                    user_message = self._format_user_message(
-                        current_body=current_body,
-                        original_body=original_body,
-                        current_header=current_header,
-                        original_header=original_header,
-                    )
-
-                    batch_requests.append(
-                        {
-                            "system_prompt": self.system_prompt,
-                            "user_prompt": user_message,
-                            "metadata": {
-                                "block_index": block_index,
-                                "current_header": current_header,
-                                "current_body": current_body,
-                                "original_body": original_body,
-                                "original_header": original_header,
-                            },
-                        }
-                    )
-
-                # Process non-None requests through batch API
-                valid_requests = [req for req in batch_requests if req is not None]
-                if valid_requests:
-                    # Merge reasoning and llm_kwargs
-                    call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                    batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
-                else:
-                    batch_responses = []
-
-                # Map responses back to requests using metadata (handles out-of-order responses)
-                mapped_responses = map_batch_responses_to_requests(
-                    batch_responses=batch_responses, requests=batch_requests, stage_name="non-subblock"
-                )
-
-                # Build mapping from block_index to request for retry logic
-                request_by_index: Dict[int, Dict[str, Any]] = {}
-                for req in valid_requests:
-                    non_subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
-                    non_subblock_req_metadata: Dict[str, Any] = cast(
-                        Dict[str, Any], non_subblock_req_dict.get("metadata", {})
-                    )
-                    block_idx = non_subblock_req_metadata.get("block_index")
-                    if block_idx is not None:
-                        request_by_index[int(block_idx)] = req
-
-                # Check for failed responses and handle according to retry configuration
-                failed_non_subblock_responses: List[Tuple[int, Dict[str, Any]]] = []
-                for resp_idx, response in enumerate(mapped_responses):
-                    if response.get("failed", False):
-                        failed_non_subblock_responses.append((resp_idx, response))
-
-                if failed_non_subblock_responses:
-                    logger.warning(
-                        f"Batch processing had {len(failed_non_subblock_responses)} failed responses "
-                        f"out of {len(mapped_responses)}"
-                    )
-
-                    if not self.enable_retry:
-                        # No retry allowed - fail immediately
-                        _, first_failed = failed_non_subblock_responses[0]
-                        failed_content = first_failed.get("content", "Unknown error")
-                        failed_metadata = first_failed.get("metadata", {})
-                        block_index = failed_metadata.get("block_index", "unknown")
-                        block_info = f"block index {block_index}"
-                        raise GenerationFailedError(
-                            message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
-                            block_info=block_info,
-                        )
-
-                    # Retry failed responses individually using metadata-based lookup
-                    logger.info(f"Retrying {len(failed_non_subblock_responses)} failed batch responses individually")
-                    for resp_idx, failed_response in failed_non_subblock_responses:
-                        failed_metadata = failed_response.get("metadata", {})
-                        block_idx = failed_metadata.get("block_index")
-
-                        if block_idx is None:
-                            logger.error(f"Failed response at position {resp_idx} missing block_index, skipping retry")
-                            continue
-
-                        original_request = request_by_index.get(int(block_idx))
-                        if original_request is None:
-                            logger.error(f"No request found for block_index={block_idx}, skipping retry")
-                            continue
-
-                        header = original_request["metadata"].get("current_header", "unknown")[:50]
-                        block_info = f"block index {block_idx}, header: {header}"
-
-                        # Retry using the retry method
-                        call_kwargs_retry = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
-                        retried_content, retried_gen_id = self._make_llm_call_with_retry(
-                            system_prompt=original_request["system_prompt"],
-                            user_prompt=original_request["user_prompt"],
-                            block_info=block_info,
-                            **call_kwargs_retry,
-                        )
-
-                        # Update the response IN-PLACE, preserving original metadata
-                        mapped_responses[resp_idx] = {
-                            "content": retried_content,
-                            "generation_id": retried_gen_id,
-                            "metadata": failed_metadata,  # Preserve original metadata
-                            "failed": False,
-                        }
-
-                # Reconstruct results maintaining original order
-                processed_blocks = []
-                for i, (current_block, original_block) in enumerate(batch):
-                    if batch_requests[i] is None:
-                        # This was a skipped block
-                        current_header, current_body = self._get_header_and_body(block=current_block)
-                        processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
-                    else:
-                        # Get the mapped response for this block
-                        response = mapped_responses[i]
-
-                        # Skip if this was a skipped response placeholder
-                        if response.get("skipped", False):
-                            current_header, current_body = self._get_header_and_body(block=current_block)
-                            processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
-                            continue
-
-                        request = batch_requests[i]
-                        assert request is not None  # Type guard for mypy
-                        request_dict: Dict[str, Any] = cast(Dict[str, Any], request)
-                        metadata: Dict[str, Any] = cast(Dict[str, Any], request_dict.get("metadata", {}))
-                        processed_body = response["content"]
-                        generation_id = response.get("generation_id")
-
-                        # Track generation ID for cost calculation
-                        if generation_id:
-                            add_generation_id(phase_name=self.name, generation_id=generation_id)
-
-                        # Apply post-processing
-                        processed_body = self._apply_post_processing(
-                            original_block=metadata["current_body"], llm_block=processed_body, **kwargs
-                        )
-
-                        # Use the subclass-specific assembly method
-                        processed_block = self._assemble_processed_block(
-                            current_header=metadata["current_header"],
-                            current_body=metadata["current_body"],
-                            llm_response=processed_body,
-                            original_body=metadata["original_body"],
-                            **kwargs,
-                        )
-                        processed_blocks.append(processed_block)
-
-                return processed_blocks
-
-            else:
-                # Fall back to sequential processing
-                logger.debug("Model does not support batch processing, falling back to sequential processing")
+            if not (hasattr(self.model, "supports_batch") and self.model.supports_batch()):
+                logger.debug("Model doesn't support batch, using sequential")
                 return self._process_batch_sequential(batch, **kwargs)
+
+            logger.debug(f"Processing batch of {len(batch)} blocks using batch API")
+
+            if self.use_subblocks:
+                return self._process_batch_with_subblocks(batch, **kwargs)
+            return self._process_batch_standard(batch, **kwargs)
 
         except (GenerationFailedError, MaxRetriesExceededError):
             # Let our retry-related exceptions propagate to stop the pipeline
             raise
         except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Batch processing errors trigger fallback to sequential processing
-            logger.warning(f"Batch processing failed: {str(e)}, falling back to sequential processing")
+            logger.warning(f"Batch processing failed: {e}, using sequential")
             return self._process_batch_sequential(batch, **kwargs)
+
+    def _process_batch_with_subblocks(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        block_entries: List[Dict[str, Any]] = []
+        valid_requests: List[Dict[str, Any]] = []
+        tags_to_preserve = self._get_tags_to_preserve()
+
+        for block_index, (current_block, original_block) in enumerate(batch):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            original_header, original_body = self._get_header_and_body(block=original_block)
+
+            # Skip blocks based on token count threshold (before subblock processing)
+            if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
+                block_entries.append(
+                    {
+                        "skipped": True,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                    }
+                )
+                continue
+
+            # Skip empty blocks or blocks with only special tags
+            if (not current_body.strip() and not original_body.strip()) or (
+                contains_only_special_tags(current_body, tags_to_preserve)
+                and contains_only_special_tags(original_body, tags_to_preserve)
+            ):
+                block_entries.append(
+                    {
+                        "skipped": True,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                    }
+                )
+                continue
+
+            current_paragraphs = self._split_body_into_paragraphs(current_body)
+
+            # If no paragraphs, treat as a single request (preserves previous batch behavior).
+            if not current_paragraphs:
+                user_message = self._format_user_message(
+                    current_body=current_body,
+                    original_body=original_body,
+                    current_header=current_header,
+                    original_header=original_header,
+                )
+                req = {
+                    "system_prompt": self.system_prompt,
+                    "user_prompt": user_message,
+                    "metadata": {
+                        "block_index": block_index,
+                        "subblock_index": 0,
+                        "subblock_count": 1,
+                        "current_header": current_header,
+                        "current_body_full": current_body,
+                        "original_body_full": original_body,
+                        "original_header": original_header,
+                    },
+                }
+                block_entries.append(
+                    {
+                        "skipped": False,
+                        "block_index": block_index,
+                        "current_header": current_header,
+                        "current_body_full": current_body,
+                        "original_body_full": original_body,
+                        "original_header": original_header,
+                        "subblock_count": 1,
+                    }
+                )
+                valid_requests.append(req)
+                continue
+
+            current_subblocks = self._group_paragraphs_into_subblocks(current_paragraphs)
+
+            with self._subblock_stats_lock:
+                self._subblock_blocks_processed_total += 1
+                self._subblocks_processed_total += len(current_subblocks)
+                if len(current_subblocks) > self._max_subblocks_in_single_block:
+                    self._max_subblocks_in_single_block = len(current_subblocks)
+
+            logger.debug(f"Batch mode: split block '{current_header[:30]}...' into {len(current_subblocks)} sub-blocks")
+
+            block_entries.append(
+                {
+                    "skipped": False,
+                    "block_index": block_index,
+                    "current_header": current_header,
+                    "current_body_full": current_body,
+                    "original_body_full": original_body,
+                    "original_header": original_header,
+                    "subblock_count": len(current_subblocks),
+                }
+            )
+
+            for subblock_index, curr_sb in enumerate(current_subblocks):
+                user_message = self._format_user_message(
+                    current_body=curr_sb,
+                    original_body=original_body,
+                    current_header=current_header,
+                    original_header=original_header,
+                )
+                valid_requests.append(
+                    {
+                        "system_prompt": self.system_prompt,
+                        "user_prompt": user_message,
+                        "metadata": {
+                            "block_index": block_index,
+                            "subblock_index": subblock_index,
+                            "subblock_count": len(current_subblocks),
+                            "current_header": current_header,
+                            "current_body_full": current_body,
+                            "original_body_full": original_body,
+                            "original_header": original_header,
+                        },
+                    }
+                )
+
+        if valid_requests:
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
+        else:
+            batch_responses = []
+
+        request_by_metadata: Dict[Any, Dict[str, Any]] = {}
+        for req in valid_requests:
+            subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+            subblock_req_metadata: Dict[str, Any] = cast(Dict[str, Any], subblock_req_dict.get("metadata", {}))
+            block_idx = subblock_req_metadata.get("block_index")
+            subblock_idx = subblock_req_metadata.get("subblock_index")
+            if block_idx is not None and subblock_idx is not None:
+                request_by_metadata[(int(block_idx), int(subblock_idx))] = req
+
+        self._retry_failed_batch_responses(
+            batch_responses=batch_responses,
+            request_lookup=request_by_metadata,
+            stage_name="subblock",
+            **kwargs,
+        )
+
+        # Group responses back into blocks using metadata-based mapping
+        # This handles cases where providers return results out of order
+        # Batch API should preserve metadata from requests to responses
+        subblock_outputs: Dict[int, List[Optional[str]]] = {}
+        for resp in batch_responses:
+            resp_metadata: Dict[str, Any] = cast(Dict[str, Any], resp.get("metadata", {}))
+            block_index = int(resp_metadata.get("block_index", -1))
+            subblock_index = int(resp_metadata.get("subblock_index", -1))
+            subblock_count = int(resp_metadata.get("subblock_count", 1))
+
+            if block_index < 0 or subblock_index < 0:
+                logger.error(
+                    f"Invalid metadata in batch response: {resp_metadata}. "
+                    "Batch API should preserve metadata from requests."
+                )
+                continue
+
+            if block_index not in subblock_outputs:
+                subblock_outputs[block_index] = [None] * subblock_count
+            subblock_outputs[block_index][subblock_index] = resp.get("content", "")
+
+            generation_id = resp.get("generation_id")
+            if generation_id:
+                add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+        # Reconstruct processed blocks maintaining original order
+        processed_blocks: List[str] = []
+        for entry in block_entries:
+            if entry.get("skipped", False):
+                processed_blocks.append(f"{entry['current_header']}\n\n{entry['current_body']}\n\n")
+                continue
+
+            block_index = int(entry["block_index"])
+            parts = subblock_outputs.get(block_index, [])
+            # Defensive: fill any missing subblocks with empty strings.
+            processed_body_raw = "\n".join([(p if p is not None else "") for p in parts])
+
+            processed_body = self._apply_post_processing(
+                original_block=entry["current_body_full"], llm_block=processed_body_raw, **kwargs
+            )
+            processed_block = self._assemble_processed_block(
+                current_header=entry["current_header"],
+                current_body=entry["current_body_full"],
+                llm_response=processed_body,
+                original_body=entry["original_body_full"],
+                **kwargs,
+            )
+            processed_blocks.append(processed_block)
+
+        return processed_blocks
+
+    def _process_batch_standard(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
+        # Prepare batch requests (non-subblock batching: one request per block)
+        batch_requests: List[Optional[Dict[str, Any]]] = []
+        tags_to_preserve = self._get_tags_to_preserve()
+        for block_index, (current_block, original_block) in enumerate(batch):
+            current_header, current_body = self._get_header_and_body(block=current_block)
+            original_header, original_body = self._get_header_and_body(block=original_block)
+
+            # Skip blocks based on token count threshold (before processing)
+            if should_skip_by_token_count(current_block, self.skip_if_less_than_tokens, self._token_counter):
+                batch_requests.append(None)  # Mark as skip
+                continue
+
+            # Skip empty blocks or blocks with only special tags
+            if (not current_body.strip() and not original_body.strip()) or (
+                contains_only_special_tags(current_body, tags_to_preserve)
+                and contains_only_special_tags(original_body, tags_to_preserve)
+            ):
+                batch_requests.append(None)  # Mark as skip
+                continue
+
+            # Format the user message
+            user_message = self._format_user_message(
+                current_body=current_body,
+                original_body=original_body,
+                current_header=current_header,
+                original_header=original_header,
+            )
+
+            batch_requests.append(
+                {
+                    "system_prompt": self.system_prompt,
+                    "user_prompt": user_message,
+                    "metadata": {
+                        "block_index": block_index,
+                        "current_header": current_header,
+                        "current_body": current_body,
+                        "original_body": original_body,
+                        "original_header": original_header,
+                    },
+                }
+            )
+
+        # Process non-None requests through batch API
+        valid_requests = [req for req in batch_requests if req is not None]
+        if valid_requests:
+            # Merge reasoning and llm_kwargs
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            batch_responses = self.model.batch_chat_completion(requests=valid_requests, **call_kwargs)
+        else:
+            batch_responses = []
+
+        # Map responses back to requests using metadata (handles out-of-order responses)
+        mapped_responses = map_batch_responses_to_requests(
+            batch_responses=batch_responses, requests=batch_requests, stage_name="non-subblock"
+        )
+
+        request_by_index: Dict[Any, Dict[str, Any]] = {}
+        for req in valid_requests:
+            non_subblock_req_dict: Dict[str, Any] = cast(Dict[str, Any], req)
+            non_subblock_req_metadata: Dict[str, Any] = cast(Dict[str, Any], non_subblock_req_dict.get("metadata", {}))
+            block_idx = non_subblock_req_metadata.get("block_index")
+            if block_idx is not None:
+                request_by_index[int(block_idx)] = req
+
+        self._retry_failed_batch_responses(
+            batch_responses=mapped_responses,
+            request_lookup=request_by_index,
+            stage_name="non-subblock",
+            **kwargs,
+        )
+
+        # Reconstruct results maintaining original order
+        processed_blocks = []
+        for i, (current_block, original_block) in enumerate(batch):
+            if batch_requests[i] is None:
+                # This was a skipped block
+                current_header, current_body = self._get_header_and_body(block=current_block)
+                processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+            else:
+                # Get the mapped response for this block
+                response = mapped_responses[i]
+
+                # Skip if this was a skipped response placeholder
+                if response.get("skipped", False):
+                    current_header, current_body = self._get_header_and_body(block=current_block)
+                    processed_blocks.append(f"{current_header}\n\n{current_body}\n\n")
+                    continue
+
+                request = batch_requests[i]
+                assert request is not None  # Type guard for mypy
+                request_dict: Dict[str, Any] = cast(Dict[str, Any], request)
+                metadata: Dict[str, Any] = cast(Dict[str, Any], request_dict.get("metadata", {}))
+                processed_body = response["content"]
+                generation_id = response.get("generation_id")
+
+                # Track generation ID for cost calculation
+                if generation_id:
+                    add_generation_id(phase_name=self.name, generation_id=generation_id)
+
+                # Apply post-processing
+                processed_body = self._apply_post_processing(
+                    original_block=metadata["current_body"], llm_block=processed_body, **kwargs
+                )
+
+                # Use the subclass-specific assembly method
+                processed_block = self._assemble_processed_block(
+                    current_header=metadata["current_header"],
+                    current_body=metadata["current_body"],
+                    llm_response=processed_body,
+                    original_body=metadata["original_body"],
+                    **kwargs,
+                )
+                processed_blocks.append(processed_block)
+
+        return processed_blocks
+
+    def _retry_failed_batch_responses(
+        self,
+        batch_responses: List[Dict[str, Any]],
+        request_lookup: Dict[Any, Dict[str, Any]],
+        stage_name: str,
+        **kwargs,
+    ) -> None:
+        """Retry failed batch responses individually.
+
+        Modifies batch_responses in-place, replacing failed responses with
+        retry results while preserving metadata.
+        """
+        failed_responses = [(idx, resp) for idx, resp in enumerate(batch_responses) if resp.get("failed", False)]
+
+        if not failed_responses:
+            return
+
+        logger.warning(f"{stage_name} batch had {len(failed_responses)} failures out of {len(batch_responses)}")
+
+        if not self.enable_retry:
+            _, first_failed = failed_responses[0]
+            failed_content = first_failed.get("content", "Unknown error")
+            failed_metadata = first_failed.get("metadata", {})
+            block_index = failed_metadata.get("block_index", "unknown")
+            subblock_index = failed_metadata.get("subblock_index")
+            if subblock_index is not None:
+                block_info = f"block index {block_index}, subblock {subblock_index}"
+            else:
+                block_info = f"block index {block_index}"
+            raise GenerationFailedError(
+                message=f"Batch generation failed (retry disabled): {failed_content[:200]}",
+                block_info=block_info,
+            )
+
+        logger.info(f"Retrying {len(failed_responses)} failed responses individually")
+
+        for resp_idx, failed_response in failed_responses:
+            failed_metadata = failed_response.get("metadata", {})
+            block_idx = failed_metadata.get("block_index")
+            subblock_idx = failed_metadata.get("subblock_index")
+
+            if block_idx is None:
+                logger.error(f"Failed response at {resp_idx} missing block_index")
+                continue
+
+            lookup_key: Any
+            block_info = f"block index {block_idx}"
+            if subblock_idx is not None:
+                lookup_key = (int(block_idx), int(subblock_idx))
+                block_info = f"{block_info}, subblock {subblock_idx}"
+            else:
+                lookup_key = int(block_idx)
+
+            original_request = request_lookup.get(lookup_key)
+            if original_request is None:
+                logger.error(f"No request for block_index={block_idx}")
+                continue
+
+            header = original_request["metadata"].get("current_header", "unknown")[:50]
+            block_info = f"{block_info}, header: {header}"
+
+            call_kwargs = {**self.llm_kwargs, "reasoning": self.reasoning, **kwargs}
+            retried_content, retried_gen_id = self._make_llm_call_with_retry(
+                system_prompt=original_request["system_prompt"],
+                user_prompt=original_request["user_prompt"],
+                block_info=block_info,
+                **call_kwargs,
+            )
+
+            batch_responses[resp_idx] = {
+                "content": retried_content,
+                "generation_id": retried_gen_id,
+                "metadata": failed_metadata,
+                "failed": False,
+            }
 
     def _process_batch_sequential(self, batch: List[Tuple[str, str]], **kwargs) -> List[str]:
         """
