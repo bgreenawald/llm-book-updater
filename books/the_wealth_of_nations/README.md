@@ -7,4 +7,5 @@
 3. Remove the table of contents and everything else before the Introduction
 4. Run `transform.py` to get `input_transformed.py`. Run the following steps on it.
 5. Turn the introduction into a Markdown 1 header
-6. Add in the preface and license sections.
+6. Manually create the level 3 headers
+7. Add in the preface and license sections.
