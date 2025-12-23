@@ -163,7 +163,27 @@ class OpenRouterClient(ProviderClient):
         response = OpenRouterResponse.model_validate(resp_data)
 
         if not response.choices or not response.choices[0].message.get("content"):
-            raise ValueError(f"Empty or malformed response: {resp_data}")
+            # Extract additional diagnostic information from raw response
+            choice_data = resp_data.get("choices", [{}])[0] if resp_data.get("choices") else {}
+            finish_reason = choice_data.get("finish_reason", "unknown")
+            native_finish_reason = choice_data.get("native_finish_reason")
+            usage = resp_data.get("usage", {})
+            completion_tokens = usage.get("completion_tokens", 0)
+
+            # Build a more informative error message
+            error_parts = ["Empty or malformed response"]
+            if native_finish_reason:
+                error_parts.append(f"native_finish_reason: {native_finish_reason}")
+            if finish_reason and finish_reason != "unknown":
+                error_parts.append(f"finish_reason: {finish_reason}")
+            if completion_tokens == 0:
+                error_parts.append("no tokens generated")
+
+            error_msg = ", ".join(error_parts)
+            if native_finish_reason == "abort":
+                error_msg += " (generation was aborted by provider/model)"
+
+            raise ValueError(f"{error_msg}: {resp_data}")
 
         content = response.choices[0].message["content"]
         finish_reason = response.choices[0].finish_reason or "unknown"
