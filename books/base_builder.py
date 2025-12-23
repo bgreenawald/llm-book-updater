@@ -390,6 +390,10 @@ class BaseBookBuilder(ABC):
         preface_content = self.config.preface_md.read_text(encoding="utf-8")
         license_content = self.config.license_md.read_text(encoding="utf-8")
 
+        # Format license content with title and author
+        license_content = license_content.replace("{title}", self.config.title)
+        license_content = license_content.replace("{author}", self.config.author)
+
         # Format main files
         self.format_markdown_file(
             self.config.staged_modernized_md, preface_content, license_content, self.config.version
