@@ -8,3 +8,4 @@
 4. Make a copy called `'input_transformed.md`
 5. Remove the Appendix
 6. Manual create the header structure
+7. Add preface and license

@@ -1,5 +1,12 @@
-
 # THE ESSENCE OF CHRISTIANITY.
+
+## Preface (TimelessLibrary Edition)
+
+{preface}
+
+## License
+
+{license}
 
 ## PREFACE TO THE SECOND EDITION.
 
