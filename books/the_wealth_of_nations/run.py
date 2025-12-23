@@ -2,40 +2,49 @@ import sys
 from pathlib import Path
 from typing import List
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import ModelConfig
-from src.logging_config import setup_logging
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from src.api.provider import Provider
+from src.core.pipeline import run_pipeline
+from src.models.model import ModelConfig
+from src.utils.logging_config import setup_logging
 
-CHATGPT_GPT52 = ModelConfig(provider=Provider.OPENAI, model_id="gpt-5.2")
-GROK_41 = ModelConfig(provider=Provider.OPENROUTER, model_id="x-ai/grok-4.1-fast")
-GEMINI_PRO = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-pro-preview")
 DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
+GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GEMINI_PRO,
+        model=GEMINI_3_FLASH,
         reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
+        use_subblocks=True,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=CHATGPT_GPT52,
+        model=KIMI_K2,
         reasoning={"effort": "high"},
-        use_batch=True,
+        enable_retry=True,
     ),
     PhaseConfig(
-        phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT52,
-        reasoning={"effort": "high"},
+        phase_type=PhaseType.FINAL_TWO_STAGE,
+        two_stage_config=TwoStageModelConfig(
+            identify_model=GEMINI_3_FLASH,
+            implement_model=GEMINI_3_FLASH,
+            identify_reasoning={"effort": "high"},
+            implement_reasoning={"effort": "high"},
+        ),
+        enable_retry=True,
         use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=GROK_41,
+        model=DEEPSEEK_V32,
         reasoning={"effort": "high"},
+        enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
@@ -45,10 +54,16 @@ run_phases: List[PhaseConfig] = [
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=GROK_41,
+        model=GEMINI_3_FLASH,
         reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
+        use_subblocks=True,
+        use_batch=True,
     ),
 ]
+
 
 # Main configuration object for the pipeline run.
 config = RunConfig(
@@ -59,7 +74,7 @@ config = RunConfig(
     output_dir=Path(r"books/the_wealth_of_nations/output"),
     original_file=Path(r"books/the_wealth_of_nations/input_transformed.md"),
     phases=run_phases,
-    max_workers=10,
+    max_workers=3,
 )
 
 
