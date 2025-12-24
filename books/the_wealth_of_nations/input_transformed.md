@@ -1,5 +1,14 @@
 # The Wealth of Nations
 
+
+# Preface (TimelessLibrary Edition)
+
+{preface}
+
+## License
+
+{license}
+
 ## INTRODUCTION AND PLAN OF THE WORK.
 
 The annual labour of every nation is the fund which originally supplies it with all the necessaries and conveniencies of life which it annually consumes, and which consist always either in the immediate produce of that labour, or in what is purchased with that produce from other nations.
@@ -488,7 +497,7 @@ Pecuniary wages and profit, indeed, are everywhere in Europe extremely different
 
 The particular consideration of those circumstances, and of that policy, will divide this Chapter into two parts.
 
-PART I. Inequalities arising from the nature of the employments themselves.
+#### PART I. Inequalities arising from the nature of the employments themselves.
 
 The five following are the principal circumstances which, so far as I have been able to observe, make up for a small pecuniary gain in some employments, and counterbalance a great one in others. First, the agreeableness or disagreeableness of the employments themselves; secondly, the easiness and cheapness, or the difficulty and expense of learning them; thirdly, the constancy or inconstancy of employment in them; fourthly, the small or great trust which must be reposed in those who exercise them; and, fifthly, the probability or improbability of success in them.
 
@@ -592,7 +601,7 @@ The spinning of linen yarn is carried on in Scotland nearly in the same way as t
 
 In opulent countries, the market is generally so extensive, that any one trade is sufficient to employ the whole labour and stock of those who occupy it. Instances of people living by one employment, and, at the same time, deriving some little advantage from another, occur chiefly in poor countries. The following instance, however, of something of the same kind, is to be found in the capital of a very rich one. There is no city in Europe, I believe, in which house-rent is dearer than in London, and yet I know no capital in which a furnished apartment can be hired so cheap. Lodging is not only much cheaper in London than in Paris; it is much cheaper than in Edinburgh, of the same degree of goodness; and, what may seem extraordinary, the dearness of house-rent is the cause of the cheapness of lodging. The dearness of house-rent in London arises, not only from those causes which render it dear in all great capitals, the dearness of labour, the dearness of all the materials of building, which must generally be brought from a great distance, and, above all, the dearness of ground-rent, every landlord acting the part of a monopolist, and frequently exacting a higher rent for a single acre of bad land in a town, than can be had for a hundred of the best in the country; but it arises in part from the peculiar manners and customs of the people, which oblige every master of a family to hire a whole house from top to bottom. A dwelling-house in England means every thing that is contained under the same roof. In France, Scotland, and many other parts of Europe, it frequently means no more than a single storey. A tradesman in London is obliged to hire a whole house in that part of the town where his customers live. His shop is upon the ground floor, and he and his family sleep in the garret; and he endeavours to pay a part of his house-rent by letting the two middle storeys to lodgers. He expects to maintain his family by his trade, and not by his lodgers. Whereas at Paris and Edinburgh, people who let lodgings have commonly no other means of subsistence; and the price of the lodging must pay, not only the rent of the house, but the whole expense of the family.
 
-PART II.—Inequalities occasioned by the Policy of Europe.
+#### PART II.—Inequalities occasioned by the Policy of Europe.
 
 Such are the inequalities in the whole of the advantages and disadvantages of the different employments of labour and stock, which the defect of any of the three requisites above mentioned must occasion, even where there is the most perfect liberty. But the policy of Europe, by not leaving things at perfect liberty, occasions other inequalities of much greater importance.
 
@@ -738,7 +747,7 @@ Rent, it is to be observed, therefore, enters into the composition of the price 
 
 The particular consideration, first, of those parts of the produce of land which always afford some rent; secondly, of those which sometimes may and sometimes may not afford rent; and, thirdly, of the variations which, in the different periods of improvement, naturally take place in the relative value of those two different sorts of rude produce, when compared both with one another and with manufactured commodities, will divide this chapter into three parts.
 
-PART I.—Of the Produce of Land which always affords Rent.
+#### PART I.—Of the Produce of Land which always affords Rent.
 
 As men, like all other animals, naturally multiply in proportion to the means of their subsistence, food is always more or less in demand. It can always purchase or command a greater or smaller quantity of labour, and somebody can always be found who is willing to do something in order to obtain it. The quantity of labour, indeed, which it can purchase, is not always equal to what it could maintain, if managed in the most economical manner, on account of the high wages which are sometimes given to labour; but it can always purchase such a quantity of labour as it can maintain, according to the rate at which that sort of labour is commonly maintained in the neighbourhood.
 
@@ -824,7 +833,7 @@ In some parts of Lancashire, it is pretended, I have been told, that bread of oa
 
 It is difficult to preserve potatoes through the year, and impossible to store them like corn, for two or three years together. The fear of not being able to sell them before they rot, discourages their cultivation, and is, perhaps, the chief obstacle to their ever becoming in any great country, like bread, the principal vegetable food of all the different ranks of the people.
 
-PART II.—Of the Produce of Land, which sometimes does, and sometimes does not, afford Rent.
+#### PART II.—Of the Produce of Land, which sometimes does, and sometimes does not, afford Rent.
 
 Human food seems to be the only produce of land, which always and necessarily affords some rent to the landlord. Other sorts of produce sometimes may, and sometimes may not, according to different circumstances.
 
@@ -898,7 +907,7 @@ It is otherwise in estates above ground. The value, both of their produce and of
 
 Whatever increases the fertility of land in producing food, increases not only the value of the lands upon which the improvement is bestowed, but contributes likewise to increase that of many other lands, by creating a new demand for their produce. That abundance of food, of which, in consequence of the improvement of land, many people have the disposal beyond what they themselves can consume, is the great cause of the demand, both for the precious metals and the precious stones, as well as for every other conveniency and ornament of dress, lodging, household furniture, and equipage. Food not only constitutes the principal part of the riches of the world, but it is the abundance of food which gives the principal part of their value to many other sorts of riches. The poor inhabitants of Cuba and St. Domingo, when they were first discovered by the Spaniards, used to wear little bits of gold as ornaments in their hair and other parts of their dress. They seemed to value them as we would do any little pebbles of somewhat more than ordinary beauty, and to consider them as just worth the picking up, but not worth the refusing to any body who asked them, They gave them to their new guests at the first request, without seeming to think that they had made them any very valuable present. They were astonished to observe the rage of the Spaniards to obtain them; and had no notion that there could anywhere be a country in which many people had the disposal of so great a superfluity of food; so scanty always among themselves, that, for a very small quantity of those glittering baubles, they would willingly give as much as might maintain a whole family for many years. Could they have been made to understand this, the passion of the Spaniards would not have surprised them.
 
-PART III.—Of the variations in the Proportion between the respective Values of that sort of Produce which always affords Rent, and of that which sometimes does, and sometimes does not, afford Rent.
+#### PART III.—Of the variations in the Proportion between the respective Values of that sort of Produce which always affords Rent, and of that which sometimes does, and sometimes does not, afford Rent.
 
 The increasing abundance of food, in consequence of the increasing improvement and cultivation, must necessarily increase the demand for every part of the produce of land which is not food, and which can be applied either to use or to ornament. In the whole progress of improvement, it might, therefore, be expected there should be only one variation in the comparative values of those two different sorts of produce. The value of that sort which sometimes does, and sometimes does not afford rent, should constantly rise in proportion to that which always affords some rent. As art and industry advance, the materials of clothing and lodging, the useful fossils and materials of the earth, the precious metals and the precious stones, should gradually come to be more and more in demand, should gradually exchange for a greater and a greater quantity of food; or, in other words, should gradually become dearer and dearer. This, accordingly, has been the case with most of these things upon most occasions, and would have been the case with all of them upon all occasions, if particular accidents had not, upon some occasions, increased the supply of some of them in a still greater proportion than the demand.
 
@@ -914,7 +923,7 @@ But if, on the other hand, the supply of that metal should increase nearly in th
 
 These three seem to exhaust all the possible combinations of events which can happen in the progress of improvement; and during the course of the four centuries preceding the present, if we may judge by what has happened both in France and Great Britain, each of those three different combinations seems to have taken place in the European market, and nearly in the same order, too, in which I have here set them down.
 
-_Digression concerning the Variations in the value of Silver during the Course of the Four last Centuries._
+#### _Digression concerning the Variations in the value of Silver during the Course of the Four last Centuries._
 
 First Period.—In 1350, and for some time before, the average price of the quarter of wheat in England seems not to have been estimated lower than four ounces of silver, Tower weight, equal to about twenty shillings of our present money. From this price it seems to have fallen gradually to two ounces of silver, equal to about ten shillings of our present money, the price at which we find it estimated in the beginning of the sixteenth century, and at which it seems to have continued to be estimated till about 1570.
 
@@ -1078,7 +1087,7 @@ The quantity of brass and iron annually brought from the mine to the market, is 
 
 The price of all metals, though liable to slow and gradual variations, varies less from year to year than that of almost any other part of the rude produce of land: and the price of the precious metals is even less liable to sudden variations than that of the coarse ones. The durableness of metals is the foundation of this extraordinary steadiness of price. The corn which was brought to market last year will be all, or almost all, consumed, long before the end of this year. But some part of the iron which was brought from the mine two or three hundred years ago, may be still in use, and, perhaps, some part of the gold which was brought from it two or three thousand years ago. The different masses of corn, which, in different years, must supply the consumption of the world, will always be nearly in proportion to the respective produce of those different years. But the proportion between the different masses of iron which may be in use in two different years, will be very little affected by any accidental difference in the produce of the iron mines of those two years; and the proportion between the masses of gold will be still less affected by any such difference in the produce of the gold mines. Though the produce of the greater part of metallic mines, therefore, varies, perhaps, still more from year to year than that of the greater part of corn fields, those variations have not the same effect upon the price of the one species of commodities as upon that of the other.
 
-_Variations in the Proportion between the respective Values of Gold and Silver._
+#### _Variations in the Proportion between the respective Values of Gold and Silver._
 
 Before the discovery of the mines of America, the value of fine gold to fine silver was regulated in the different mines of Europe, between the proportions of one to ten and one to twelve; that is, an ounce of fine gold was supposed to be worth from ten to twelve ounces of fine silver. About the middle of the last century, it came to be regulated, between the proportions of one to fourteen and one to fifteen; that is, an ounce of fine gold came to be supposed worth between fourteen and fifteen ounces of fine silver. Gold rose in its nominal value, or in the quantity of silver which was given for it. Both metals sunk in their real value, or in the quantity of labour which they could purchase; but silver sunk more than gold. Though both the gold and silver mines of America exceeded in fertility all those which had ever been known before, the fertility of the silver mines had, it seems, been proportionally still greater than that of the gold ones.
 
@@ -1104,7 +1113,7 @@ It must be observed, however, that whatever may be the supposed annual importati
 
 If, when the annual consumption has become equal to the annual importation, the annual importation should gradually diminish, the annual consumption may, for some time, exceed the annual importation. The mass of those metals may gradually and insensibly diminish, and their value gradually and insensibly rise, till the annual importation becoming again stationary, the annual consumption will gradually and insensibly accommodate itself to what that annual importation can maintain.
 
-_Grounds of the suspicion that the Value of Silver still continues to decrease._
+#### _Grounds of the suspicion that the Value of Silver still continues to decrease._
 
 The increase of the wealth of Europe, and the popular notion, that as the quantity of the precious metals naturally increases with the increase of wealth, so their value diminishes as their quantity increases, may, perhaps, dispose many people to believe that their value still continues to fall in the European market; and the still gradually increasing price of many parts of the rude produce of land may confirm them still farther in this opinion.
 
@@ -1112,7 +1121,7 @@ That that increase in the quantity of the precious metals, which arises in any c
 
 If you except corn, and such other vegetables as are raised altogether by human industry, that all other sorts of rude produce, cattle, poultry, game of all kinds, the useful fossils and minerals of the earth, etc. naturally grow dearer, as the society advances in wealth and improvement, I have endeavoured to shew already. Though such commodities, therefore, come to exchange for a greater quantity of silver than before, it will not from thence follow that silver has become really cheaper, or will purchase less labour than before; but that such commodities have become really dearer, or will purchase more labour than before. It is not their nominal price only, but their real price, which rises in the progress of improvement. The rise of their nominal price is the effect, not of any degradation of the value of silver, but of the rise in their real price.
 
-_Different Effects of the Progress of Improvement upon three different sorts of rude Produce._
+#### _Different Effects of the Progress of Improvement upon three different sorts of rude Produce._
 
 These different sorts of rude produce may be divided into three classes. The first comprehends those which it is scarce in the power of human industry to multiply at all. The second, those which it can multiply in proportion to the demand. The third, those in which the efficacy of industry is either limited or uncertain. In the progress of wealth and improvement, the real price of the first may rise to any degree of extravagance, and seems not to be limited by any certain boundary. That of the second, though it may rise greatly, has, however, a certain boundary, beyond which it cannot well pass for any considerable time together. That of the third, though its natural tendency is to rise in the progress of improvement, yet in the same degree of improvement it may sometimes happen even to fall, sometimes to continue the same, and sometimes to rise more or less, according as different accidents render the efforts of human industry, in multiplying this sort of rude produce, more or less successful.
 
@@ -1186,7 +1195,7 @@ So far as their quantity in any particular country depends upon the latter of th
 
 The fertility or barrenness of the mines, however, which may happen at any particular time to supply the commercial world, is a circumstance which, it is evident, may have no sort of connection with the state of industry in a particular country. It seems even to have no very necessary connection with that of the world in general. As arts and commerce, indeed, gradually spread themselves over a greater and a greater part of the earth, the search for new mines, being extended over a wider surface, may have somewhat a better chance for being successful than when confined within narrower bounds. The discovery of new mines, however, as the old ones come to be gradually exhausted, is a matter of the greatest uncertainty, and such as no human skill or industry can insure. All indications, it is acknowledged, are doubtful; and the actual discovery and successful working of a new mine can alone ascertain the reality of its value, or even of its existence. In this search there seem to be no certain limits, either to the possible success, or to the possible disappointment of human industry. In the course of a century or two, it is possible that new mines may be discovered, more fertile than any that have ever yet been known; and it is just equally possible, that the most fertile mine then known may be more barren than any that was wrought before the discovery of the mines of America. Whether the one or the other of those two events may happen to take place, is of very little importance to the real wealth and prosperity of the world, to the real value of the annual produce of the land and labour of mankind. Its nominal value, the quantity of gold and silver by which this annual produce could be expressed or represented, would, no doubt, be very different; but its real value, the real quantity of labour which it could purchase or command, would be precisely the same. A shilling might, in the one case, represent no more labour than a penny does at present; and a penny, in the other, might represent as much as a shilling does now. But in the one case, he who had a shilling in his pocket would be no richer than he who has a penny at present; and in the other, he who had a penny would be just as rich as he who has a shilling now. The cheapness and abundance of gold and silver plate would be the sole advantage which the world could derive from the one event; and the dearness and scarcity of those trifling superfluities, the only inconveniency it could suffer from the other.
 
-Conclusion of the Digression concerning the Variations in the Value of Silver.
+#### Conclusion of the Digression concerning the Variations in the Value of Silver.
 
 The greater part of the writers who have collected the money price of things in ancient times, seem to have considered the low money price of corn, and of goods in general, or, in other words, the high value of gold and silver, as a proof, not only of the scarcity of those metals, but of the poverty and barbarism of the country at the time when it took place. This notion is connected with the system of political economy, which represents national wealth as consisting in the abundance and national poverty in the scarcity, of gold and silver; a system which I shall endeavour to explain and examine at great length in the fourth book of this Inquiry. I shall only observe at present, that the high value of the precious metals can be no proof of the poverty or barbarism of any particular country at the time when it took place. It is a proof only of the barrenness of the mines which happened at that time to supply the commercial world. A poor country, as it cannot afford to buy more, so it can as little afford to pay dearer for gold and silver than a rich one; and the value of those metals, therefore, is not likely to be higher in the former than in the latter. In China, a country much richer than any part of Europe, the value of the precious metals is much higher than in any part of Europe. As the wealth of Europe, indeed, has increased greatly since the discovery of the mines of America, so the value of gold and silver has gradually diminished. This diminution of their value, however, has not been owing to the increase of the real wealth of Europe, of the annual produce of its land and labour, but to the accidental discovery of more abundant mines than any that were known before. The increase of the quantity of gold and silver in Europe, and the increase of its manufactures and agriculture, are two events which, though they have happened nearly about the same time, yet have arisen from very different causes, and have scarce any natural connection with one another. The one has arisen from a mere accident, in which neither prudence nor policy either had or could have any share; the other, from the fall of the feudal system, and from the establishment of a government which afforded to industry the only encouragement which it requires, some tolerable security that it shall enjoy the fruits of its own labour. Poland, where the feudal system still continues to take place, is at this day as beggarly a country as it was before the discovery of America. The money price of corn, however, has risen; the real value of the precious metals has fallen in Poland, in the same manner as in other parts of Europe. Their quantity, therefore, must have increased there as in other places, and nearly in the same proportion to the annual produce of its land and labour. This increase of the quantity of those metals, however, has not, it seems, increased that annual produce, has neither improved the manufactures and agriculture of the country, nor mended the circumstances of its inhabitants. Spain and Portugal, the countries which possess the mines, are, after Poland, perhaps the two most beggarly countries in Europe. The value of the precious metals, however, must be lower in Spain and Portugal than in any other part of Europe, as they come from those countries to all other parts of Europe, loaded, not only with a freight and an insurance, but with the expense of smuggling, their exportation being either prohibited or subjected to a duty. In proportion to the annual produce of the land and labour, therefore, their quantity must be greater in those countries than in any other part of Europe; those countries, however, are poorer than the greater part of Europe. Though the feudal system has been abolished in Spain and Portugal, it has not been succeeded by a much better.
 
@@ -1210,7 +1219,7 @@ It may, too, be of some use to the public, in regulating the pecuniary reward of
 
 In the present season of scarcity, the high price of corn no doubt distresses the poor. But in times of moderate plenty, when corn is at its ordinary or average price, the natural rise in the price of any other sort of rude produce cannot much affect them. They suffer more, perhaps, by the artificial rise which has been occasioned by taxes in the price of some manufactured commodities, as of salt, soap, leather, candles, malt, beer, ale, etc.
 
-_Effects of the Progress of Improvement upon the real Price of Manufactures._
+#### _Effects of the Progress of Improvement upon the real Price of Manufactures._
 
 It is the natural effect of improvement, however, to diminish gradually the real price of almost all manufactures. That of the manufacturing workmanship diminishes, perhaps, in all of them without exception. In consequence of better machinery, of greater dexterity, and of a more proper division and distribution of work, all of which are the natural effects of improvement, a much smaller quantity of labour becomes requisite for executing any particular piece of work; and though, in consequence of the flourishing circumstances of the society, the real price of labour should rise very considerably, yet the great diminution of the quantity will generally much more than compensate the greatest rise which can happen in the price.
 
@@ -1242,7 +1251,7 @@ The coarse manufacture probably was, in those ancient times, carried on in Engla
 
 The consideration of these circumstances may, perhaps, in some measure explain to us why, in those ancient times, the real price of the coarse manufacture was, in proportion to that of the fine, so much lower than in the present times.
 
-Conclusion of the Chapter.
+#### Conclusion of the Chapter.
 
 I shall conclude this very long chapter with observing, that every improvement in the circumstances of the society tends, either directly or indirectly, to raise the real rent of land to increase the real wealth of the landlord, his power of purchasing the labour, or the produce of the labour of other people.
 
@@ -1300,7 +1309,7 @@ PRICES OF THE QUARTER OF NINE BUSHELS OF THE BEST OR HIGHEST PRICED WHEAT AT WIN
 
 ## BOOK II. OF THE NATURE, ACCUMULATION, AND EMPLOYMENT OF STOCK.
 
-INTRODUCTION.
+### INTRODUCTION.
 
 In that rude state of society, in which there is no division of labour, in which exchanges are seldom made, and in which every man provides every thing for himself, it is not necessary that any stock should be accumulated, or stored up before-hand, in order to carry on the business of the society. Every man endeavours to supply, by his own industry, his own occasional wants, as they occur. When he is hungry, he goes to the forest to hunt; when his coat is worn out, he clothes himself with the skin of the first large animal he kills: and when his hut begins to go to ruin, he repairs it, as well as he can, with the trees and the turf that are nearest it.
 
@@ -2142,7 +2151,7 @@ How far it may be proper to impose taxes upon the importation of foreign goods, 
 
 ### CHAPTER III. OF THE EXTRAORDINARY RESTRAINTS UPON THE IMPORTATION OF GOODS OF ALMOST ALL KINDS, FROM THOSE COUNTRIES WITH WHICH THE BALANCE IS SUPPOSED TO BE DISADVANTAGEOUS.
 
-Part I—Of the Unreasonableness of those Restraints, even upon the Principles of the Commercial System.
+#### Part I — Of the Unreasonableness of those Restraints, even upon the Principles of the Commercial System.
 
 To lay extraordinary restraints upon the importation of goods of almost all kinds, from those particular countries with which the balance of trade is supposed to be disadvantageous, is the second expedient by which the commercial system proposes to increase the quantity of gold and silver. Thus, in Great Britain, Silesia lawns may be imported for home consumption, upon paying certain duties; but French cambrics and lawns are prohibited to be imported, except into the port of London, there to be warehoused for exportation. Higher duties are imposed upon the wines of France than upon those of Portugal, or indeed of any other country. By what is called the impost 1692, a duty of five and-twenty per cent. of the rate or value, was laid upon all French goods; while the goods of other nations were, the greater part of them, subjected to much lighter duties, seldom exceeding five per cent. The wine, brandy, salt, and vinegar of France, were indeed excepted; these commodities being subjected to other heavy duties, either by other laws, or by particular clauses of the same law. In 1696, a second duty of twenty-five per cent. the first not having been thought a sufficient discouragement, was imposed upon all French goods, except brandy; together with a new duty of five-and-twenty pounds upon the ton of French wine, and another of fifteen pounds upon the ton of French vinegar. French goods have never been omitted in any of those general subsidies or duties of five per cent. which have been imposed upon all, or the greater part, of the goods enumerated in the book of rates. If we count the one-third and two-third subsidies as making a complete subsidy between them, there have been five of these general subsidies; so that, before the commencement of the present war, seventy-five per cent. may be considered as the lowest duty to which the greater part of the goods of the growth, produce, or manufacture of France, were liable. But upon the greater part of goods, those duties are equivalent to a prohibition. The French, in their turn, have, I believe, treated our goods and manufactures just as hardly; though I am not so well acquainted with the particular hardships which they have imposed upon them. Those mutual restraints have put an end to almost all fair commerce between the two nations; and smugglers are now the principal importers, either of British goods into France, or of French goods into Great Britain. The principles which I have been examining, in the foregoing chapter, took their origin from private interest and the spirit of monopoly; those which I am going te examine in this, from national prejudice and animosity. They are, accordingly, as might well be expected, still more unreasonable. They are so, even upon the principles of the commercial system.
 
@@ -2214,7 +2223,7 @@ What may be the amount of the treasure in the bank, is a question which has long
 
 The city of Amsterdam derives a considerable revenue from the bank. Besides what may be called the warehouse rent above mentioned, each person, upon first opening an account with the bank, pays a fee of ten guilders; and for every new account, three guilders three stivers; for every transfer, two stivers; and if the transfer is for less than 300 guilders, six stivers, in order to discourage the multiplicity of small transactions. The person who neglects to balance his account twice in the year, forfeits twenty-five guilders. The person who orders a transfer for more than is upon his account, is obliged to pay three per cent. for the sum overdrawn, and his order is set aside into the bargain. The bank is supposed, too, to make a considerable profit by the sale of the foreign coin or bullion which sometimes falls to it by the expiring of receipts, and which is always kept till it can be sold with advantage. It makes a profit, likewise, by selling bank money at five per cent. agio, and buying it in at four. These different emoluments amount to a good deal more than what is necessary for paying the salaries of officers, and defraying the expense of management. What is paid for the keeping of bullion upon receipts, is alone supposed to amount to a neat annual revenue of between 150,000 and 200,000 guilders. Public utility, however, and not revenue, was the original object of this institution. Its object was to relieve the merchants from the inconvenience of a disadvantageous exchange. The revenue which has arisen from it was unforeseen, and may be considered as accidental. But it is now time to return from this long digression, into which I have been insensibly led, in endeavouring to explain the reasons why the exchange between the countries which pay in what is called bank money, and those which pay in common currency, should generally appear to be in favour of the former, and against the latter. The former pay in a species of money, of which the intrinsic value is always the same, and exactly agreeable to the standard of their respective mints; the latter is a species of money, of which the intrinsic value is continually varying, and is almost always more or less below that standard.
 
-PART II.—Of the Unreasonableness of those extraordinary Restraints, upon other Principles.
+#### PART II. — Of the Unreasonableness of those extraordinary Restraints, upon other Principles.
 
 In the foregoing part of this chapter, I have endeavoured to show, even upon the principles of the commercial system, how unnecessary it is to lay extraordinary restraints upon the importation of goods from those countries with which the balance of trade is supposed to be disadvantageous.
 
@@ -2366,7 +2375,7 @@ Premiums given by the public to artists and manufacturers, who excel in their pa
 
 Bounties are sometimes called premiums, as drawbacks are sometimes called bounties. But we must, in all cases, attend to the nature of the thing, without paying any regard to the word.
 
-Digression concerning the Corn Trade and Corn Laws.
+#### Digression concerning the Corn Trade and Corn Laws.
 
 I cannot conclude this chapter concerning bounties, without observing, that the praises which have been bestowed upon the law which establishes the bounty upon the exportation of corn, and upon that system of regulations which is connected with it, are altogether unmerited. A particular examination of the nature of the corn trade, and of the principal British laws which relate to it, will sufficiently demonstrate the truth of this assertion. The great importance of this subject must justify the length of the digression.
 
@@ -2546,7 +2555,7 @@ Some of the foregoing reasonings and observations might, perhaps, have been more
 
 ### CHAPTER VII. OF COLONIES.
 
-PART I. Of the Motives for Establishing New Colonies.
+#### PART I. Of the Motives for Establishing New Colonies.
 
 The interest which occasioned the first settlement of the different European colonies in America and the West Indies, was not altogether so plain and distinct as that which directed the establishment of those of ancient Greece and Rome.
 
@@ -2592,7 +2601,7 @@ A project of commerce to the East Indies, therefore, gave occasion to the first 
 
 The first adventurers of all the other nations of Europe who attempted to make settlements in America, were animated by the like chimerical views; but they were not equally successful. It was more than a hundred years after the first settlement of the Brazils, before any silver, gold, or diamond mines, were discovered there. In the English, French, Dutch, and Danish colonies, none have ever yet been discovered, at least none that are at present supposed to be worth the working. The first English settlers in North America, however, offered a fifth of all the gold and silver which should be found there to the king, as a motive for granting them their patents. In the patents of Sir Waiter Raleigh, to the London and Plymouth companies, to the council of Plymouth, etc. this fifth was accordingly reserved to the crown. To the expectation of finding gold and silver mines, those first settlers, too, joined that of discovering a north-west passage to the East Indies. They have hitherto been disappointed in both.
 
-PART II. Causes of the Prosperity of New Colonies.
+#### PART II. Causes of the Prosperity of New Colonies.
 
 The colony of a civilized nation which takes possession either of a waste country, or of one so thinly inhabited that the natives easily give place to the new settlers, advances more rapidly to wealth and greatness than any other human society.
 
@@ -2722,7 +2731,7 @@ When those establishments were effectuated, and had become so considerable as to
 
 In what way, therefore, has the policy of Europe contributed either to the first establishment, or to the present grandeur of the colonies of America? In one way, and in one way only, it has contributed a good deal. Magna virum mater! It bred and formed the men who were capable of achieving such great actions, and of laying the foundation of so great an empire; and there is no other quarter of the world; of which the policy is capable of forming, or has ever actually, and in fact, formed such men. The colonies owe to the policy of Europe the education and great views of their active and enterprizing founders; and some of the greatest and most important of them, so far as concerns their internal government, owe to it scarce anything else.
 
-PART III. Of the Advantages which Europe has derived From the Discovery of America, and from that of a Passage to the East Indies by the Cape of Good Hope.
+#### PART III. Of the Advantages which Europe has derived From the Discovery of America, and from that of a Passage to the East Indies by the Cape of Good Hope.
 
 Such are the advantages which the colonies of America have derived from the policy of Europe.
 
@@ -3196,7 +3205,7 @@ It is to be observed, that the bushel of foreign salt weighs 48lbs., that of Bri
 
 ### CHAPTER I. OF THE EXPENSES OF THE SOVEREIGN OR COMMONWEALTH.
 
-PART I. Of the Expense of Defence.
+#### PART I. Of the Expense of Defence.
 
 The first duty of the sovereign, that of protecting the society from the violence and invasion of other independent societies, can be performed only by means of a military force. But the expense both of preparing this military force in time of peace, and of employing it in time of war, is very different in the different states of society, in the different periods of improvement.
 
@@ -3286,7 +3295,7 @@ The great change introduced into the art of war by the invention of fire-arms, h
 
 In modern war, the great expense of firearms gives an evident advantage to the nation which can best afford that expense; and, consequently, to an opulent and civilized, over a poor and barbarous nation. In ancient times, the opulent and civilized found it difficult to defend themselves against the poor and barbarous nations. In modern times, the poor and barbarous find it difficult to defend themselves against the opulent and civilized. The invention of fire-arms, an invention which at first sight appears to be so pernicious, is certainly favourable, both to the permanency and to the extension of civilization.
 
-PART II. Of the Expense of Justice
+#### PART II. Of the Expense of Justice
 
 The second duty of the sovereign, that of protecting, as far as possible, every member of the society from the injustice or oppression of every other member of it, or the duty of establishing an exact administration of justice, requires two very different degrees of expense in the different periods of society.
 
@@ -3338,7 +3347,7 @@ The separation of the judicial from the executive power, seems originally to hav
 
 When the judicial is united to the executive power, it is scarce possible that justice should not frequently be sacrificed to what is vulgarly called politics. The persons entrusted with the great interests of the state may even without any corrupt views, sometimes imagine it necessary to sacrifice to those interests the rights of a private man. But upon the impartial administration of justice depends the liberty of every individual, the sense which he has of his own security. In order to make every individual feel himself perfectly secure in the possession of every right which belongs to him, it is not only necessary that the judicial should be separated from the executive power, but that it should be rendered as much as possible independent of that power. The judge should not be liable to be removed from his office according to the caprice of that power. The regular payment of his salary should not depend upon the good will, or even upon the good economy of that power.
 
-PART III. Of the Expense of public Works and public Institutions.
+#### PART III. Of the Expense of public Works and public Institutions.
 
 The third and last duty of the sovereign or commonwealth, is that of erecting and maintaining those public institutions and those public works, which though they may be in the highest degree advantageous to a great society, are, however, of such a nature, that the profit could never repay the expense to any individual, or small number of individuals; and which it, therefore, cannot be expected that any individual, or small number of individuals, should erect or maintain. The performance of this duty requires, too, very different degrees of expense in the different periods of society.
 
@@ -3676,7 +3685,7 @@ The revenue of every established church, such parts of it excepted as may arise 
 
 The proper performance of every service seems to require, that its pay or recompence should be, as exactly as possible, proportioned to the nature of the service. If any service is very much underpaid, it is very apt to suffer by the meanness and incapacity of the greater part of those who are employed in it. If it is very much overpaid, it is apt to suffer, perhaps still more, by their negligence and idleness. A man of a large revenue, whatever may be his profession, thinks he ought to live like other men of large revenues; and to spend a great part of his time in festivity, in vanity, and in dissipation. But in a clergyman, this train of life not only consumes the time which ought to be employed in the duties of his function, but in the eyes of the common people, destroys almost entirely that sanctity of character, which can alone enable him to perform those duties with proper weight and authority.
 
-PART IV. Of the Expense of supporting the Dignity of the Sovereign.
+#### PART IV. Of the Expense of supporting the Dignity of the Sovereign.
 
 Over and above the expenses necessary for enabling the sovereign to perform his several duties, a certain expense is requisite for the support of his dignity. This expense varies, both with the different periods of improvement, and with the different forms of government.
 
@@ -3684,7 +3693,7 @@ In an opulent and improved society, where all the different orders of people are
 
 As, in point of dignity, a monarch is more raised above his subjects than the chief magistrate of any republic is ever supposed to be above his fellow-citizens; so a greater expense is necessary for supporting that higher dignity. We naturally expect more splendour in the court of a king, than in the mansion-house of a doge or burgo-master.
 
-CONCLUSION.
+#### CONCLUSION.
 
 The expense of defending the society, and that of supporting the dignity of the chief magistrate, are both laid out for the general benefit of the whole society. It is reasonable, therefore, that they should be defrayed by the general contribution of the whole society; all the different members contributing, as nearly as possible, in proportion to their respective abilities.
 
@@ -3702,7 +3711,7 @@ When the institutions, or public works, which are beneficial to the whole societ
 
 The revenue which must defray, not only the expense of defending the society and of supporting the dignity of the chief magistrate, but all the other necessary expenses of government, for which the constitution of the state has not provided any particular revenue may be drawn, either, first, from some fund which peculiarly belongs to the sovereign or commonwealth, and which is independent of the revenue of the people; or, secondly, from the revenue of the people.
 
-PART I. Of the Funds, or Sources, of Revenue, which may peculiarly belong to the Sovereign or Commonwealth.
+#### PART I. Of the Funds, or Sources, of Revenue, which may peculiarly belong to the Sovereign or Commonwealth.
 
 The funds, or sources, of revenue, which may peculiarly belong to the sovereign or commonwealth, must consist, either in stock, or in land.
 
@@ -3746,7 +3755,7 @@ Lands, for the purposes of pleasure and magnificence, parks, gardens, public wal
 
 Public stock and public lands, therefore, the two sources of revenue which may peculiarly belong to the sovereign or commonwealth, being both improper and insufficient funds for defraying the necessary expense of any great and civilized state; it remains that this expense must, the greater part of it, be defrayed by taxes of one kind or another; the people contributing a part of their own private revenue, in order to make up a public revenue to the sovereign or commonwealth.
 
-PART II. Of Taxes.
+#### PART II. Of Taxes.
 
 The private revenue of individuals, it has been shown in the first book of this Inquiry, arises, ultimately from three different sources; rent, profit, and wages. Every tax must finally be paid from some one or other of those three different sources of revenue, or from all of them indifferently. I shall endeavour to give the best account I can, first, of those taxes which, it is intended should fall upon rent; secondly, of those which, it is intended should fall upon profit; thirdly, of those which, it is intended should fall upon wages; and fourthly, of those which, it is intended should fall indifferently upon all those three different sources of private revenue. The particular consideration of each of these four different sorts of taxes will divide the second part of the present chapter into four articles, three of which will require several other subdivisions. Many of these taxes, it will appear from the following review, are not finally paid from the fund, or source of revenue, upon which it is intended they should fall.
 

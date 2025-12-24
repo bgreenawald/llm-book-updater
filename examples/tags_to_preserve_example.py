@@ -12,16 +12,17 @@ from typing import List
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.models import GEMINI_PRO, OPENAI_04_MINI
 
 
-def main():
+def main() -> None:
     """Demonstrate different tags_to_preserve configurations."""
 
     # Example 1: Default tags_to_preserve (["{preface}", "{license}"])
     print("=== Example 1: Default tags_to_preserve ===")
     config1 = RunConfig(
+        book_id="example_book_1",
         book_name="Example Book",
         author_name="Example Author",
         input_file=Path("input.md"),
@@ -36,6 +37,7 @@ def main():
     # Example 2: Custom tags_to_preserve
     print("=== Example 2: Custom tags_to_preserve ===")
     config2 = RunConfig(
+        book_id="example_book_2",
         book_name="Example Book",
         author_name="Example Author",
         input_file=Path("input.md"),
@@ -50,6 +52,7 @@ def main():
     # Example 3: Only specific tags
     print("=== Example 3: Only specific tags ===")
     config3 = RunConfig(
+        book_id="example_book_3",
         book_name="Example Book",
         author_name="Example Author",
         input_file=Path("input.md"),
@@ -64,6 +67,7 @@ def main():
     # Example 4: No tags to preserve
     print("=== Example 4: No tags to preserve ===")
     config4 = RunConfig(
+        book_id="example_book_4",
         book_name="Example Book",
         author_name="Example Author",
         input_file=Path("input.md"),
@@ -81,21 +85,19 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model=OPENAI_04_MINI,
-            temperature=0.3,
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
             model=GEMINI_PRO,
-            temperature=0.2,
         ),
         PhaseConfig(
             phase_type=PhaseType.FINAL,
             model=OPENAI_04_MINI,
-            temperature=0.1,
         ),
     ]
 
     config5 = RunConfig(
+        book_id="example_book_5",
         book_name="Complex Example Book",
         author_name="Complex Example Author",
         input_file=Path("input.md"),
@@ -103,10 +105,8 @@ def main():
         original_file=Path("original.md"),
         phases=run_phases,
         tags_to_preserve=["{preface}", "{license}", "{dedication}"],
-        length_reduction=(30, 50),
     )
     print(f"Config 5 tags_to_preserve: {config5.tags_to_preserve}")
-    print(f"Config 5 length_reduction: {config5.length_reduction}")
     print()
 
     print("Benefits of tags_to_preserve configuration:")

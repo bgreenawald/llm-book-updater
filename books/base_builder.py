@@ -390,6 +390,10 @@ class BaseBookBuilder(ABC):
         preface_content = self.config.preface_md.read_text(encoding="utf-8")
         license_content = self.config.license_md.read_text(encoding="utf-8")
 
+        # Format license content with title and author
+        license_content = license_content.replace("{title}", self.config.title)
+        license_content = license_content.replace("{author}", self.config.author)
+
         # Format main files
         self.format_markdown_file(
             self.config.staged_modernized_md, preface_content, license_content, self.config.version
@@ -406,7 +410,8 @@ class BaseBookBuilder(ABC):
 
     def clean_markdown_files(self) -> None:
         """
-        Clean markdown files by replacing <br> tags and cleaning annotation patterns.
+        Clean markdown files by replacing <br> tags, cleaning annotation patterns,
+        and replacing pipeline-specific markers with reader-friendly alternatives.
         """
         logger.info("Replacing <br> tags with spaces")
         self.replace_br_tags(self.config.staged_modernized_md)
@@ -419,6 +424,12 @@ class BaseBookBuilder(ABC):
         self.clean_annotation_patterns(self.config.staged_annotated_md)
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
+
+        logger.info("Replacing pipeline-specific markers with reader-friendly alternatives")
+        self.clean_start_markers(self.config.staged_modernized_md)
+        self.clean_start_markers(self.config.staged_annotated_md)
+        if self.config.staged_original_md.exists():
+            self.clean_start_markers(self.config.staged_original_md)
 
         logger.info("Loosening blockquote lists for EPUB/PDF rendering")
         self.loosen_blockquote_lists(self.config.staged_modernized_md)
@@ -493,6 +504,39 @@ class BaseBookBuilder(ABC):
 
         input_path.write_text(updated, encoding="utf-8")
         logger.info(f"Loosened blockquote lists in '{self.safe_relative_path(input_path)}'")
+
+    def clean_start_markers(self, input_path: Path) -> None:
+        """Replace pipeline-specific blockquote markers with reader-friendly alternatives.
+
+        Transforms the following markers within blockquotes:
+        - **Annotation:** -> **Note:**
+        - **Annotated introduction:** -> **Overview:**
+        - **Annotated summary:** -> **Summary:**
+        - **Quote:** is left unchanged (already reader-friendly)
+
+        Args:
+            input_path: Path to the markdown file to process.
+        """
+        content = input_path.read_text(encoding="utf-8")
+
+        # Define marker replacements (pattern -> replacement)
+        # Note: These patterns should only match within blockquotes (lines starting with >)
+        replacements = [
+            (r"(>\s*)\*\*Annotation:\*\*", r"\1**Note:**"),
+            (r"(>\s*)\*\*Annotated introduction:\*\*", r"\1**Introduction:**"),
+            (r"(>\s*)\*\*Annotated summary:\*\*", r"\1**Summary:**"),
+        ]
+
+        modified = False
+        for pattern, replacement in replacements:
+            new_content = re.sub(pattern=pattern, repl=replacement, string=content, flags=re.MULTILINE)
+            if new_content != content:
+                modified = True
+                content = new_content
+
+        if modified:
+            input_path.write_text(content, encoding="utf-8")
+            logger.info(f"Cleaned start markers in '{self.safe_relative_path(input_path)}'")
 
     def _ensure_compatible_cover_image(self) -> Optional[Path]:
         """

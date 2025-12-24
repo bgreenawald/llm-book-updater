@@ -9,19 +9,19 @@ from typing import List
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import run_pipeline
+from src.models import GEMINI_PRO, OPENAI_04_MINI
 
 
-def main():
+def main() -> None:
     # Define the sequence of phases for this run
     # This list can be customized to change the order, repeat phases, or disable them.
     run_phases: List[PhaseConfig] = [
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model=OPENAI_04_MINI,
-            temperature=0.3,  # Example: Set a custom temperature
+            # Note: Temperature can be passed via llm_kwargs if needed: llm_kwargs={"temperature": 0.3}
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
@@ -39,24 +39,22 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,
             model=GEMINI_PRO,
-            temperature=0.4,
         ),
         PhaseConfig(
             phase_type=PhaseType.SUMMARY,
             model=OPENAI_04_MINI,
-            temperature=0.3,
         ),
     ]
 
     # Create a run configuration from the defined phases
     config = RunConfig(
+        book_id="on_liberty",
         book_name="On Liberty",
         author_name="John Stuart Mill",
         input_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),
         output_dir=Path("books/On Liberty/markdown/Mill, On Liberty"),
         original_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),
         phases=run_phases,
-        length_reduction=(30, 50),  # Set length reduction for the entire run
     )
 
     # Run the pipeline

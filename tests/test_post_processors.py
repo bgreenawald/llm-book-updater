@@ -1,13 +1,16 @@
 import pytest
 
-from src.post_processors import (
+from src.processing.post_processors import (
+    EmptySectionError,
     NoNewHeadersPostProcessor,
     PostProcessor,
     PostProcessorChain,
     PreserveFStringTagsProcessor,
+    RemoveMarkdownBlocksProcessor,
     RemoveTrailingWhitespaceProcessor,
     RemoveXmlTagsProcessor,
     RevertRemovedBlockLines,
+    ValidateNonEmptySectionProcessor,
 )
 
 # ============================================================================
@@ -190,6 +193,348 @@ class TestNoNewHeadersPostProcessor:
         assert "  # Header with leading spaces" in result
         assert "\t# Header with leading tab" in result
         assert "Content here." in result
+
+    def test_revert_header_level_change(self, no_new_headers_processor):
+        """
+        Test that when LLM changes a header's level, it should be reverted to original level.
+
+        This test demonstrates issue #137: when the LLM changes # Intro to ## Intro,
+        the processor should revert it back to # Intro, but currently it deletes the header
+        because the lookup fails (header_content is "Intro" but original_content_map has "# Intro" as key).
+        """
+        original_block = "# Intro\n\nSome introductory text."
+        llm_block = "## Intro\n\nSome introductory text."
+
+        result = no_new_headers_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # The header should be reverted to its original level, not deleted
+        assert "# Intro" in result, "Header should be reverted to original level # Intro"
+        assert "## Intro" not in result, "Modified header level should not be present"
+        assert "Some introductory text." in result, "Content should be preserved"
+
+
+# ============================================================================
+# RemoveMarkdownBlocksProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def remove_markdown_blocks_processor():
+    return RemoveMarkdownBlocksProcessor()
+
+
+class TestRemoveMarkdownBlocksProcessor:
+    """Test suite for RemoveMarkdownBlocksProcessor."""
+
+    def test_remove_single_markdown_block(self, remove_markdown_blocks_processor):
+        """Test removing a single markdown code block."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+This is markdown content
+that should be removed
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is markdown content" not in result
+        assert "Some content" in result
+        assert "More content" in result
+
+    def test_remove_multiple_markdown_blocks(self, remove_markdown_blocks_processor):
+        """Test removing multiple markdown code blocks."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+First markdown block
+```
+
+Middle content
+
+```markdown
+Second markdown block
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "First markdown block" not in result
+        assert "Second markdown block" not in result
+        assert "Some content" in result
+        assert "Middle content" in result
+        assert "End content" in result
+
+    def test_preserve_other_code_blocks(self, remove_markdown_blocks_processor):
+        """Test that other code blocks (python, bash, etc.) are preserved."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```python
+def hello():
+    print("world")
+```
+
+```bash
+echo "test"
+```
+
+```markdown
+This should be removed
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```python" in result
+        assert "def hello():" in result
+        assert "```bash" in result
+        assert 'echo "test"' in result
+        assert "```markdown" not in result
+        assert "This should be removed" not in result
+
+    def test_no_markdown_blocks(self, remove_markdown_blocks_processor):
+        """Test when there are no markdown blocks to remove."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```python
+code here
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result.strip() == llm_block.strip()
+
+    def test_empty_markdown_block(self, remove_markdown_blocks_processor):
+        """Test removing an empty markdown block."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+```
+
+More content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Some content" in result
+        assert "More content" in result
+
+    def test_markdown_block_with_complex_content(self, remove_markdown_blocks_processor):
+        """Test removing markdown block with complex nested content."""
+        original_block = "Some content"
+        llm_block = """Some content
+
+```markdown
+# Header
+
+This is **bold** and *italic*
+
+- List item 1
+- List item 2
+
+> A quote
+
+Another paragraph
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "# Header" not in result
+        assert "This is **bold**" not in result
+        assert "List item 1" not in result
+        assert "Some content" in result
+        assert "End content" in result
+
+    def test_markdown_block_at_start(self, remove_markdown_blocks_processor):
+        """Test removing markdown block at the beginning."""
+        original_block = "Content"
+        llm_block = """```markdown
+This is at the start
+```
+
+Content after"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is at the start" not in result
+        assert "Content after" in result
+
+    def test_markdown_block_at_end(self, remove_markdown_blocks_processor):
+        """Test removing markdown block at the end."""
+        original_block = "Content"
+        llm_block = """Content before
+
+```markdown
+This is at the end
+```"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "This is at the end" not in result
+        assert "Content before" in result
+
+    def test_only_markdown_block(self, remove_markdown_blocks_processor):
+        """Test when the entire content is just a markdown block."""
+        original_block = "Some content"
+        llm_block = """```markdown
+Only markdown content here
+```"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # After removing the block and stripping, should be empty
+        assert result.strip() == ""
+
+    def test_consecutive_blank_lines_cleanup(self, remove_markdown_blocks_processor):
+        """Test that multiple consecutive blank lines are cleaned up after removal."""
+        original_block = "Content"
+        llm_block = """Line 1
+
+
+```markdown
+Block to remove
+```
+
+
+Line 2"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Block to remove" not in result
+        # Should not have more than 2 consecutive newlines
+        assert "\n\n\n" not in result
+
+    def test_markdown_block_with_backticks_inside(self, remove_markdown_blocks_processor):
+        """Test markdown block containing inline code with backticks."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```markdown
+Use `code` for inline formatting
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "```markdown" not in result
+        assert "Use `code` for inline formatting" not in result
+        assert "Some content" in result
+        assert "End content" in result
+
+    def test_case_sensitive_markdown_tag(self, remove_markdown_blocks_processor):
+        """Test that only lowercase 'markdown' tags are removed."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```MARKDOWN
+This should NOT be removed (uppercase)
+```
+
+```Markdown
+This should NOT be removed (title case)
+```
+
+```markdown
+This SHOULD be removed (lowercase)
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Only lowercase markdown should be removed
+        assert result.count("```MARKDOWN") == 1
+        assert result.count("```Markdown") == 1
+        assert "```markdown" not in result
+        assert "This SHOULD be removed (lowercase)" not in result
+
+    def test_markdown_with_extra_whitespace(self, remove_markdown_blocks_processor):
+        """Test markdown blocks with extra whitespace in the tag."""
+        original_block = "Content"
+        llm_block = """Some content
+
+```markdown
+Content with trailing spaces in tag
+```
+
+End content"""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Should still be removed despite extra whitespace
+        assert "```markdown" not in result
+        assert "Content with trailing spaces" not in result
+
+    def test_processor_name(self, remove_markdown_blocks_processor):
+        """Test that processor has correct name."""
+        assert remove_markdown_blocks_processor.name == "remove_markdown_blocks"
+
+    def test_processor_string_representation(self, remove_markdown_blocks_processor):
+        """Test string representation of the processor."""
+        str_repr = str(remove_markdown_blocks_processor)
+        assert "RemoveMarkdownBlocksProcessor" in str_repr
+        assert "remove_markdown_blocks" in str_repr
+
+    def test_empty_input(self, remove_markdown_blocks_processor):
+        """Test with empty input."""
+        original_block = ""
+        llm_block = ""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_markdown_block_preserves_surrounding_structure(self, remove_markdown_blocks_processor):
+        """Test that removing markdown blocks preserves surrounding document structure."""
+        original_block = "Content"
+        llm_block = """# Header 1
+
+Some introductory text.
+
+```markdown
+Removed content
+```
+
+## Header 2
+
+More text here.
+
+```python
+kept_code()
+```
+
+Final paragraph."""
+
+        result = remove_markdown_blocks_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "# Header 1" in result
+        assert "## Header 2" in result
+        assert "Some introductory text." in result
+        assert "More text here." in result
+        assert "```python" in result
+        assert "kept_code()" in result
+        assert "Final paragraph." in result
+        assert "```markdown" not in result
+        assert "Removed content" not in result
 
 
 # ============================================================================
@@ -725,14 +1070,14 @@ class TestPostProcessorChain:
         assert tracker2.order == ["second"]
 
     def test_chain_with_error_handling(self, post_processor_chain):
-        """Test chain continues processing when a processor fails."""
+        """Test chain fails fast when a processor raises an exception."""
 
         class ErrorProcessor(PostProcessor):
             def __init__(self, name):
                 super().__init__(name=name)
 
             def process(self, original_block, llm_block, **kwargs):
-                raise Exception(f"Error in {self.name}")
+                raise ValueError(f"Error in {self.name}")
 
         class SafeProcessor(PostProcessor):
             def __init__(self, name):
@@ -750,10 +1095,13 @@ class TestPostProcessorChain:
         original_block = "Original"
         llm_block = "LLM"
 
-        # Should not raise an exception, should return original llm_block
-        result = post_processor_chain.process(original_block=original_block, llm_block=llm_block)
+        # Should raise RuntimeError when error processor fails
+        with pytest.raises(RuntimeError) as exc_info:
+            post_processor_chain.process(original_block=original_block, llm_block=llm_block)
 
-        assert result == llm_block
+        assert "Post-processing failed at processor error" in str(exc_info.value)
+        # Verify the safe processor never runs
+        assert "safe" not in str(exc_info.value)
 
     def test_chain_string_representation(self, post_processor_chain):
         """Test string representation of chain."""
@@ -887,3 +1235,224 @@ class TestPostProcessorChain:
 
         assert "{preface}" in result
         assert "{license}" in result
+
+
+# ============================================================================
+# ValidateNonEmptySectionProcessor Tests
+# ============================================================================
+
+
+@pytest.fixture
+def validate_non_empty_processor():
+    return ValidateNonEmptySectionProcessor()
+
+
+@pytest.fixture
+def validate_non_empty_processor_preserve_whitespace():
+    return ValidateNonEmptySectionProcessor(config={"preserve_whitespace_only": True})
+
+
+class TestValidateNonEmptySectionProcessor:
+    """Test suite for ValidateNonEmptySectionProcessor."""
+
+    def test_non_empty_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that non-empty to non-empty content passes validation."""
+        original_block = "This is the original content."
+        llm_block = "This is the processed content."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_empty_to_empty_passes(self, validate_non_empty_processor):
+        """Test that empty to empty content passes validation."""
+        original_block = ""
+        llm_block = ""
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_empty_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that empty to non-empty content passes validation."""
+        original_block = ""
+        llm_block = "New content added."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_non_empty_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that non-empty to empty content raises EmptySectionError."""
+        original_block = "This is the original content with meaningful text."
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+        assert exc_info.value.original_content == original_block
+        assert exc_info.value.processed_content == llm_block
+
+    def test_non_empty_to_whitespace_only_raises_error(self, validate_non_empty_processor):
+        """Test that non-empty to whitespace-only content raises EmptySectionError."""
+        original_block = "This is the original content."
+        llm_block = "   \n\t\n   "
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+
+    def test_whitespace_only_to_empty_passes(self, validate_non_empty_processor):
+        """Test that whitespace-only original to empty passes (original considered empty)."""
+        original_block = "   \n\t\n   "
+        llm_block = ""
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == ""
+
+    def test_whitespace_only_to_non_empty_passes(self, validate_non_empty_processor):
+        """Test that whitespace-only original to non-empty passes."""
+        original_block = "   \n\t\n   "
+        llm_block = "New content."
+
+        result = validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        assert result == llm_block
+
+    def test_preserve_whitespace_only_mode_empty_string(self, validate_non_empty_processor_preserve_whitespace):
+        """Test preserve_whitespace_only mode with empty string."""
+        original_block = "Content"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor_preserve_whitespace.process(original_block=original_block, llm_block=llm_block)
+
+    def test_preserve_whitespace_only_mode_whitespace_passes(self, validate_non_empty_processor_preserve_whitespace):
+        """Test preserve_whitespace_only mode allows whitespace-only output."""
+        original_block = "Content"
+        llm_block = "   \n\t\n   "
+
+        # In preserve_whitespace_only mode, whitespace is NOT considered empty
+        result = validate_non_empty_processor_preserve_whitespace.process(
+            original_block=original_block, llm_block=llm_block
+        )
+
+        assert result == llm_block
+
+    def test_multiline_content_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that multiline content becoming empty raises error."""
+        original_block = "Line 1\nLine 2\nLine 3\nLine 4"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Check that the preview contains first line content
+        assert "Line 1" in str(exc_info.value)
+
+    def test_error_contains_content_preview(self, validate_non_empty_processor):
+        """Test that error message contains a preview of original content."""
+        original_block = "This is the first line of important content.\nSecond line here."
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error_message = str(exc_info.value)
+        assert "Original content preview" in error_message
+        assert "This is the first line" in error_message
+
+    def test_error_truncates_long_preview(self, validate_non_empty_processor):
+        """Test that error preview truncates very long content."""
+        long_content = "x" * 200
+        original_block = long_content
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error_message = str(exc_info.value)
+        # Preview should be truncated with ellipsis
+        assert "..." in error_message
+
+    def test_blank_lines_only_considered_empty(self, validate_non_empty_processor):
+        """Test that content with only blank lines is considered empty."""
+        original_block = "Real content here."
+        llm_block = "\n\n\n\n"
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+    def test_processor_name(self, validate_non_empty_processor):
+        """Test that processor has correct name."""
+        assert validate_non_empty_processor.name == "validate_non_empty_section"
+
+    def test_processor_string_representation(self, validate_non_empty_processor):
+        """Test string representation of the processor."""
+        str_repr = str(validate_non_empty_processor)
+        assert "ValidateNonEmptySectionProcessor" in str_repr
+        assert "validate_non_empty_section" in str_repr
+
+    def test_complex_markdown_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that complex markdown content becoming empty raises error."""
+        original_block = """# Header
+
+This is a paragraph with **bold** and *italic* text.
+
+- List item 1
+- List item 2
+
+> A blockquote here.
+
+```python
+def hello():
+    print("world")
+```
+"""
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError):
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+    def test_unicode_content_to_empty_raises_error(self, validate_non_empty_processor):
+        """Test that unicode content becoming empty raises error."""
+        original_block = "中文内容 Русский текст العربية"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        # Preview should contain unicode content
+        assert "中文内容" in str(exc_info.value)
+
+    def test_empty_section_error_attributes(self, validate_non_empty_processor):
+        """Test EmptySectionError has correct attributes."""
+        original_block = "Original content"
+        llm_block = ""
+
+        with pytest.raises(EmptySectionError) as exc_info:
+            validate_non_empty_processor.process(original_block=original_block, llm_block=llm_block)
+
+        error = exc_info.value
+        assert error.original_content == original_block
+        assert error.processed_content == llm_block
+        assert isinstance(error, Exception)
+
+    def test_chain_stops_on_empty_section_error(self):
+        """Test that PostProcessorChain propagates EmptySectionError and stops processing."""
+        chain = PostProcessorChain()
+        chain.add_processor(processor=ValidateNonEmptySectionProcessor())
+        chain.add_processor(processor=RemoveTrailingWhitespaceProcessor())
+
+        original_block = "Content here."
+        llm_block = ""
+
+        # EmptySectionError should propagate through the chain to stop the pipeline
+        with pytest.raises(EmptySectionError) as exc_info:
+            chain.process(original_block=original_block, llm_block=llm_block)
+
+        assert "Section content was completely removed" in str(exc_info.value)
+        assert exc_info.value.original_content == original_block

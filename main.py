@@ -3,12 +3,6 @@ from pathlib import Path
 
 from loguru import logger
 
-# Add src directory to path
-sys.path.append(str(Path(__file__).parent))
-
-from src.pipeline import run_pipeline
-from src.run_settings import config
-
 
 def setup_logging() -> None:
     """Configure logging with debug level and better formatting."""
@@ -27,6 +21,11 @@ def setup_logging() -> None:
 
 def main() -> None:
     """Main function to run the pipeline."""
+    # Add src directory to path for local execution.
+    sys.path.append(str(Path(__file__).parent))
+    from src.pipeline import run_pipeline
+    from src.run_settings import config
+
     setup_logging()
     try:
         logger.info("Starting pipeline execution from main.py")

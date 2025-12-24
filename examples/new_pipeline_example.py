@@ -9,12 +9,12 @@ from typing import List
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import GEMINI_PRO, OPENAI_04_MINI
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import run_pipeline
+from src.models import GEMINI_PRO, OPENAI_04_MINI
 
 
-def main():
+def main() -> None:
     """Run the pipeline with different phase types."""
 
     # Define phases with different types
@@ -23,7 +23,7 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.MODERNIZE,
             model=OPENAI_04_MINI,
-            temperature=0.3,
+            # Note: Temperature can be passed via llm_kwargs if needed: llm_kwargs={"temperature": 0.3}
         ),
         PhaseConfig(
             phase_type=PhaseType.EDIT,
@@ -41,17 +41,16 @@ def main():
         PhaseConfig(
             phase_type=PhaseType.INTRODUCTION,
             model=GEMINI_PRO,
-            temperature=0.4,
         ),
         PhaseConfig(
             phase_type=PhaseType.SUMMARY,
             model=OPENAI_04_MINI,
-            temperature=0.3,
         ),
     ]
 
     # Create run configuration
     config = RunConfig(
+        book_id="on_liberty",
         book_name="On Liberty",
         author_name="John Stuart Mill",
         input_file=Path("books/On Liberty/markdown/Mill, On Liberty/Mill, On Liberty Clean.md"),

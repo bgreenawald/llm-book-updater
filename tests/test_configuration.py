@@ -10,10 +10,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.pipeline import Pipeline
-from src.post_processors import (
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import Pipeline
+from src.processing.post_processors import (
     PostProcessorChain,
     PreserveFStringTagsProcessor,
     RemoveXmlTagsProcessor,
@@ -42,7 +43,6 @@ class TestConfigurationValidation:
                 output_dir=output_dir,
                 original_file=non_existent_file,
                 phases=[],
-                length_reduction=(35, 50),
             )
 
             # But using it should fail
@@ -79,7 +79,6 @@ class TestConfigurationValidation:
                     output_dir=invalid_output_dir,
                     original_file=input_file,
                     phases=[],
-                    length_reduction=(35, 50),
                 )
                 pipeline = Pipeline(config=config)
                 pipeline._copy_input_file_to_output()
@@ -106,24 +105,21 @@ class TestConfigurationValidation:
                 output_dir=output_dir,
                 original_file=input_file,
                 phases=[],
-                length_reduction=(35, 50),
             )
             # Verify empty string is stored
             assert config.book_name == ""
 
-            # Test None - dataclasses don't enforce type hints at runtime
-            config_with_none = RunConfig(
-                book_id="test_book",
-                book_name=None,  # None value
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=(35, 50),
-            )
-            # Verify None is stored (though this might cause issues later)
-            assert config_with_none.book_name is None
+            # Test None - Pydantic enforces type hints at runtime
+            with pytest.raises(ValidationError):
+                RunConfig(
+                    book_id="test_book",
+                    book_name=None,  # type: ignore[arg-type]
+                    author_name="Test Author",
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    original_file=input_file,
+                    phases=[],
+                )
 
     def test_invalid_phase_configuration(self):
         """Test behavior with invalid phase configurations."""
@@ -136,7 +132,7 @@ class TestConfigurationValidation:
             output_dir.mkdir()
 
             # Test invalid phase type
-            with pytest.raises((TypeError, ValueError, AttributeError)):
+            with pytest.raises(ValidationError):
                 RunConfig(
                     book_id="test_book",
                     book_name="Test Book",
@@ -148,98 +144,8 @@ class TestConfigurationValidation:
                         PhaseConfig(
                             phase_type="INVALID_PHASE_TYPE",  # Invalid type
                             enabled=True,
-                            temperature=0.5,
                         )
                     ],
-                    length_reduction=(35, 50),
-                )
-
-    def test_invalid_temperature_values(self):
-        """Test behavior with extreme temperature values."""
-        # Temperature should be validated at config construction time
-        with pytest.raises(ValueError):
-            PhaseConfig(
-                phase_type=PhaseType.MODERNIZE,
-                enabled=True,
-                temperature=-0.1,  # Negative temperature
-            )
-
-        with pytest.raises(ValueError):
-            PhaseConfig(
-                phase_type=PhaseType.MODERNIZE,
-                enabled=True,
-                temperature=3.0,  # High temperature
-            )
-
-    def test_invalid_length_reduction_values(self):
-        """Test behavior with extreme length reduction values."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            input_file = temp_path / "test_input.md"
-            input_file.write_text("# Test Content")
-            output_dir = temp_path / "output"
-            output_dir.mkdir()
-
-            # Length reduction should be validated at config construction time
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(-10, 50),  # Negative value
-                )
-
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(110, 120),  # Values > 100
-                )
-
-    def test_malformed_length_reduction_tuple(self):
-        """Test behavior with different length reduction formats."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            input_file = temp_path / "test_input.md"
-            input_file.write_text("# Test Content")
-            output_dir = temp_path / "output"
-            output_dir.mkdir()
-
-            # Test single value instead of tuple - should work per Union type
-            config = RunConfig(
-                book_id="test_book",
-                book_name="Test Book",
-                author_name="Test Author",
-                input_file=input_file,
-                output_dir=output_dir,
-                original_file=input_file,
-                phases=[],
-                length_reduction=50,  # Single int value
-            )
-            assert config.length_reduction == 50
-
-            # Test tuple with wrong order - should fail at config construction time
-            with pytest.raises(ValueError):
-                RunConfig(
-                    book_id="test_book",
-                    book_name="Test Book",
-                    author_name="Test Author",
-                    input_file=input_file,
-                    output_dir=output_dir,
-                    original_file=input_file,
-                    phases=[],
-                    length_reduction=(70, 30),  # High before low
                 )
 
 
@@ -304,7 +210,7 @@ class TestPostProcessorConfigurationEdgeCases:
         assert "{лицензия}" in result
 
     def test_processor_chain_with_failing_processor(self):
-        """Test processor chain resilience when one processor fails."""
+        """Test processor chain fails fast when one processor fails."""
 
         class FailingProcessor:
             def __init__(self):
@@ -325,11 +231,11 @@ class TestPostProcessorConfigurationEdgeCases:
         chain.add_processor(FailingProcessor())
         chain.add_processor(WorkingProcessor())
 
-        # Chain should continue processing despite failure
-        result = chain.process(original_block="", llm_block="old content old")
+        # Chain should fail fast when a processor raises an exception
+        with pytest.raises(RuntimeError) as exc_info:
+            chain.process(original_block="", llm_block="old content old")
 
-        # Should have processed with working processors despite failure
-        assert "new content new" in result
+        assert "Post-processing failed at processor failing_processor" in str(exc_info.value)
 
     def test_processor_with_extremely_large_config(self):
         """Test processor behavior with extremely large configuration."""
@@ -398,16 +304,13 @@ class TestErrorRecoveryAndGracefulDegradation:
                         PhaseConfig(
                             phase_type=PhaseType.MODERNIZE,
                             enabled=True,
-                            temperature=0.5,
                         ),
                         # This phase has invalid configuration but system should handle it
                         PhaseConfig(
                             phase_type=PhaseType.EDIT,
                             enabled=True,
-                            temperature=0.5,
                         ),
                     ],
-                    length_reduction=(35, 50),
                 )
 
                 pipeline = Pipeline(config=config)
@@ -423,7 +326,7 @@ class TestErrorRecoveryAndGracefulDegradation:
     def test_graceful_handling_of_missing_dependencies(self):
         """Test graceful handling when optional dependencies are missing."""
         # Mock a missing dependency
-        with patch("src.post_processors.re", None):
+        with patch("src.processing.post_processors.re", None):
             # Should either work with degraded functionality or fail gracefully
             try:
                 processor = RemoveXmlTagsProcessor()
@@ -459,13 +362,10 @@ class TestErrorRecoveryAndGracefulDegradation:
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.0,  # Very low temperature might generate warning
                     )
                 ],
-                length_reduction=(35, 35),  # Same min/max might generate warning
             )
 
             # Should create successfully despite potential warnings
             pipeline = Pipeline(config=config)
             assert pipeline is not None
-            assert pipeline.config.length_reduction == (35, 35)

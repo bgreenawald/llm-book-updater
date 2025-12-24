@@ -5,15 +5,14 @@ These tests verify that the cost tracking wrapper works correctly,
 including thread-safe singleton initialization.
 """
 
-import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src import cost_tracking_wrapper
-from src.cost_tracking_wrapper import (
+from src.models import cost_tracking
+from src.models.cost_tracking import (
     CostTrackingWrapper,
     get_cost_tracking_wrapper,
 )
@@ -22,11 +21,11 @@ from src.cost_tracking_wrapper import (
 @pytest.fixture(autouse=True)
 def reset_global_wrapper():
     """Reset the global wrapper instance and lock before each test."""
-    cost_tracking_wrapper._cost_tracking_wrapper = None
-    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
+    cost_tracking._cost_tracking_wrapper = None
+    cost_tracking._cost_tracking_lock = threading.Lock()
     yield
-    cost_tracking_wrapper._cost_tracking_wrapper = None
-    cost_tracking_wrapper._cost_tracking_lock = threading.Lock()
+    cost_tracking._cost_tracking_wrapper = None
+    cost_tracking._cost_tracking_lock = threading.Lock()
 
 
 class TestCostTrackingWrapper:
@@ -40,8 +39,12 @@ class TestCostTrackingWrapper:
 
     def test_wrapper_initialization_without_api_key(self):
         """Test that wrapper initializes correctly without an API key."""
-        # Temporarily remove the API key from environment for this test
-        with patch.dict(os.environ, {}, clear=True):
+        # Replace the entire settings object with a mock since Pydantic models
+        # don't allow direct method patching, and the module-level settings
+        # instance may have already loaded the API key at import time
+        mock_settings = MagicMock()
+        mock_settings.get_api_key.return_value = None
+        with patch("src.utils.settings.settings", mock_settings):
             wrapper = CostTrackingWrapper(api_key=None)
             assert wrapper.enabled is False
             assert wrapper.cost_tracker is None

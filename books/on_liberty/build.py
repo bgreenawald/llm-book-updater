@@ -35,7 +35,7 @@ class OnLibertyBuilder(BaseBookBuilder):
             FileNotFoundError: If required source files are missing
         """
         source_files = {
-            "modernized": self.config.source_output_dir / "03-input_transformed Final_1.md",
+            "modernized": self.config.source_output_dir / "03-input_transformed Final_two_stage_1.md",
             "annotated": self.config.source_output_dir / "06-input_transformed Annotate_1.md",
         }
 

@@ -2,50 +2,65 @@ import sys
 from pathlib import Path
 from typing import List
 
-from src.common.provider import Provider
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.llm_model import ModelConfig
-from src.logging_config import setup_logging
-from src.pipeline import run_pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from src.api.provider import Provider
+from src.core.pipeline import run_pipeline
+from src.models.model import ModelConfig
+from src.utils.logging_config import setup_logging
 
-# Use OpenRouter for all phases
-GOOGLE_GEMINI_PRO = ModelConfig(Provider.GEMINI, "gemini-3-pro-preview")
-CHATGPT_GPT5_MINI = ModelConfig(Provider.OPENAI, "gpt-5-mini")
-CHATGPT_GPT5 = ModelConfig(Provider.OPENAI, "gpt-5")
-GROK_41 = ModelConfig(Provider.OPENROUTER, "x-ai/grok-4.1-fast")
+DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
+GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
 
 run_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
+        use_subblocks=True,
+        use_batch=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.EDIT,
-        model=GOOGLE_GEMINI_PRO,
-        use_batch=True,
-        reasoning={"effort": "medium"},
+        model=KIMI_K2,
+        reasoning={"effort": "high"},
+        enable_retry=True,
     ),
     PhaseConfig(
-        phase_type=PhaseType.FINAL,
-        model=CHATGPT_GPT5,
+        phase_type=PhaseType.FINAL_TWO_STAGE,
+        two_stage_config=TwoStageModelConfig(
+            identify_model=GEMINI_3_FLASH,
+            implement_model=GEMINI_3_FLASH,
+            identify_reasoning={"effort": "high"},
+            implement_reasoning={"effort": "high"},
+        ),
+        enable_retry=True,
         use_batch=True,
-        reasoning={"effort": "medium"},
     ),
     PhaseConfig(
         phase_type=PhaseType.INTRODUCTION,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
+        enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.SUMMARY,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=DEEPSEEK_V32,
+        reasoning={"effort": "high"},
+        enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
-        model=GROK_41,
-        reasoning={"effort": "medium"},
+        model=GEMINI_3_FLASH,
+        reasoning={"effort": "high"},
+        enable_retry=True,
+        min_subblock_tokens=4096,
+        max_subblock_tokens=8192,
+        use_subblocks=True,
+        use_batch=True,
     ),
 ]
 
@@ -58,7 +73,6 @@ config = RunConfig(
     output_dir=Path(r"books/on_liberty/output"),
     original_file=Path(r"books/on_liberty/input_transformed.md"),
     phases=run_phases,
-    length_reduction=(35, 50),
     max_workers=10,
 )
 

@@ -12,24 +12,17 @@ from unittest.mock import Mock, patch
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, RunConfig
-from src.pipeline import Pipeline
+from src.api.config import PhaseConfig, PhaseType, RunConfig
+from src.core.pipeline import Pipeline
 
 
-@patch("src.llm_model.LlmModel.create")
-@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
-def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
+@patch("src.models.model.LlmModel.create")
+def test_pipeline_metadata(mock_llm_create):
     """Test that pipeline metadata is correctly collected and saved."""
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = 0.2
     mock_llm_create.return_value = mock_model_instance
-
-    # Mock the cost wrapper to avoid API dependencies
-    mock_wrapper_instance = Mock()
-    mock_wrapper_instance.enabled = False
-    mock_cost_wrapper.return_value = mock_wrapper_instance
 
     try:
         # Create temporary directory for test
@@ -60,10 +53,8 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.2,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -95,7 +86,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "input_file" in metadata
             assert "original_file" in metadata
             assert "output_directory" in metadata
-            assert "length_reduction" in metadata
             assert "phases" in metadata
 
             # Verify metadata version
@@ -110,14 +100,12 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert "phase_type" in phase_metadata
             assert "enabled" in phase_metadata
             assert "model_type" in phase_metadata
-            assert "temperature" in phase_metadata
             assert "max_workers" in phase_metadata
             assert "input_file" in phase_metadata
             assert "output_file" in phase_metadata
             assert "system_prompt_path" in phase_metadata
             assert "user_prompt_path" in phase_metadata
             assert "fully_rendered_system_prompt" in phase_metadata
-            assert "length_reduction_parameter" in phase_metadata
             assert "post_processors" in phase_metadata
             assert "post_processor_count" in phase_metadata
             assert "completed" in phase_metadata
@@ -127,7 +115,6 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
             assert phase_metadata["phase_index"] == 0
             assert phase_metadata["book_name"] == "Test Book"
             assert phase_metadata["author_name"] == "Test Author"
-            assert phase_metadata["length_reduction_parameter"] == [35, 50]
             assert phase_metadata["completed"] is True
 
             # Verify system prompt content
@@ -142,14 +129,13 @@ def test_pipeline_metadata(mock_cost_wrapper, mock_llm_create):
         raise
 
 
-@patch("src.llm_model.LlmModel.create")
-@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+@patch("src.models.model.LlmModel.create")
+@patch("src.models.cost_tracking.CostTrackingWrapper")
 def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
     """Test that cost analysis data is correctly saved."""
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = 0.2
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -186,10 +172,8 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.2,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -267,14 +251,13 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
         raise
 
 
-@patch("src.llm_model.LlmModel.create")
-@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+@patch("src.models.model.LlmModel.create")
+@patch("src.models.cost_tracking.CostTrackingWrapper")
 def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for disabled phases."""
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = 0.2
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -311,20 +294,16 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.2,
                     ),
                     PhaseConfig(
                         phase_type=PhaseType.EDIT,
                         enabled=False,  # Disabled phase
-                        temperature=0.3,
                     ),
                     PhaseConfig(
                         phase_type=PhaseType.ANNOTATE,
                         enabled=True,
-                        temperature=0.1,
                     ),
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -343,7 +322,6 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
             assert disabled_phase_metadata["enabled"] is False
             assert disabled_phase_metadata["completed"] is False
             assert disabled_phase_metadata["reason"] == "disabled"
-            assert disabled_phase_metadata["temperature"] == 0.3
 
             print("✓ Disabled phase metadata test passed")
 
@@ -352,14 +330,13 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
         raise
 
 
-@patch("src.llm_model.LlmModel.create")
-@patch("src.cost_tracking_wrapper.CostTrackingWrapper")
+@patch("src.models.model.LlmModel.create")
+@patch("src.models.cost_tracking.CostTrackingWrapper")
 def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for failed phases."""
     # Mock the LlmModel.create to avoid API key requirements
     mock_model_instance = Mock()
     mock_model_instance.model_id = "test/model"
-    mock_model_instance.temperature = 0.2
     mock_llm_create.return_value = mock_model_instance
 
     # Mock the cost wrapper to avoid API dependencies
@@ -396,10 +373,8 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
                     PhaseConfig(
                         phase_type=PhaseType.MODERNIZE,
                         enabled=True,
-                        temperature=0.2,
                     )
                 ],
-                length_reduction=(35, 50),
             )
 
             # Create pipeline
@@ -422,7 +397,6 @@ def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
             assert failed_phase_metadata["enabled"] is True
             assert failed_phase_metadata["completed"] is False
             assert failed_phase_metadata["reason"] == "not_run"
-            assert failed_phase_metadata["temperature"] == 0.2
 
             print("✓ Failed phase metadata test passed")
 

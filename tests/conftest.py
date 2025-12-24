@@ -21,7 +21,7 @@ def mock_llm_model():
     """Mock LlmModel to avoid actual API calls during testing."""
     from unittest.mock import Mock, patch
 
-    from src.llm_model import LlmModel
+    from src.models.model import LlmModel
 
     with (
         patch.object(LlmModel, "__init__", return_value=None),
@@ -30,7 +30,6 @@ def mock_llm_model():
         # Create a mock instance with necessary attributes
         mock_instance = Mock(spec=LlmModel)
         mock_instance.model_id = "test/model"
-        mock_instance.temperature = 0.2
         mock_instance.chat_completion = mock_completion
 
         with patch("src.llm_model.LlmModel", return_value=mock_instance):
@@ -42,7 +41,7 @@ def mock_cost_tracker():
     """Mock cost tracking to avoid API dependencies."""
     from unittest.mock import Mock, patch
 
-    from src.cost_tracker import CostTracker
+    from src.models.cost_tracking import CostTracker
 
     with patch.object(CostTracker, "__init__", return_value=None):
         mock_tracker = Mock(spec=CostTracker)

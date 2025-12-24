@@ -13,7 +13,7 @@ Your mission is to harmonize these two sources. You should feel **free to make c
 ## Context: The Work So Far
 
 * **Stage 1 (Modernize):** Translated archaic language.
-* **Stage 2 (Edit):** Shortened for clarity and conciseness ({length_reduction} reduction).
+* **Stage 2 (Edit):** Shortened for clarity and conciseness.
 
 You are applying the final, expert touch that integrates these layers into a perfect whole.
 
@@ -25,7 +25,7 @@ You should consider making an edit when you spot one of these opportunities. The
 2. **Opportunity for Richer Voice:** The `Transformed` text is clear, but a more precise or evocative word choice, inspired by the spirit of the `Original`, could more perfectly capture the author's unique tone (e.g., its passion, irony, or formality).
 3. **Opportunity for Superior Flow:** A sentence or paragraph could be slightly restructured to improve its rhythm, logical flow, or impact for a modern reader, making the argument more compelling.
 4. **Important Section Context:** Sometimes, sections will contain important metadata (like author, place of publication, etc.) either at the beginning or end that gets removed during the process. This should be restored.
-5. **Additional Quotes:**: The `Trasformed Passage` would benefit from additional quotes. These can be added as new `> **Quote:** ... **End quote.` blocks.
+5. **Additional Quotes:**: The `Trasformed Passage` would benefit from additional quotes. These can be added as new `> **Quote:** ... **End quote.**` blocks.
 
 ## Step-by-Step Workflow
 
@@ -39,7 +39,7 @@ You should consider making an edit when you spot one of these opportunities. The
 ## Critical Constraints (Non-Negotiable Rules)
 
 * **Enhance, Don't Revert**: Your allegiance is to creating the best possible modern version. Use the `Original` for guidance on meaning and voice, but all your edits must result in clear, contemporary prose.
-* **Respect the Core Edit**: The {length_reduction} length reduction is a key goal. Your refinements should not significantly increase the length of the text.
+* **Respect the Core Edit**: The length reduction is a key goal. Your refinements should not significantly increase the length of the text.
 * **Special F-String Tags**:
   * Preserve all special f-string tags such as `{preface}`, `{license}`, and any similar tags exactly as they appear in the original text.
   * Do not modify, remove, or replace these tags with any other content.

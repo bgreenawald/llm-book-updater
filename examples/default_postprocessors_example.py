@@ -11,8 +11,8 @@ from pathlib import Path
 # Add the parent directory to the path to import src modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import PhaseConfig, PhaseType, PostProcessorType
-from src.phase_factory import PhaseFactory
+from src.api.config import PhaseConfig, PhaseType, PostProcessorType
+from src.phases.factory import PhaseFactory
 
 
 def main():
@@ -31,7 +31,6 @@ def main():
             input_file_path=Path(f"input/{phase_type.name.lower()}.md"),
             output_file_path=Path(f"output/{phase_type.name.lower()}.md"),
             original_file_path=Path("original/gatsby.md"),
-            temperature=0.2,
         )
         for phase_type in PhaseType
     }
@@ -89,7 +88,6 @@ def main():
         input_file_path=Path("input/modernize.md"),
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.3,
         # Using string names
         post_processors=["remove_xml_tags", "ensure_blank_line"],
     )
@@ -109,7 +107,6 @@ def main():
         input_file_path=Path("input/modernize.md"),
         output_file_path=Path("output/modernize.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.3,
         # Using PostProcessorType enum values
         post_processors=[
             PostProcessorType.REMOVE_XML_TAGS,
@@ -124,7 +121,7 @@ def main():
     print()
 
     # Example 3: Mixing different approaches
-    from src.post_processors import RemoveTrailingWhitespaceProcessor
+    from src.processing.post_processors import RemoveTrailingWhitespaceProcessor
 
     mixed_config = PhaseConfig(
         phase_type=PhaseType.ANNOTATE,
@@ -134,7 +131,6 @@ def main():
         input_file_path=Path("input/annotate.md"),
         output_file_path=Path("output/annotate.md"),
         original_file_path=Path("original/gatsby.md"),
-        temperature=0.2,
         # Mixing strings, enums, and instances
         post_processors=[
             "revert_removed_block_lines",  # String
