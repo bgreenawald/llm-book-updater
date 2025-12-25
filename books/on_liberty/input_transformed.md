@@ -4,7 +4,7 @@
 
 {license}
 
-## Preface (Modern Edition)
+## Preface (Timeless Library Edition)
 
 {preface}
 

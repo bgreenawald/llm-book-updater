@@ -29,7 +29,7 @@ class DemocracyInAmericaBuilder(BaseBookBuilder):
             Dictionary mapping file types to their source paths.
         """
         return {
-            "modernized": self.config.source_output_dir / "03-input_transformed Final_1.md",
+            "modernized": self.config.source_output_dir / "03-input_transformed Final_two_stage_1.md",
             "annotated": self.config.source_output_dir / "06-input_transformed Annotate_1.md",
         }
 
@@ -59,7 +59,7 @@ def build(version: str, name: str) -> None:
     config = BookConfig(
         name=name,
         version=version,
-        title="Democracy in America (Timeless Library Edition)",
+        title="Democracy in America - Volume I (Timeless Library Edition)",
         author="Alexis de Tocqueville",
     )
 

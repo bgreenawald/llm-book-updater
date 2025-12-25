@@ -1,6 +1,6 @@
 # On Liberty
 
-## Preface (Modern Edition)
+## Preface (Timeless Library Edition)
 
 {preface}
 
