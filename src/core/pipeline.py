@@ -16,7 +16,7 @@ from src.phases.factory import PhaseFactory
 from src.phases.protocol import Phase
 
 # Metadata version for compatibility
-METADATA_VERSION = "0.0"
+METADATA_VERSION = "1.0"
 
 
 class Pipeline:
