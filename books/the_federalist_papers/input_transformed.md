@@ -1,7 +1,7 @@
 
 # THE FEDERALIST PAPERS
 
-## Preface (Modern Edition)
+## Preface (Timeless Library Edition)
 
 {preface}
 
