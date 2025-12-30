@@ -58,7 +58,7 @@ def fix_numbered_blocks(content: str) -> str:
             result.append(line)
             continue
 
-        # Check for numbered line: "23. content" or "23." alone
+        # Check for numbered line: "23. content"
         match = re.match(r"^(\d+)\.\s*(.*)", line)
         if match:
             num = match.group(1)
@@ -68,13 +68,12 @@ def fix_numbered_blocks(content: str) -> str:
             if result and result[-1] != "":
                 result.append("")
 
-            # Add bold number header
-            result.append(f"**{num}**")
-            result.append("")  # blank line after header
-
-            # If there's content after the number, add it
+            # Convert to bold number with escaped period, inline format
+            # Use \. to prevent markdown from rendering as a list
             if rest:
-                result.append(rest)
+                result.append(f"**{num}\\.** {rest}")
+            else:
+                result.append(f"**{num}\\.**")
             continue
 
         # Default: pass through unchanged
