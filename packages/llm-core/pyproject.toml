@@ -1,0 +1,36 @@
+[project]
+name = "llm-core"
+version = "0.1.0"
+description = "Shared LLM provider integration, cost tracking, and utilities"
+requires-python = ">=3.12"
+dependencies = [
+    # Core
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "loguru>=0.7.3",
+    "tiktoken>=0.12.0",
+    "python-dotenv>=1.1.1",
+
+    # Sync HTTP (for book-updater)
+    "requests>=2.0.0",
+    "urllib3>=2.0.0",
+
+    # Async HTTP (for book-writer)
+    "httpx>=0.24.0",
+    "tenacity>=8.0.0",
+
+    # Provider SDKs
+    "openai>=1.82.0",
+    "google-genai>=1.27.0",
+    "anthropic>=0.40.0",
+
+    # Conversion
+    "pypandoc>=1.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_core"]

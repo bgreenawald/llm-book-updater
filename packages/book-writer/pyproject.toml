@@ -1,0 +1,30 @@
+[project]
+name = "book-writer"
+version = "0.1.0"
+description = "LLM-powered book generation from outlines"
+requires-python = ">=3.12"
+dependencies = [
+    "llm-core",  # Workspace dependency
+
+    # CLI
+    "click>=8.2.1",
+
+    # Async
+    "httpx>=0.24.0",
+
+    # Config
+    "pyyaml>=6.0.0",
+
+    # UI
+    "rich>=13.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/book_writer"]
+
+[tool.uv.sources]
+llm-core = { workspace = true }
