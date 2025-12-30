@@ -1,4 +1,4 @@
-from src.phases.utils import extract_markdown_blocks
+from book_updater.phases.utils import extract_markdown_blocks
 
 
 def test_extract_blocks_final_section_no_content():

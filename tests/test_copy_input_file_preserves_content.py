@@ -11,8 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.api.config import RunConfig
-from src.core.pipeline import Pipeline
+from book_updater import RunConfig, Pipeline
 
 
 class TestInputFileCopying:

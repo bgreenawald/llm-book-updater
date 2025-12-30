@@ -21,7 +21,7 @@ def mock_llm_model():
     """Mock LlmModel to avoid actual API calls during testing."""
     from unittest.mock import Mock, patch
 
-    from src.models.model import LlmModel
+    from llm_core import LlmModel
 
     with (
         patch.object(LlmModel, "__init__", return_value=None),
@@ -32,7 +32,7 @@ def mock_llm_model():
         mock_instance.model_id = "test/model"
         mock_instance.chat_completion = mock_completion
 
-        with patch("src.llm_model.LlmModel", return_value=mock_instance):
+        with patch("llm_core.LlmModel", return_value=mock_instance):
             yield mock_instance
 
 
@@ -41,7 +41,7 @@ def mock_cost_tracker():
     """Mock cost tracking to avoid API dependencies."""
     from unittest.mock import Mock, patch
 
-    from src.models.cost_tracking import CostTracker
+    from llm_core.cost import CostTracker
 
     with patch.object(CostTracker, "__init__", return_value=None):
         mock_tracker = Mock(spec=CostTracker)
@@ -66,5 +66,5 @@ def mock_cost_tracker():
             "phase_costs": [mock_tracker.calculate_phase_costs.return_value],
         }
 
-        with patch("src.cost_tracker.CostTracker", return_value=mock_tracker):
+        with patch("llm_core.cost.CostTracker", return_value=mock_tracker):
             yield mock_tracker

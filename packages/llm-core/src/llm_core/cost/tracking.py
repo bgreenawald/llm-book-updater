@@ -794,7 +794,7 @@ class CostTrackingWrapper:
             api_key: OpenRouter API key. If None, will try to get from environment.
         """
         # Import here to avoid circular dependency
-        from src.utils.settings import settings
+        from llm_core.config import settings
 
         if api_key is None:
             api_key = settings.get_api_key("openrouter")

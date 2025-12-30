@@ -12,11 +12,10 @@ from unittest.mock import Mock, patch
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.core.pipeline import Pipeline
+from book_updater import PhaseConfig, PhaseType, RunConfig, Pipeline
 
 
-@patch("src.models.model.LlmModel.create")
+@patch("llm_core.LlmModel.create")
 def test_pipeline_metadata(mock_llm_create):
     """Test that pipeline metadata is correctly collected and saved."""
     # Mock the LlmModel.create to avoid API key requirements
@@ -129,8 +128,8 @@ def test_pipeline_metadata(mock_llm_create):
         raise
 
 
-@patch("src.models.model.LlmModel.create")
-@patch("src.models.cost_tracking.CostTrackingWrapper")
+@patch("llm_core.LlmModel.create")
+@patch("llm_core.cost.CostTrackingWrapper")
 def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
     """Test that cost analysis data is correctly saved."""
     # Mock the LlmModel.create to avoid API key requirements
@@ -251,8 +250,8 @@ def test_cost_analysis_saving(mock_cost_wrapper, mock_llm_create):
         raise
 
 
-@patch("src.models.model.LlmModel.create")
-@patch("src.models.cost_tracking.CostTrackingWrapper")
+@patch("llm_core.LlmModel.create")
+@patch("llm_core.cost.CostTrackingWrapper")
 def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for disabled phases."""
     # Mock the LlmModel.create to avoid API key requirements
@@ -330,8 +329,8 @@ def test_metadata_with_disabled_phases(mock_cost_wrapper, mock_llm_create):
         raise
 
 
-@patch("src.models.model.LlmModel.create")
-@patch("src.models.cost_tracking.CostTrackingWrapper")
+@patch("llm_core.LlmModel.create")
+@patch("llm_core.cost.CostTrackingWrapper")
 def test_metadata_with_failed_phases(mock_cost_wrapper, mock_llm_create):
     """Test that metadata is correctly collected for failed phases."""
     # Mock the LlmModel.create to avoid API key requirements
