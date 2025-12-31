@@ -16,11 +16,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from book_updater import PhaseConfig, PhaseType, TwoStageModelConfig
+from llm_core import ModelConfig, Provider
 from pydantic import ValidationError
-
-from src.api.config import PhaseConfig, PhaseType, TwoStageModelConfig
-from src.api.provider import Provider
-from src.models.model import ModelConfig
 
 
 class TestTwoStageModelConfig:
@@ -378,7 +376,7 @@ class TestTwoStageFinalPhaseInitialization:
 
     def test_initialization_success(self, temp_files, mock_models):
         """Test successful initialization of TwoStageFinalPhase."""
-        from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+        from book_updater.phases import StageConfig, TwoStageFinalPhase
 
         # Create stage configs
         identify_config = StageConfig(
@@ -448,7 +446,7 @@ class TestTwoStageFinalPhaseProcessing:
             implement_model.supports_batch.return_value = False
             implement_model.__str__ = lambda self: "mock-implement"
 
-            from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+            from book_updater.phases import StageConfig, TwoStageFinalPhase
 
             # Create stage configs
             identify_config = StageConfig(
@@ -489,7 +487,7 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Chapter 1\n\nThis is the content."
         original_block = "## Chapter 1\n\nThis is the original content."
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             result = phase._process_single_block(current_block, original_block, block_index=0)
 
         # Both models should have been called
@@ -539,7 +537,7 @@ class TestTwoStageFinalPhaseProcessing:
         current_block = "## Chapter 1\n\nThis is the content."
         original_block = "## Chapter 1\n\nThis is the original content."
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase._process_single_block(current_block, original_block, block_index=0)
 
         # Debug data should be collected
@@ -593,7 +591,7 @@ class TestTwoStageFinalPhaseRun:
             implement_model.supports_batch.return_value = False
             implement_model.__str__ = lambda self: "implement-model"
 
-            from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+            from book_updater.phases import StageConfig, TwoStageFinalPhase
 
             # Load prompts from files
             identify_system = (prompts_dir / "final_identify_system.md").read_text()
@@ -636,7 +634,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_file = full_phase_setup["output_file"]
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase.run()
 
         assert output_file.exists()
@@ -649,7 +647,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_dir = full_phase_setup["output_dir"]
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase.run()
 
         # Find the debug file
@@ -670,7 +668,7 @@ class TestTwoStageFinalPhaseRun:
         phase = full_phase_setup["phase"]
         output_dir = full_phase_setup["output_dir"]
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase.run()
 
         debug_files = list(output_dir.glob("final_identify_debug_*.json"))
@@ -746,7 +744,7 @@ class TestTwoStageFinalPhaseBatchMode:
         ]
         implement_model.__str__ = lambda self: "impl-model"
 
-        from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+        from book_updater.phases import StageConfig, TwoStageFinalPhase
 
         # Load prompts from files
         prompts_dir = batch_phase_setup["prompts_dir"]
@@ -779,7 +777,7 @@ class TestTwoStageFinalPhaseBatchMode:
             use_batch=True,
         )
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase.run()
 
         # Both batch APIs should have been called
@@ -799,7 +797,7 @@ class TestTwoStageFinalPhaseBatchMode:
         implement_model.chat_completion.return_value = ("Refined", "impl-1")
         implement_model.__str__ = lambda self: "impl-model"
 
-        from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+        from book_updater.phases import StageConfig, TwoStageFinalPhase
 
         # Load prompts from files
         prompts_dir = batch_phase_setup["prompts_dir"]
@@ -833,7 +831,7 @@ class TestTwoStageFinalPhaseBatchMode:
             max_workers=1,
         )
 
-        with patch("src.phases.two_stage.add_generation_id"):
+        with patch("book_updater.phases.two_stage.add_generation_id"):
             phase.run()
 
         # Should fall back to individual calls
@@ -876,7 +874,7 @@ class TestTwoStageFinalPhaseBatchMode:
         ]
         implement_model.__str__ = lambda self: "impl-model"
 
-        from src.phases.two_stage import StageConfig, TwoStageFinalPhase
+        from book_updater.phases import StageConfig, TwoStageFinalPhase
 
         # Load prompts from files
         prompts_dir = batch_phase_setup["prompts_dir"]
@@ -926,8 +924,8 @@ class TestTwoStageFinalPhaseBatchMode:
             return ("Changes 1 (retried)", "id-1-retried")
 
         with (
-            patch("src.phases.two_stage.add_generation_id"),
-            patch("src.phases.two_stage.make_llm_call_with_retry", side_effect=mock_retry),
+            patch("book_updater.phases.two_stage.add_generation_id"),
+            patch("book_updater.phases.two_stage.make_llm_call_with_retry", side_effect=mock_retry),
         ):
             phase.run()
 
@@ -1008,7 +1006,7 @@ class TestPhaseFactoryTwoStage:
             implement_model.supports_batch.return_value = False
             implement_model.__str__ = lambda self: "impl-model"
 
-            from src.phases.factory import PhaseFactory
+            from book_updater.phases import PhaseFactory
 
             phase = PhaseFactory.create_two_stage_final_phase(
                 config=phase_config,

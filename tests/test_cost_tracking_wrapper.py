@@ -10,9 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from src.models import cost_tracking
-from src.models.cost_tracking import (
+from llm_core.cost import tracking as cost_tracking
+from llm_core.cost.tracking import (
     CostTrackingWrapper,
     get_cost_tracking_wrapper,
 )
@@ -44,7 +43,8 @@ class TestCostTrackingWrapper:
         # instance may have already loaded the API key at import time
         mock_settings = MagicMock()
         mock_settings.get_api_key.return_value = None
-        with patch("src.utils.settings.settings", mock_settings):
+        # Patch the module-level settings import in tracking.py
+        with patch("llm_core.cost.tracking.settings", mock_settings):
             wrapper = CostTrackingWrapper(api_key=None)
             assert wrapper.enabled is False
             assert wrapper.cost_tracker is None

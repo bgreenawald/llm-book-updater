@@ -10,14 +10,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
-
-from src.api.config import PhaseConfig, PhaseType
-from src.core.constants import (
+from book_updater import PhaseConfig, PhaseType
+from llm_core.config import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     MAX_SUBBLOCK_TOKEN_BOUND,
 )
+from pydantic import ValidationError
 
 # ============================================================================
 # PhaseConfig Sub-block Validation Tests
@@ -145,7 +144,7 @@ class TestSplitBodyIntoParagraphs:
     @pytest.fixture
     def mock_phase(self):
         """Create a mock StandardLlmPhase for testing splitting methods."""
-        from src.phases.standard import StandardLlmPhase
+        from book_updater.phases import StandardLlmPhase
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -230,7 +229,7 @@ class TestGroupParagraphsIntoSubblocks:
     @pytest.fixture
     def mock_phase(self):
         """Create a mock StandardLlmPhase for testing grouping methods."""
-        from src.phases.standard import StandardLlmPhase
+        from book_updater.phases import StandardLlmPhase
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -376,7 +375,7 @@ class TestProcessBlockWithSubblocks:
     @pytest.fixture
     def mock_phase_with_subblocks(self):
         """Create a mock StandardLlmPhase with sub-blocks enabled."""
-        from src.phases.standard import StandardLlmPhase
+        from book_updater.phases import StandardLlmPhase
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -463,8 +462,8 @@ class TestPhaseFactorySubblockParams:
 
     def test_factory_passes_subblock_params(self):
         """Test that PhaseFactory passes sub-block parameters to phase."""
-        from src.api.config import PhaseConfig, PhaseType
-        from src.phases.factory import PhaseFactory
+        from book_updater import PhaseConfig, PhaseType
+        from book_updater.phases import PhaseFactory
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -507,7 +506,7 @@ class TestBatchModeWithSubblocks:
 
     def test_batch_processing_splits_into_subblocks(self):
         """Batch mode should expand a single block into multiple sub-block requests and reassemble output."""
-        from src.phases.standard import StandardLlmPhase
+        from book_updater.phases import StandardLlmPhase
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

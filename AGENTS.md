@@ -1,7 +1,21 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/`: core library code for pipeline, models, phases, and utilities.
+
+This is a UV workspace monorepo with three packages:
+
+- `packages/llm-core/`: shared LLM provider infrastructure, cost tracking, and utilities.
+  - `providers/`: multi-provider LLM clients (OpenRouter, OpenAI, Gemini, Claude).
+  - `cost/`: cost tracking infrastructure.
+  - `tokens/`: token counting utilities.
+  - `config/`: configuration and settings.
+- `packages/book-updater/`: phase-based text transformation pipeline.
+  - `phases/`: phase implementations (modernize, edit, annotate).
+  - `processing/`: post-processors.
+  - `pipeline.py`: main pipeline orchestration.
+- `packages/book-writer/`: async book generation from outlines.
+  - `generator.py`: async orchestration.
+  - `state.py`: state management for resumable generation.
 - `cli/`: command-line entry points (`python -m cli ...`) and subcommands.
 - `books/`: book-specific build/run modules and assets.
 - `examples/`: runnable usage examples for pipeline features.
@@ -9,18 +23,18 @@
 - `build/`, `logs/`, `htmlcov/`: generated artifacts (do not edit by hand).
 
 ## Build, Test, and Development Commands
-- `uv pip install .`: install runtime dependencies from `pyproject.toml`.
-- `uv pip install ".[dev]"`: install dev tools (ruff, pytest, mypy, bandit, pre-commit).
+- `uv sync`: install all workspace packages in editable mode.
+- `uv sync --extra dev`: install with dev tools (ruff, pytest, mypy, bandit, pre-commit).
 - `python -m cli build <book_name> <version>`: build EPUB/PDF for a book.
 - `python -m cli run <book_name>`: run the processing pipeline for a book.
 - `python -m cli --help`: list available CLI commands and options.
-- `pytest`: run the full test suite in `tests/`.
-- `ruff check .` / `ruff format .`: lint and format the codebase.
+- `uv run pytest`: run the full test suite in `tests/`.
+- `uv run ruff check .` / `uv run ruff format .`: lint and format the codebase.
 
 ## Coding Style & Naming Conventions
 - Python 3.12; 4-space indentation; double quotes; max line length 120 (`ruff`).
 - Use `snake_case` for functions/variables and `PascalCase` for classes.
-- Keep CLI behavior in `cli/` and reusable logic in `src/`.
+- Keep CLI behavior in `cli/` and reusable logic in `packages/`.
 
 ## Testing Guidelines
 - Framework: `pytest` with discovery rules in `pyproject.toml`.

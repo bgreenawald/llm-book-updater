@@ -8,8 +8,7 @@ import sys
 from pathlib import Path
 
 import click
-
-from src.utils.metadata_consolidator import consolidate_metadata
+from book_updater.metadata_consolidator import consolidate_metadata
 
 
 @click.command("consolidate-metadata")

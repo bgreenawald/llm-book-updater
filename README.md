@@ -1,17 +1,32 @@
 # LLM Book Updater
 
-A tool for processing and updating book content using Large Language Models (LLMs).
+A monorepo for processing, updating, and generating book content using Large Language Models (LLMs).
+
+## Packages
+
+This repository contains three packages:
+
+- **[llm-core](packages/llm-core/)**: Shared LLM provider infrastructure, cost tracking, and utilities
+- **[book-updater](packages/book-updater/)**: Phase-based text transformation pipeline for updating existing texts
+- **[book-writer](packages/book-writer/)**: Async book generation from outlines
 
 ## Features
 
+### Book Updater
 - **Markdown-First Workflow**: Easily convert PDF books to Markdown and process them.
 - **Flexible Processing Pipeline**: Customize content processing with different "phases" like content modernization, editing, and adding annotations.
 - **Extensible Annotation System**: Add introductions or summaries to sections without altering the original text.
-- **Configurable LLM Models**: Supports various LLM providers and models.
 - **Parallel Processing**: Process multiple sections concurrently for improved performance.
 - **Automatic Metadata**: Keeps a JSON record of each pipeline run, tracking settings, files, and phase details.
 - **Post-Processing Pipeline**: Configurable post-processing chain with detailed logging and metadata tracking.
-- **Cost Tracking**: Monitor and log OpenRouter API usage costs per phase and total run costs (optional add-on).
+
+### Book Writer
+- **Async Generation**: Generate complete books from outlines with parallel chapter/section processing.
+- **State Management**: Resume interrupted generation with persistent state tracking.
+
+### Shared (LLM Core)
+- **Configurable LLM Models**: Supports various LLM providers (OpenRouter, OpenAI, Gemini, Claude).
+- **Cost Tracking**: Monitor and log API usage costs per phase and total run costs.
 
 ## Installation
 
@@ -23,11 +38,41 @@ A tool for processing and updating book content using Large Language Models (LLM
 
 2.  **Install dependencies using `uv`:**
     ```bash
-    uv pip install .
+    uv sync
     ```
-    *(This command uses the dependencies specified in `pyproject.toml`)*
+    *(This installs all workspace packages in editable mode)*
 
 3.  **Configure your LLM API credentials** (see [LLM Provider Configuration](#llm-provider-configuration) below).
+
+## Project Structure
+
+```
+llm-book-updater/
+├── packages/
+│   ├── llm-core/                    # Shared infrastructure
+│   │   └── src/llm_core/
+│   │       ├── providers/           # Multi-provider LLM clients
+│   │       ├── cost/                # Cost tracking
+│   │       ├── tokens/              # Token counting
+│   │       └── config/              # Settings
+│   │
+│   ├── book-updater/                # Text transformation
+│   │   └── src/book_updater/
+│   │       ├── phases/              # Phase implementations
+│   │       ├── processing/          # Post-processors
+│   │       └── pipeline.py
+│   │
+│   └── book-writer/                 # Book generation
+│       └── src/book_writer/
+│           ├── generator.py         # Async orchestration
+│           ├── state.py             # State management
+│           └── models.py
+├── books/                           # Book configurations
+├── cli/                             # CLI entry points
+├── examples/                        # Usage examples
+├── tests/                           # Test suite
+└── pyproject.toml                   # UV workspace root
+```
 
 ## System Requirements
 
@@ -60,7 +105,7 @@ Use the Python pipeline to apply transformations to the Markdown file. You can r
 ```python
 # See examples/run_pipeline_example.py for a complete example
 
-from src.pipeline import Pipeline
+from book_updater import Pipeline
 from pathlib import Path
 
 # Configure the pipeline
@@ -102,7 +147,7 @@ export GEMINI_API_KEY="your_gemini_key_here"
 ### Using Predefined Models
 
 ```python
-from src.llm_model import GEMINI_FLASH, OPENAI_04_MINI, GROK_3_MINI, LlmModel
+from llm_core import GEMINI_FLASH, OPENAI_04_MINI, GROK_3_MINI, LlmModel
 
 # Use Gemini directly via Google's SDK (faster, cheaper)
 model = LlmModel.create(model=GEMINI_FLASH, temperature=0.2)
@@ -133,8 +178,7 @@ model = LlmModel.create(model=GROK_3_MINI, temperature=0.2)
 ### Custom Model Configurations
 
 ```python
-from src.common.provider import Provider
-from src.llm_model import ModelConfig, LlmModel
+from llm_core import LlmModel, ModelConfig, Provider
 
 # Custom OpenAI model
 custom_openai = ModelConfig(
@@ -158,8 +202,8 @@ model = LlmModel.create(model=custom_gemini)
 In your pipeline configuration, use ModelConfig objects:
 
 ```python
-from src.config import PhaseConfig, PhaseType
-from src.llm_model import GEMINI_FLASH
+from book_updater import PhaseConfig, PhaseType
+from llm_core import GEMINI_FLASH
 
 phase_config = PhaseConfig(
     phase_type=PhaseType.MODERNIZE,
@@ -193,7 +237,7 @@ The system includes an optional cost tracking feature for LLM API usage across a
 
 2. Use the CostTrackingWrapper class in your code:
    ```python
-   from src.cost_tracking_wrapper import CostTrackingWrapper
+   from llm_core.cost import CostTrackingWrapper
 
    # Initialize the wrapper with your API key
    cost_wrapper = CostTrackingWrapper(api_key="your-openrouter-api-key")

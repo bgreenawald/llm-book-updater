@@ -1,6 +1,5 @@
 import pytest
-
-from src.processing.post_processors import (
+from book_updater.processing import (
     EnsureBlankLineProcessor,
     OrderQuoteAnnotationProcessor,
     RemoveBlankLinesInListProcessor,

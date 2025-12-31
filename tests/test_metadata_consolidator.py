@@ -9,8 +9,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
-from src.utils.metadata_consolidator import MetadataConsolidator, consolidate_metadata
+from book_updater.metadata_consolidator import MetadataConsolidator, consolidate_metadata
 
 
 class TestMetadataConsolidator:

@@ -5,14 +5,9 @@ Example demonstrating the consolidated metadata saving functionality of the pipe
 This example shows how comprehensive metadata is automatically saved when running the pipeline.
 """
 
-import sys
 from pathlib import Path
 
-# Add project root to path to allow importing from src
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.core.pipeline import Pipeline
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
 
 
 def main():

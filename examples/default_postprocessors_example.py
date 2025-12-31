@@ -5,14 +5,10 @@ This example shows how each phase type automatically gets its default post-proce
 when no explicit post_processors are specified in the PhaseConfig.
 """
 
-import sys
 from pathlib import Path
 
-# Add the parent directory to the path to import src modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, PostProcessorType
-from src.phases.factory import PhaseFactory
+from book_updater import PhaseConfig, PhaseType, PostProcessorType
+from book_updater.phases import PhaseFactory
 
 
 def main():

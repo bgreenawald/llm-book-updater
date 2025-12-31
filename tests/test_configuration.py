@@ -10,15 +10,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.core.pipeline import Pipeline
-from src.processing.post_processors import (
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
+from book_updater.processing import (
     PostProcessorChain,
     PreserveFStringTagsProcessor,
     RemoveXmlTagsProcessor,
 )
+from pydantic import ValidationError
 
 
 class TestConfigurationValidation:
@@ -326,7 +324,7 @@ class TestErrorRecoveryAndGracefulDegradation:
     def test_graceful_handling_of_missing_dependencies(self):
         """Test graceful handling when optional dependencies are missing."""
         # Mock a missing dependency
-        with patch("src.processing.post_processors.re", None):
+        with patch("book_updater.processing.post_processors.re", None):
             # Should either work with degraded functionality or fail gracefully
             try:
                 processor = RemoveXmlTagsProcessor()

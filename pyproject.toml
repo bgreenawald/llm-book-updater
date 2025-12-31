@@ -1,25 +1,23 @@
 [project]
 name = "llm-book-updater"
 version = "0.1.0"
-description = "Add your description here"
+description = "LLM-powered book tools monorepo"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.2.1",
-    "google-genai>=1.27.0",
-    "loguru>=0.7.3",
-    "marker-pdf[full]>=1.7.3",
-    "openai>=1.82.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "psutil>=7.0.0",
-    "pypandoc>=1.15",
-    "python-dotenv>=1.1.1",
-    "streamlit>=1.45.1",
-    "streamlit-ace>=0.1.1",
-    "tiktoken>=0.12.0",
-    "tqdm>=4.67.1",
+    # Workspace packages
+    "llm-core",
+    "book-updater",
+    "book-writer",
 ]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+llm-core = { workspace = true }
+book-updater = { workspace = true }
+book-writer = { workspace = true }
 
 [project.optional-dependencies]
 dev = [
@@ -29,6 +27,7 @@ dev = [
     "pre-commit>=4.0.1",
     "mypy>=1.13.0",
     "bandit>=1.8.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [tool.ruff]
@@ -105,3 +104,6 @@ python_functions = ["test_*"]
 python_version = "3.12"
 exclude = "build|htmlcov|logs"
 ignore_missing_imports = true
+explicit_package_bases = true
+mypy_path = "packages/llm-core/src:packages/book-updater/src:packages/book-writer/src"
+namespace_packages = true
