@@ -16,8 +16,30 @@ from .models import (
     SectionOutline,
     SectionStatus,
 )
-from .prompts import build_section_prompt
+from .prompts import build_identify_prompt, build_implement_prompt, build_section_prompt
 from .state import StateManager
+
+# Markers used by Phase 2 to indicate changes or no changes
+NO_CHANGES_MARKER = "No Changes Recommended"
+CHANGE_MARKER = "### Change"
+
+
+def _feedback_indicates_no_changes(feedback: str) -> bool:
+    """
+    Check if the identify phase feedback indicates no changes are needed.
+
+    Returns True only if:
+    - The feedback contains "No Changes Recommended" AND
+    - The feedback does NOT contain any "### Change" markers
+
+    This prevents false positives where the model mentions "no changes recommended"
+    for one aspect while still proposing changes for others.
+    """
+    has_no_changes_marker = NO_CHANGES_MARKER in feedback
+    has_change_markers = CHANGE_MARKER in feedback
+
+    # Only skip Phase 3 if explicitly no changes AND no actual change proposals
+    return has_no_changes_marker and not has_change_markers
 
 
 def get_chapter_filename(chapter: ChapterOutline) -> str:
@@ -203,14 +225,69 @@ class BookGenerator:
         state: BookState,
     ) -> tuple[bool, Optional[str]]:
         """
-        Generate a single section with retries.
-        Returns (success, content).
+        Generate a single section through the three-phase pipeline.
+
+        Phase 1 (Generate): Create initial content from rubric
+        Phase 2 (Identify): Analyze content and identify refinement opportunities
+        Phase 3 (Implement): Apply refinements to produce final content
+
+        Returns (success, final_content).
         """
         # Mark as in progress
         self.state_manager.update_section(state, chapter.id, section.id, status=SectionStatus.IN_PROGRESS)
-        self._notify_progress(chapter.id, section.id, "generating")
 
-        # Build prompt
+        # Phase 1: Generate initial content
+        success, initial_content = await self._run_generation_phase(chapter, section, previous_sections, state)
+        if not success or not initial_content:
+            return False, None
+
+        # Phase 2: Identify refinements
+        success, feedback = await self._run_identify_phase(chapter.id, section.id, initial_content, state)
+        if not success or not feedback:
+            return False, None
+
+        # Check if Phase 2 indicates no changes are needed
+        final_content: Optional[str]
+        if _feedback_indicates_no_changes(feedback):
+            # Skip Phase 3 - use initial content as final
+            self._notify_progress(chapter.id, section.id, "phase3_skipped", "No refinements needed")
+            final_content = initial_content
+        else:
+            # Phase 3: Implement refinements
+            success, final_content = await self._run_implement_phase(
+                chapter.id, section.id, initial_content, feedback, state
+            )
+            if not success or not final_content:
+                return False, None
+
+        # Save final content to state
+        self.state_manager.update_section(
+            state,
+            chapter.id,
+            section.id,
+            status=SectionStatus.COMPLETED,
+            content=final_content,
+            initial_content=initial_content,
+            identify_feedback=feedback,
+        )
+
+        self._notify_progress(chapter.id, section.id, "completed")
+        return True, final_content
+
+    async def _run_generation_phase(
+        self,
+        chapter: ChapterOutline,
+        section: SectionOutline,
+        previous_sections: list[tuple[str, str]],
+        state: BookState,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Phase 1: Generate initial section content from rubric.
+
+        Returns (success, initial_content).
+        """
+        self._notify_progress(chapter.id, section.id, "phase1_generating")
+
         messages = build_section_prompt(
             section=section,
             chapter=chapter,
@@ -220,30 +297,89 @@ class BookGenerator:
 
         try:
             content = await self.client.generate(messages)
-
-            # Success - save content
-            self.state_manager.update_section(
-                state,
-                chapter.id,
-                section.id,
-                status=SectionStatus.COMPLETED,
-                content=content,
-            )
-
-            self._notify_progress(chapter.id, section.id, "completed")
+            self._notify_progress(chapter.id, section.id, "phase1_completed")
             return True, content
 
         except LlmModelError as e:
-            # All retries exhausted
             self.state_manager.update_section(
                 state,
                 chapter.id,
                 section.id,
                 status=SectionStatus.FAILED,
-                error=str(e),
+                error=f"Phase 1 (Generate) failed: {e}",
             )
+            self._notify_progress(chapter.id, section.id, "phase1_failed", str(e))
+            return False, None
 
-            self._notify_progress(chapter.id, section.id, "failed", str(e))
+    async def _run_identify_phase(
+        self,
+        chapter_id: str,
+        section_id: str,
+        initial_content: str,
+        state: BookState,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Phase 2: Analyze content and identify refinement opportunities.
+
+        Returns (success, feedback).
+        """
+        self._notify_progress(chapter_id, section_id, "phase2_identifying")
+
+        messages = build_identify_prompt(generated_content=initial_content)
+
+        try:
+            feedback = await self.client.generate(messages)
+            self._notify_progress(chapter_id, section_id, "phase2_completed")
+            return True, feedback
+
+        except LlmModelError as e:
+            self.state_manager.update_section(
+                state,
+                chapter_id,
+                section_id,
+                status=SectionStatus.FAILED,
+                error=f"Phase 2 (Identify) failed: {e}",
+                initial_content=initial_content,  # Preserve P1 output for debugging
+            )
+            self._notify_progress(chapter_id, section_id, "phase2_failed", str(e))
+            return False, None
+
+    async def _run_implement_phase(
+        self,
+        chapter_id: str,
+        section_id: str,
+        initial_content: str,
+        feedback: str,
+        state: BookState,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Phase 3: Apply identified refinements to produce final content.
+
+        Returns (success, final_content).
+        """
+        self._notify_progress(chapter_id, section_id, "phase3_implementing")
+
+        messages = build_implement_prompt(
+            generated_content=initial_content,
+            feedback=feedback,
+        )
+
+        try:
+            final_content = await self.client.generate(messages)
+            self._notify_progress(chapter_id, section_id, "phase3_completed")
+            return True, final_content
+
+        except LlmModelError as e:
+            self.state_manager.update_section(
+                state,
+                chapter_id,
+                section_id,
+                status=SectionStatus.FAILED,
+                error=f"Phase 3 (Implement) failed: {e}",
+                initial_content=initial_content,  # Preserve P1 output for debugging
+                identify_feedback=feedback,  # Preserve P2 output for debugging
+            )
+            self._notify_progress(chapter_id, section_id, "phase3_failed", str(e))
             return False, None
 
     async def _write_partial_chapter(

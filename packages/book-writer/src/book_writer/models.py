@@ -44,7 +44,9 @@ class SectionState(BaseModel):
     status: SectionStatus = SectionStatus.PENDING
     retry_count: int = 0
     last_error: Optional[str] = None
-    generated_content: Optional[str] = None
+    generated_content: Optional[str] = None  # Final content (after all phases)
+    initial_content: Optional[str] = None  # Phase 1 output (before refinement)
+    identify_feedback: Optional[str] = None  # Phase 2 output (refinement feedback)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     token_count: Optional[int] = None

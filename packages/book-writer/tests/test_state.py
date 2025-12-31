@@ -199,6 +199,85 @@ class TestUpdateSection:
             state_manager.update_section(sample_state, "1", "nonexistent", SectionStatus.COMPLETED)
 
 
+class TestIntermediateOutputPersistence:
+    """Tests for intermediate output persistence in three-phase pipeline."""
+
+    def test_intermediate_outputs_saved_on_completed(self, state_manager, sample_state):
+        """Test intermediate outputs are saved when section completes."""
+        state_manager.save_state(sample_state)
+        updated = state_manager.update_section(
+            sample_state,
+            "1",
+            "1.1",
+            SectionStatus.COMPLETED,
+            content="Final content",
+            initial_content="Initial content from P1",
+            identify_feedback="Feedback from P2",
+        )
+
+        section = updated.chapters["1"].sections["1.1"]
+        assert section.status == SectionStatus.COMPLETED
+        assert section.generated_content == "Final content"
+        assert section.initial_content == "Initial content from P1"
+        assert section.identify_feedback == "Feedback from P2"
+
+    def test_intermediate_outputs_saved_on_failed_phase2(self, state_manager, sample_state):
+        """Test intermediate outputs are saved when Phase 2 fails."""
+        state_manager.save_state(sample_state)
+        updated = state_manager.update_section(
+            sample_state,
+            "1",
+            "1.1",
+            SectionStatus.FAILED,
+            error="Phase 2 (Identify) failed: API error",
+            initial_content="Initial content from P1",
+        )
+
+        section = updated.chapters["1"].sections["1.1"]
+        assert section.status == SectionStatus.FAILED
+        assert section.last_error == "Phase 2 (Identify) failed: API error"
+        assert section.initial_content == "Initial content from P1"
+        assert section.identify_feedback is None  # P2 failed, no feedback yet
+
+    def test_intermediate_outputs_saved_on_failed_phase3(self, state_manager, sample_state):
+        """Test intermediate outputs are saved when Phase 3 fails."""
+        state_manager.save_state(sample_state)
+        updated = state_manager.update_section(
+            sample_state,
+            "1",
+            "1.1",
+            SectionStatus.FAILED,
+            error="Phase 3 (Implement) failed: API error",
+            initial_content="Initial content from P1",
+            identify_feedback="Feedback from P2",
+        )
+
+        section = updated.chapters["1"].sections["1.1"]
+        assert section.status == SectionStatus.FAILED
+        assert section.last_error == "Phase 3 (Implement) failed: API error"
+        assert section.initial_content == "Initial content from P1"
+        assert section.identify_feedback == "Feedback from P2"
+
+    def test_intermediate_outputs_persisted_to_disk_on_failure(self, state_manager, sample_state):
+        """Test intermediate outputs are persisted to disk on failure for resume."""
+        state_manager.save_state(sample_state)
+        state_manager.update_section(
+            sample_state,
+            "1",
+            "1.1",
+            SectionStatus.FAILED,
+            error="Phase 3 (Implement) failed: API error",
+            initial_content="Initial content from P1",
+            identify_feedback="Feedback from P2",
+        )
+
+        # Reload from disk
+        loaded = state_manager.load_state()
+        section = loaded.chapters["1"].sections["1.1"]
+        assert section.initial_content == "Initial content from P1"
+        assert section.identify_feedback == "Feedback from P2"
+
+
 class TestChapterStatusUpdate:
     """Tests for chapter status updates."""
 
