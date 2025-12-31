@@ -21,16 +21,19 @@ def setup_logging() -> None:
 
 def main() -> None:
     """Main function to run the pipeline."""
-    # Add src directory to path for local execution.
-    sys.path.append(str(Path(__file__).parent))
-    from src.pipeline import run_pipeline
-    from src.run_settings import config
+    from book_updater.pipeline import run_pipeline
 
     setup_logging()
     try:
         logger.info("Starting pipeline execution from main.py")
-        run_pipeline(config=config)
-        logger.success("Pipeline execution finished.")
+        # Note: config must be defined here or imported from a module
+        # This is a legacy entry point - consider using 'python -m cli run <book_name>' instead
+        # Example: Define a RunConfig here or import from your book's run.py module
+        logger.error(
+            "main.py requires a config object to be defined. "
+            "Please use 'python -m cli run <book_name>' or define a RunConfig in this file."
+        )
+        sys.exit(1)
     except Exception as e:
         logger.error(f"An error occurred during pipeline execution: {e}", exc_info=True)
         sys.exit(1)
