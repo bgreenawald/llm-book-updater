@@ -89,10 +89,7 @@ def get_api_key() -> str:
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         if api_key:
             return api_key
-        raise ValueError(
-            "OpenRouter API key not found. Set BOOKWRITER_OPENROUTER_API_KEY or "
-            "OPENROUTER_API_KEY environment variable."
-        )
+        raise ValueError("OpenRouter API key not found. Set OPENROUTER_API_KEY environment variable.")
     return settings.openrouter_api_key
 
 

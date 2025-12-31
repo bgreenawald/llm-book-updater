@@ -5,15 +5,11 @@ This example shows how to configure which f-string tags should be preserved
 during processing, such as {preface} and {license} tags.
 """
 
-import sys
 from pathlib import Path
 from typing import List
 
-# Add project root to path to allow importing from src
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.models import GEMINI_PRO, OPENAI_04_MINI
+from book_updater import PhaseConfig, PhaseType, RunConfig
+from llm_core import GEMINI_PRO, OPENAI_04_MINI
 
 
 def main() -> None:

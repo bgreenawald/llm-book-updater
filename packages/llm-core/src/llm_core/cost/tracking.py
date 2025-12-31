@@ -129,7 +129,7 @@ class CostTracker:
     """
 
     # Fallback pricing per 1M tokens (USD). Prefer live pricing from OpenRouter models API.
-    # These are imported from src.constants for maintainability.
+    # These are imported from llm_core.config for maintainability.
     OPENAI_PRICING = {
         "o4-mini": {
             "input": OPENAI_O4_MINI_INPUT_PRICE_PER_1M,

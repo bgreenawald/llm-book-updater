@@ -7,17 +7,12 @@ including specifying provider order, filtering by data collection policies, and 
 See: https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request
 """
 
-import sys
 from pathlib import Path
 from typing import List
 
-# Add project root to path to allow importing from src
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.api.provider import Provider
-from src.core.pipeline import run_pipeline
-from src.models import GROK_3_MINI, ModelConfig
+from book_updater import PhaseConfig, PhaseType, RunConfig
+from book_updater.pipeline import run_pipeline
+from llm_core import GROK_3_MINI, ModelConfig, Provider
 
 
 def main() -> None:

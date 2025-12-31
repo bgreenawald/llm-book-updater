@@ -256,13 +256,18 @@ class OpenAIClient(ProviderClient):
                             error_info = {"message": f"HTTP {response.get('status_code')} error"}
 
                 if error_info:
-                    error_message = error_info.get("message", "Unknown error") if isinstance(error_info, dict) else str(error_info)
-                    responses.append({
-                        "content": f"Error: {error_message}",
-                        "generation_id": f"openai_batch_error_{custom_id}",
-                        "metadata": id_to_metadata.get(custom_id, {}),
-                        "failed": True,
-                    })
+                    if isinstance(error_info, dict):
+                        error_message = error_info.get("message", "Unknown error")
+                    else:
+                        error_message = str(error_info)
+                    responses.append(
+                        {
+                            "content": f"Error: {error_message}",
+                            "generation_id": f"openai_batch_error_{custom_id}",
+                            "metadata": id_to_metadata.get(custom_id, {}),
+                            "failed": True,
+                        }
+                    )
                     continue
 
                 # Extract successful response
@@ -284,21 +289,25 @@ class OpenAIClient(ProviderClient):
                 metadata = id_to_metadata.get(custom_id, {})
 
                 response_failed = is_failed_response(content)
-                responses.append({
-                    "content": content,
-                    "generation_id": generation_id,
-                    "metadata": metadata,
-                    "failed": response_failed,
-                })
+                responses.append(
+                    {
+                        "content": content,
+                        "generation_id": generation_id,
+                        "metadata": metadata,
+                        "failed": response_failed,
+                    }
+                )
 
             except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
-                responses.append({
-                    "content": f"Error parsing result: {str(e)}",
-                    "generation_id": f"openai_batch_parse_error_{int(time.time())}",
-                    "metadata": {},
-                    "failed": True,
-                })
+                responses.append(
+                    {
+                        "content": f"Error parsing result: {str(e)}",
+                        "generation_id": f"openai_batch_parse_error_{int(time.time())}",
+                        "metadata": {},
+                        "failed": True,
+                    }
+                )
 
         return responses
 

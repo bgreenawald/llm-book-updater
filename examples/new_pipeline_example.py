@@ -2,16 +2,12 @@
 Example script demonstrating the new pipeline system with phase factory.
 """
 
-import sys
 from pathlib import Path
 from typing import List
 
-# Add project root to path to allow importing from src
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.core.pipeline import run_pipeline
-from src.models import GEMINI_PRO, OPENAI_04_MINI
+from book_updater import PhaseConfig, PhaseType, RunConfig
+from book_updater.pipeline import run_pipeline
+from llm_core import GEMINI_PRO, OPENAI_04_MINI
 
 
 def main() -> None:

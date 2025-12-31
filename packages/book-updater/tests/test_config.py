@@ -250,7 +250,7 @@ class TestRunConfig:
         output_dir = temp_dir / "new_output"
         assert not output_dir.exists()
 
-        config = RunConfig(
+        RunConfig(
             book_id="test_book",
             book_name="Test Book",
             author_name="Test Author",

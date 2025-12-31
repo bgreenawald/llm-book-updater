@@ -6,14 +6,10 @@ instance with a unified post_processors list that can contain both built-in
 processor names (strings) and custom processor instances.
 """
 
-import sys
 from pathlib import Path
 
-# Add the parent directory to the path to import src modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, PostProcessorType
-from src.processing.post_processors import EnsureBlankLineProcessor, RemoveXmlTagsProcessor
+from book_updater import PhaseConfig, PhaseType, PostProcessorType
+from book_updater.processing import EnsureBlankLineProcessor, RemoveXmlTagsProcessor
 
 
 def main():

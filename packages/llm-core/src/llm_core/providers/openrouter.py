@@ -272,19 +272,23 @@ class AsyncOpenRouterClient(AsyncProviderClient):
         except Exception as e:
             raise APIError(f"Unexpected error: {str(e)}") from e
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=60),
-        retry=retry_if_exception_type((RateLimitError, httpx.TimeoutException)),
-        reraise=True,
-    )
     async def _call_api_with_retry(
         self,
         messages: list[dict[str, str]],
         model: str,
     ) -> dict:
         """Make single API call with retry wrapper."""
-        return await self._call_api(messages, model)
+
+        @retry(
+            stop=stop_after_attempt(self.max_retries + 1),
+            wait=wait_exponential(multiplier=1, min=1, max=60),
+            retry=retry_if_exception_type((RateLimitError, httpx.TimeoutException)),
+            reraise=True,
+        )
+        async def _api_call_with_retries() -> dict:
+            return await self._call_api(messages, model)
+
+        return await _api_call_with_retries()
 
     async def _call_api(
         self,

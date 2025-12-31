@@ -18,7 +18,7 @@ This project uses Pydantic v2 models for configuration, API response validation,
 Example:
 
 ```python
-from src.config import PhaseConfig, PhaseType
+from book_updater import PhaseConfig, PhaseType
 
 config = PhaseConfig(
     phase_type=PhaseType.MODERNIZE,
@@ -41,7 +41,7 @@ config = PhaseConfig(
 Example:
 
 ```python
-from src.api_models import OpenRouterResponse
+from llm_core.api_models import OpenRouterResponse
 
 response = OpenRouterResponse.model_validate(payload)
 content = response.choices[0].message["content"]

@@ -7,10 +7,10 @@ post-processor configurations to clean up and improve LLM-generated content.
 
 from pathlib import Path
 
-from src.api.config import PhaseConfig, PhaseType, PostProcessorType
-from src.models import LlmModel
-from src.phases.factory import PhaseFactory
-from src.processing.post_processors import PostProcessor
+from book_updater import PhaseConfig, PhaseType, PostProcessorType
+from book_updater.phases import PhaseFactory
+from book_updater.processing import PostProcessor
+from llm_core import LlmModel
 
 
 def create_custom_post_processor() -> PostProcessor:

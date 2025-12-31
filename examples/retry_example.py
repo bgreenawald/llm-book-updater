@@ -7,13 +7,8 @@ the pipeline handles LLM model errors after max retries are exhausted.
 """
 
 import os
-import sys
-from pathlib import Path
 
-# Add the src directory to the path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from src.models import LlmModel, LlmModelError
+from llm_core import LlmModel, LlmModelError
 
 
 def example_basic_retry():

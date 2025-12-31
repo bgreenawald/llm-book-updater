@@ -11,10 +11,8 @@ This example shows how to:
 
 from pathlib import Path
 
-from src.api.config import PhaseConfig, PhaseType, RunConfig
-from src.api.provider import Provider
-from src.core.pipeline import Pipeline
-from src.models import ModelConfig
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
+from llm_core import ModelConfig, Provider
 
 
 def main():

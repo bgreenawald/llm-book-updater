@@ -5,13 +5,9 @@ This example shows how the pipeline now skips processing sections that contain
 only special tags like {preface} and {license} after removing blank lines.
 """
 
-import sys
 from pathlib import Path
 
-# Add project root to path to allow importing from src
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.api.config import PhaseConfig, PhaseType, RunConfig
+from book_updater import PhaseConfig, PhaseType, RunConfig
 
 
 def main():
