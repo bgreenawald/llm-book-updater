@@ -64,7 +64,7 @@ def convert_to_pdf(input_md: Path, output_pdf: Path) -> Path:
         return output_pdf
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr or e.stdout or "Unknown error"
-        raise ConversionError(f"PDF conversion failed: {error_msg}")
+        raise ConversionError(f"PDF conversion failed: {error_msg}") from e
 
 
 def convert_to_epub(input_md: Path, output_epub: Path) -> Path:
@@ -93,7 +93,7 @@ def convert_to_epub(input_md: Path, output_epub: Path) -> Path:
         return output_epub
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr or e.stdout or "Unknown error"
-        raise ConversionError(f"EPUB conversion failed: {error_msg}")
+        raise ConversionError(f"EPUB conversion failed: {error_msg}") from e
 
 
 def convert_to_html(input_md: Path, output_html: Path) -> Path:
@@ -124,7 +124,7 @@ def convert_to_html(input_md: Path, output_html: Path) -> Path:
         return output_html
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr or e.stdout or "Unknown error"
-        raise ConversionError(f"HTML conversion failed: {error_msg}")
+        raise ConversionError(f"HTML conversion failed: {error_msg}") from e
 
 
 def get_pandoc_version() -> str | None:
