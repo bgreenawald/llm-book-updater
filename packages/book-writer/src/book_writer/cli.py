@@ -395,7 +395,7 @@ def combine(book_dir: str):
 )
 def convert(book_dir: str, format: str):
     """Convert generated markdown to PDF/EPUB using Pandoc."""
-    from .converter import convert_to_epub, convert_to_pdf
+    from .converter import ConversionError, convert_to_epub, convert_to_pdf
 
     book_path = Path(book_dir)
     output_dir = book_path / "output"
@@ -416,14 +416,14 @@ def convert(book_dir: str, format: str):
         try:
             pdf_path = convert_to_pdf(book_md, output_dir / "book.pdf")
             console.print(f"[green]Created: {pdf_path}[/green]")
-        except Exception as e:
+        except ConversionError as e:
             console.print(f"[red]PDF conversion failed: {e}[/red]")
 
     if format in ("epub", "both"):
         try:
             epub_path = convert_to_epub(book_md, output_dir / "book.epub")
             console.print(f"[green]Created: {epub_path}[/green]")
-        except Exception as e:
+        except ConversionError as e:
             console.print(f"[red]EPUB conversion failed: {e}[/red]")
 
 
