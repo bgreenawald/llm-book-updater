@@ -247,18 +247,19 @@ class BookGenerator:
             return False, None
 
         # Check if Phase 2 indicates no changes are needed
-        final_content: Optional[str]
+        final_content: Optional[str] = None
         if _feedback_indicates_no_changes(feedback):
             # Skip Phase 3 - use initial content as final
             self._notify_progress(chapter.id, section.id, "phase3_skipped", "No refinements needed")
             final_content = initial_content
         else:
             # Phase 3: Implement refinements
-            success, final_content = await self._run_implement_phase(
+            success, temp_final = await self._run_implement_phase(
                 chapter.id, section.id, initial_content, feedback, state
             )
-            if not success or not final_content:
+            if not success or not temp_final:
                 return False, None
+            final_content = temp_final
 
         # Save final content to state
         self.state_manager.update_section(
