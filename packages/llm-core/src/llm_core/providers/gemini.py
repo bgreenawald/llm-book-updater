@@ -51,9 +51,7 @@ class GeminiClient(ProviderClient):
 
         if text_parts:
             if len(text_parts) > 1:
-                module_logger.warning(
-                    f"Found {len(text_parts)} text parts in Gemini response. Using only first part."
-                )
+                module_logger.warning(f"Found {len(text_parts)} text parts in Gemini response. Using only first part.")
             return text_parts[0]
         return ""
 
@@ -220,21 +218,25 @@ class GeminiClient(ProviderClient):
                     module_logger.debug(f"Failed to track Gemini batch usage: {e}")
 
                 response_failed = is_failed_response(content)
-                responses.append({
-                    "content": content,
-                    "generation_id": generation_id,
-                    "metadata": metadata,
-                    "failed": response_failed,
-                })
+                responses.append(
+                    {
+                        "content": content,
+                        "generation_id": generation_id,
+                        "metadata": metadata,
+                        "failed": response_failed,
+                    }
+                )
 
             except (json.JSONDecodeError, KeyError, ValueError, IndexError, AttributeError) as e:
                 module_logger.error(f"Error parsing batch result line: {e}")
-                responses.append({
-                    "content": f"Error parsing result: {str(e)}",
-                    "generation_id": f"gemini_batch_parse_error_{int(time.time())}",
-                    "metadata": {},
-                    "failed": True,
-                })
+                responses.append(
+                    {
+                        "content": f"Error parsing result: {str(e)}",
+                        "generation_id": f"gemini_batch_parse_error_{int(time.time())}",
+                        "metadata": {},
+                        "failed": True,
+                    }
+                )
 
         return responses
 

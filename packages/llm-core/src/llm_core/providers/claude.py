@@ -187,39 +187,47 @@ class ClaudeClient(ProviderClient):
                         module_logger.debug(f"Failed to track batch usage for {generation_id}: {e}")
 
                     response_failed = is_failed_response(content)
-                    responses.append({
-                        "content": content,
-                        "generation_id": generation_id,
-                        "metadata": metadata,
-                        "failed": response_failed,
-                    })
+                    responses.append(
+                        {
+                            "content": content,
+                            "generation_id": generation_id,
+                            "metadata": metadata,
+                            "failed": response_failed,
+                        }
+                    )
 
                 elif result.result.type == "errored":
                     error = result.result.error
                     error_message = error.message if hasattr(error, "message") else str(error)
                     module_logger.error(f"Error in batch result {custom_id}: {error_message}")
-                    responses.append({
-                        "content": f"Error: {error_message}",
-                        "generation_id": f"claude_batch_error_{custom_id}",
-                        "metadata": metadata,
-                        "failed": True,
-                    })
+                    responses.append(
+                        {
+                            "content": f"Error: {error_message}",
+                            "generation_id": f"claude_batch_error_{custom_id}",
+                            "metadata": metadata,
+                            "failed": True,
+                        }
+                    )
 
                 elif result.result.type == "expired":
-                    responses.append({
-                        "content": "Error: Request expired",
-                        "generation_id": f"claude_batch_expired_{custom_id}",
-                        "metadata": metadata,
-                        "failed": True,
-                    })
+                    responses.append(
+                        {
+                            "content": "Error: Request expired",
+                            "generation_id": f"claude_batch_expired_{custom_id}",
+                            "metadata": metadata,
+                            "failed": True,
+                        }
+                    )
 
                 elif result.result.type == "canceled":
-                    responses.append({
-                        "content": "Error: Request canceled",
-                        "generation_id": f"claude_batch_canceled_{custom_id}",
-                        "metadata": metadata,
-                        "failed": True,
-                    })
+                    responses.append(
+                        {
+                            "content": "Error: Request canceled",
+                            "generation_id": f"claude_batch_canceled_{custom_id}",
+                            "metadata": metadata,
+                            "failed": True,
+                        }
+                    )
 
             module_logger.info(f"Successfully processed {len(responses)} batch responses")
             return responses
