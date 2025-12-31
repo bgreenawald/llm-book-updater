@@ -8,7 +8,7 @@ the pipeline handles LLM model errors after max retries are exhausted.
 
 import os
 
-from llm_core import LlmModel, LlmModelError
+from llm_core import LlmModel, LlmModelError, ModelConfig, Provider
 
 
 def example_basic_retry():
@@ -16,18 +16,25 @@ def example_basic_retry():
     print("=== Basic Retry Example ===")
 
     # Create model with default retry settings (3 retries, 1s delay, 2x backoff)
+    # Note: Retry parameters only apply to OpenRouter provider
     model = LlmModel.create(
-        model="google/gemini-2.5-flash",
-        max_retries=3,
-        retry_delay=1.0,
-        backoff_factor=2.0,
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="google/gemini-2.5-flash"),
+        openrouter_max_retries=3,
+        openrouter_retry_delay=1.0,
+        openrouter_backoff_factor=2.0,
     )
 
+    # Access retry configuration (stored in internal _config dict)
+    retry_config = model._config["openrouter"]
+    max_retries = retry_config["max_retries"]
+    retry_delay = retry_config["retry_delay"]
+    backoff_factor = retry_config["backoff_factor"]
+
     print("Model configured with:")
-    print(f"  - Max retries: {model.max_retries}")
-    print(f"  - Retry delay: {model.retry_delay}s")
-    print(f"  - Backoff factor: {model.backoff_factor}x")
-    print(f"  - Total attempts: {model.max_retries + 1}")
+    print(f"  - Max retries: {max_retries}")
+    print(f"  - Retry delay: {retry_delay}s")
+    print(f"  - Backoff factor: {backoff_factor}x")
+    print(f"  - Total attempts: {max_retries + 1}")
     print()
 
 
@@ -36,21 +43,28 @@ def example_custom_retry():
     print("=== Custom Retry Example ===")
 
     # Create model with aggressive retry settings
+    # Note: Retry parameters only apply to OpenRouter provider
     model = LlmModel.create(
-        model="google/gemini-2.5-flash",
-        max_retries=5,
-        retry_delay=0.5,
-        backoff_factor=1.5,
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="google/gemini-2.5-flash"),
+        openrouter_max_retries=5,
+        openrouter_retry_delay=0.5,
+        openrouter_backoff_factor=1.5,
     )
 
+    # Access retry configuration (stored in internal _config dict)
+    retry_config = model._config["openrouter"]
+    max_retries = retry_config["max_retries"]
+    retry_delay = retry_config["retry_delay"]
+    backoff_factor = retry_config["backoff_factor"]
+
     print("Model configured with aggressive retry settings:")
-    print(f"  - Max retries: {model.max_retries}")
-    print(f"  - Retry delay: {model.retry_delay}s")
-    print(f"  - Backoff factor: {model.backoff_factor}x")
-    print(f"  - Total attempts: {model.max_retries + 1}")
+    print(f"  - Max retries: {max_retries}")
+    print(f"  - Retry delay: {retry_delay}s")
+    print(f"  - Backoff factor: {backoff_factor}x")
+    print(f"  - Total attempts: {max_retries + 1}")
 
     # Calculate delay sequence
-    delays = [model.retry_delay * (model.backoff_factor**i) for i in range(model.max_retries)]
+    delays = [retry_delay * (backoff_factor**i) for i in range(max_retries)]
     print(f"  - Delay sequence: {delays}")
     print()
 
@@ -60,16 +74,21 @@ def example_no_retry():
     print("=== No Retry Example ===")
 
     # Create model with no retries
+    # Note: Retry parameters only apply to OpenRouter provider
     model = LlmModel.create(
-        model="google/gemini-2.5-flash",
-        max_retries=0,
-        retry_delay=1.0,
-        backoff_factor=2.0,
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="google/gemini-2.5-flash"),
+        openrouter_max_retries=0,
+        openrouter_retry_delay=1.0,
+        openrouter_backoff_factor=2.0,
     )
 
+    # Access retry configuration (stored in internal _config dict)
+    retry_config = model._config["openrouter"]
+    max_retries = retry_config["max_retries"]
+
     print("Model configured with no retries:")
-    print(f"  - Max retries: {model.max_retries}")
-    print(f"  - Total attempts: {model.max_retries + 1}")
+    print(f"  - Max retries: {max_retries}")
+    print(f"  - Total attempts: {max_retries + 1}")
     print()
 
 
@@ -78,11 +97,12 @@ def example_error_handling():
     print("=== Error Handling Example ===")
 
     # Create model with minimal retries for quick demonstration
+    # Note: Retry parameters only apply to OpenRouter provider
     model = LlmModel.create(
-        model="google/gemini-2.5-flash",
-        max_retries=1,
-        retry_delay=0.1,
-        backoff_factor=1.0,
+        model=ModelConfig(provider=Provider.OPENROUTER, model_id="google/gemini-2.5-flash"),
+        openrouter_max_retries=1,
+        openrouter_retry_delay=0.1,
+        openrouter_backoff_factor=1.0,
     )
 
     print("Attempting API call with invalid API key to demonstrate error handling...")
