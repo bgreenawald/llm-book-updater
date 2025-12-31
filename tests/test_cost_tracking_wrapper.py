@@ -44,7 +44,8 @@ class TestCostTrackingWrapper:
         # instance may have already loaded the API key at import time
         mock_settings = MagicMock()
         mock_settings.get_api_key.return_value = None
-        with patch("llm_core.config.settings", mock_settings):
+        # Patch the module-level settings import in tracking.py
+        with patch("llm_core.cost.tracking.settings", mock_settings):
             wrapper = CostTrackingWrapper(api_key=None)
             assert wrapper.enabled is False
             assert wrapper.cost_tracker is None

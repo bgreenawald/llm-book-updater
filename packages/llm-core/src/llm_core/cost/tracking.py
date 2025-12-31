@@ -25,7 +25,7 @@ pricing and may not reflect actual charges, especially for enterprise pricing.
 
 import json
 import threading
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import requests  # type: ignore[import-untyped]
 from loguru import logger
@@ -50,8 +50,12 @@ from llm_core.config import (
     OPENROUTER_MODELS_API_TIMEOUT,
     TOKENS_PER_MILLION,
     BaseConfig,
+    settings,
 )
 from llm_core.providers.types import Provider
+
+if TYPE_CHECKING:
+    from llm_core.config import Settings
 
 # Initialize module-level logger
 module_logger = logger
@@ -786,18 +790,19 @@ class CostTrackingWrapper:
     and log costs at the end of processing.
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, settings_instance: Optional["Settings"] = None):
         """
         Initialize the cost tracking wrapper.
 
         Args:
             api_key: OpenRouter API key. If None, will try to get from environment.
+            settings_instance: Settings instance to use. If None, uses the default module-level settings.
         """
-        # Import here to avoid circular dependency
-        from llm_core.config import settings
+        # Use provided settings or fall back to module-level settings
+        settings_to_use = settings_instance if settings_instance is not None else settings
 
         if api_key is None:
-            api_key = settings.get_api_key("openrouter")
+            api_key = settings_to_use.get_api_key("openrouter")
 
         if api_key:
             self.cost_tracker: CostTracker | None = CostTracker(api_key=api_key)
