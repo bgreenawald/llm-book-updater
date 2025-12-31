@@ -41,7 +41,7 @@ class StateManager:
         """Atomically save state to disk (write to temp, rename)."""
         state.updated_at = datetime.now()
 
-        # Write to temp file first, then rename for atomicity
+        # Write to temp file first, then replace for atomicity
         with tempfile.NamedTemporaryFile(
             mode="w",
             dir=self.output_dir,
@@ -52,8 +52,13 @@ class StateManager:
             f.write(state.model_dump_json(indent=2))
             temp_path = Path(f.name)
 
-        # Atomic rename
-        temp_path.rename(self.state_file)
+        # Atomic replace (cross-platform, handles existing destination)
+        try:
+            temp_path.replace(self.state_file)
+        except OSError as e:
+            # Clean up temp file on error
+            temp_path.unlink(missing_ok=True)
+            raise OSError(f"Failed to save state file: {e}") from e
 
     def initialize_state(self, outline: BookOutline, model: str, rubric_hash: str) -> BookState:
         """Create fresh state from book outline."""
