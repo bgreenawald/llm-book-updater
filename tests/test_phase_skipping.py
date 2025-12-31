@@ -10,9 +10,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
 from pydantic import ValidationError
-
-from book_updater import PhaseConfig, PhaseType, RunConfig, Pipeline
 
 
 class TestPhaseSkipping:

@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import click
-
 from book_updater.metadata_consolidator import consolidate_metadata
 
 

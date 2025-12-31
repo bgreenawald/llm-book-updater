@@ -10,8 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-
-from book_updater import RunConfig, Pipeline
+from book_updater import Pipeline, RunConfig
 
 
 class TestInputFileCopying:

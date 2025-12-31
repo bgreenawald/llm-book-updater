@@ -1,5 +1,4 @@
 import pytest
-
 from book_updater.processing import (
     EmptySectionError,
     NoNewHeadersPostProcessor,

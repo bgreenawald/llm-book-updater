@@ -105,3 +105,5 @@ python_version = "3.12"
 exclude = "build|htmlcov|logs"
 ignore_missing_imports = true
 explicit_package_bases = true
+mypy_path = "packages/llm-core/src:packages/book-updater/src:packages/book-writer/src"
+namespace_packages = true

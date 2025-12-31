@@ -10,14 +10,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
-
-from book_updater import PhaseConfig, PhaseType, RunConfig, Pipeline
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
 from book_updater.processing import (
     PostProcessorChain,
     PreserveFStringTagsProcessor,
     RemoveXmlTagsProcessor,
 )
+from pydantic import ValidationError
 
 
 class TestConfigurationValidation:

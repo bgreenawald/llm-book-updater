@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from llm_core.cost import tracking as cost_tracking
 from llm_core.cost.tracking import (
     CostTrackingWrapper,

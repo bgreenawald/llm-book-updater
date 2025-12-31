@@ -10,14 +10,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
-
 from book_updater import PhaseConfig, PhaseType
 from llm_core.config import (
     DEFAULT_MAX_SUBBLOCK_TOKENS,
     DEFAULT_MIN_SUBBLOCK_TOKENS,
     MAX_SUBBLOCK_TOKEN_BOUND,
 )
+from pydantic import ValidationError
 
 # ============================================================================
 # PhaseConfig Sub-block Validation Tests

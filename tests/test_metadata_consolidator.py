@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from book_updater.metadata_consolidator import MetadataConsolidator, consolidate_metadata
 
 

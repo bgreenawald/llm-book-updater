@@ -16,10 +16,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
-
 from book_updater import PhaseConfig, PhaseType, TwoStageModelConfig
-from llm_core import Provider, ModelConfig
+from llm_core import ModelConfig, Provider
+from pydantic import ValidationError
 
 
 class TestTwoStageModelConfig:

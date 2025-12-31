@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock
 
-from book_updater import PhaseConfig, PhaseType, RunConfig, Pipeline
-from llm_core import Provider, LlmModel, ModelConfig
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
+from llm_core import LlmModel, ModelConfig, Provider
 
 
 def test_pipeline_initialization_preserves_llm_kwargs(tmp_path: Path, monkeypatch) -> None:

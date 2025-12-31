@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 # Add project root to path to allow importing from src
 sys.path.append(str(Path(__file__).parent.parent))
 
-from book_updater import PhaseConfig, PhaseType, RunConfig, Pipeline
+from book_updater import PhaseConfig, PhaseType, Pipeline, RunConfig
 
 
 @patch("llm_core.LlmModel.create")

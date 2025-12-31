@@ -21,7 +21,7 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from book_updater import RunConfig, Pipeline
+from book_updater import Pipeline, RunConfig
 from book_updater.processing import (
     EnsureBlankLineProcessor,
     OrderQuoteAnnotationProcessor,
