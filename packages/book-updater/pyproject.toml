@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "llm-core",  # Workspace dependency
 
+    # Core dependencies (direct imports)
+    "pydantic>=2.0.0",
+    "loguru>=0.7.3",
+
     # CLI
     "click>=8.2.1",
 
