@@ -15,6 +15,9 @@ def mock_api_keys():
         os.environ,
         {
             "OPENROUTER_API_KEY": "test-openrouter-key",
+            "OPENAI_API_KEY": "test-openai-key",
+            "GEMINI_API_KEY": "test-gemini-key",
+            "ANTHROPIC_API_KEY": "test-anthropic-key",
         },
     ):
         yield
