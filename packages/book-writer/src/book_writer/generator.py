@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from llm_core import AsyncOpenRouterClient, LlmModelError
+from loguru import logger
 
 from .models import (
     BookOutline,
@@ -64,18 +65,46 @@ class BookGenerator:
         else:
             chapter_ids = list(self._chapters.keys())
 
-        # Create tasks for each chapter
-        tasks = [
-            self._generate_chapter_with_semaphore(semaphore, state, chapter_id)
+        # Create tasks for each chapter, preserving chapter_id mapping
+        task_chapter_pairs = [
+            (self._generate_chapter_with_semaphore(semaphore, state, chapter_id), chapter_id)
             for chapter_id in chapter_ids
             if chapter_id in self._chapters
         ]
+        tasks = [task for task, _ in task_chapter_pairs]
+        chapter_ids_list = [chapter_id for _, chapter_id in task_chapter_pairs]
 
         # Run all chapters in parallel (limited by semaphore)
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Reload and return final state
-        return self.state_manager.load_state() or state
+        # Check for exceptions and log them with context
+        exceptions: list[Exception] = []
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                chapter_id = chapter_ids_list[idx]
+                logger.error(
+                    f"Chapter generation failed for chapter_id='{chapter_id}' (index={idx}): "
+                    f"{type(result).__name__}: {result}",
+                    exc_info=result,
+                )
+                exceptions.append(result)
+
+        # Reload and return final state (even if there were exceptions)
+        final_state = self.state_manager.load_state() or state
+
+        # Raise aggregate error if any exceptions occurred (after state reload)
+        if exceptions:
+            if len(exceptions) == 1:
+                # Single exception - re-raise it directly
+                raise exceptions[0]
+            else:
+                # Multiple exceptions - use ExceptionGroup (Python 3.11+)
+                raise ExceptionGroup(
+                    f"Multiple chapter generation failures ({len(exceptions)} chapters failed)",
+                    exceptions,
+                )
+
+        return final_state
 
     async def _generate_chapter_with_semaphore(
         self,
