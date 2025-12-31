@@ -20,6 +20,18 @@ from .prompts import build_section_prompt
 from .state import StateManager
 
 
+def get_chapter_filename(chapter: ChapterOutline) -> str:
+    """Generate the filename for a chapter based on its ID."""
+    if chapter.id == "preface":
+        return "00_preface.md"
+    elif chapter.id.startswith("appendix_"):
+        letter = chapter.id.replace("appendix_", "").lower()
+        return f"appendix_{letter}.md"
+    else:
+        num = int(chapter.id) if chapter.id.isdigit() else 0
+        return f"chapter_{num:02d}.md"
+
+
 class BookGenerator:
     """Orchestrates parallel chapter generation with sequential section processing."""
 
@@ -276,16 +288,8 @@ class BookGenerator:
         chapters_dir = self.output_dir / "chapters"
         chapters_dir.mkdir(parents=True, exist_ok=True)
 
-        # Determine filename
-        if chapter.id == "preface":
-            filename = "00_preface.md"
-        elif chapter.id.startswith("appendix_"):
-            letter = chapter.id.replace("appendix_", "").upper()
-            filename = f"appendix_{letter.lower()}.md"
-        else:
-            num = int(chapter.id) if chapter.id.isdigit() else 0
-            filename = f"chapter_{num:02d}.md"
-
+        # Determine filename using helper
+        filename = get_chapter_filename(chapter)
         filepath = chapters_dir / filename
 
         # Build chapter content
@@ -345,25 +349,19 @@ def combine_chapters(output_dir: Path, outline: BookOutline) -> Path:
     chapters_dir = output_dir / "chapters"
     book_md = output_dir / "book.md"
 
-    # Get all chapter files in order
+    # Get all chapter files in order by iterating through the outline
     chapter_files = []
 
-    # Preface first
-    preface_file = chapters_dir / "00_preface.md"
-    if preface_file.exists():
-        chapter_files.append(preface_file)
+    all_chapters = []
+    if outline.preface:
+        all_chapters.append(outline.preface)
+    all_chapters.extend(outline.chapters)
+    all_chapters.extend(outline.appendices)
 
-    # Main chapters
-    for i in range(1, 100):
-        chapter_file = chapters_dir / f"chapter_{i:02d}.md"
+    for chapter in all_chapters:
+        chapter_file = chapters_dir / get_chapter_filename(chapter)
         if chapter_file.exists():
             chapter_files.append(chapter_file)
-
-    # Appendices
-    for letter in "abcdefghijklmnopqrstuvwxyz":
-        appendix_file = chapters_dir / f"appendix_{letter}.md"
-        if appendix_file.exists():
-            chapter_files.append(appendix_file)
 
     # Combine into book.md
     with open(book_md, "w", encoding="utf-8") as out:
