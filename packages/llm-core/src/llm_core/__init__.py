@@ -2,34 +2,43 @@
 
 __version__ = "0.1.0"
 
-from llm_core.config import settings, Settings, BaseConfig
+from llm_core.config import BaseConfig, Settings, settings
 from llm_core.exceptions import (
-    LlmModelError,
+    APIError,
+    AuthenticationError,
     GenerationFailedError,
+    LlmModelError,
     MaxRetriesExceededError,
+    RateLimitError,
     ResponseTruncatedError,
 )
 from llm_core.models import LlmModel
 from llm_core.providers import (
-    Provider,
-    ModelConfig,
+    # Base classes
+    AsyncProviderClient,
     ProviderClient,
-    OpenRouterClient,
-    OpenAIClient,
-    GeminiClient,
+    # Sync clients
     ClaudeClient,
+    GeminiClient,
+    OpenAIClient,
+    OpenRouterClient,
+    # Async clients
+    AsyncOpenRouterClient,
+    # Types
+    ModelConfig,
+    Provider,
     # Model constants
-    GROK_3_MINI,
-    GEMINI_FLASH,
-    GEMINI_PRO,
-    DEEPSEEK,
-    OPENAI_04_MINI,
     CLAUDE_4_SONNET,
-    GEMINI_FLASH_LITE,
-    KIMI_K2,
+    CLAUDE_HAIKU_4_5,
     CLAUDE_OPUS_4_5,
     CLAUDE_SONNET_4_5,
-    CLAUDE_HAIKU_4_5,
+    DEEPSEEK,
+    GEMINI_FLASH,
+    GEMINI_FLASH_LITE,
+    GEMINI_PRO,
+    GROK_3_MINI,
+    KIMI_K2,
+    OPENAI_04_MINI,
 )
 from llm_core.utils import is_failed_response
 
@@ -42,19 +51,26 @@ __all__ = [
     "settings",
     "Settings",
     "BaseConfig",
-    # Providers
+    # Base classes
+    "ProviderClient",
+    "AsyncProviderClient",
+    # Sync providers
     "Provider",
     "ModelConfig",
-    "ProviderClient",
     "OpenRouterClient",
     "OpenAIClient",
     "GeminiClient",
     "ClaudeClient",
+    # Async providers
+    "AsyncOpenRouterClient",
     # Exceptions
     "LlmModelError",
     "GenerationFailedError",
     "MaxRetriesExceededError",
     "ResponseTruncatedError",
+    "RateLimitError",
+    "APIError",
+    "AuthenticationError",
     # Utilities
     "is_failed_response",
     # Model constants

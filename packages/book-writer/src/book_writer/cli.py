@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from llm_core import AsyncOpenRouterClient
 from rich.console import Console
 from rich.table import Table
 
@@ -18,7 +19,6 @@ from .config import (
 )
 from .generator import BookGenerator, combine_chapters
 from .models import BookConfig, ChapterStatus
-from .openrouter import OpenRouterClient
 from .parser import compute_rubric_hash, parse_rubric
 from .state import StateManager
 
@@ -157,7 +157,11 @@ def generate(
 
     # Run generation
     async def run():
-        async with OpenRouterClient(api_key, gen_config) as client:
+        async with AsyncOpenRouterClient(
+            api_key=api_key,
+            default_model=gen_config.model,
+            max_retries=gen_config.max_retries,
+        ) as client:
             generator = BookGenerator(
                 outline=outline,
                 client=client,
@@ -250,7 +254,11 @@ def resume(book_dir: str, chapters: Optional[str]):
 
     # Run generation
     async def run():
-        async with OpenRouterClient(api_key, gen_config) as client:
+        async with AsyncOpenRouterClient(
+            api_key=api_key,
+            default_model=gen_config.model,
+            max_retries=gen_config.max_retries,
+        ) as client:
             generator = BookGenerator(
                 outline=outline,
                 client=client,

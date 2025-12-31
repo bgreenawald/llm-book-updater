@@ -61,3 +61,24 @@ class ResponseTruncatedError(LlmModelError):
         self.message = message
         self.model_name = model_name
         super().__init__(self.message)
+
+
+# Async-specific exceptions (used by async providers)
+
+
+class RateLimitError(LlmModelError):
+    """Rate limit exceeded - retryable with backoff."""
+
+    pass
+
+
+class APIError(LlmModelError):
+    """General API error - may or may not be retryable."""
+
+    pass
+
+
+class AuthenticationError(LlmModelError):
+    """Authentication failed - not retryable."""
+
+    pass

@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import Callable, Optional
 
+from llm_core import AsyncOpenRouterClient, LlmModelError
+
 from .models import (
     BookOutline,
     BookState,
@@ -13,7 +15,6 @@ from .models import (
     SectionOutline,
     SectionStatus,
 )
-from .openrouter import OpenRouterClient, OpenRouterError
 from .prompts import build_section_prompt
 from .state import StateManager
 
@@ -24,7 +25,7 @@ class BookGenerator:
     def __init__(
         self,
         outline: BookOutline,
-        client: OpenRouterClient,
+        client: AsyncOpenRouterClient,
         state_manager: StateManager,
         config: GenerationConfig,
         output_dir: Path,
@@ -191,7 +192,7 @@ class BookGenerator:
             self._notify_progress(chapter.id, section.id, "completed")
             return True, content
 
-        except OpenRouterError as e:
+        except LlmModelError as e:
             # All retries exhausted
             self.state_manager.update_section(
                 state,

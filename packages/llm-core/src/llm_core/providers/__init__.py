@@ -1,10 +1,10 @@
 """LLM provider clients for multiple providers (sync and async)."""
 
-from llm_core.providers.base import ProviderClient
+from llm_core.providers.base import AsyncProviderClient, ProviderClient
 from llm_core.providers.claude import ClaudeClient
 from llm_core.providers.gemini import GeminiClient
 from llm_core.providers.openai_client import OpenAIClient
-from llm_core.providers.openrouter import OpenRouterClient
+from llm_core.providers.openrouter import AsyncOpenRouterClient, OpenRouterClient
 from llm_core.providers.types import (
     CLAUDE_4_SONNET,
     CLAUDE_HAIKU_4_5,
@@ -22,13 +22,16 @@ from llm_core.providers.types import (
 )
 
 __all__ = [
-    # Base class
+    # Base classes
     "ProviderClient",
-    # Provider clients
+    "AsyncProviderClient",
+    # Sync provider clients
     "OpenRouterClient",
     "OpenAIClient",
     "GeminiClient",
     "ClaudeClient",
+    # Async provider clients
+    "AsyncOpenRouterClient",
     # Types
     "Provider",
     "ModelConfig",

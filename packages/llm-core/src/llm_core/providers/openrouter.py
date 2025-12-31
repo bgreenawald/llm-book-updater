@@ -1,12 +1,19 @@
-"""OpenRouter provider client with connection pooling."""
+"""OpenRouter provider clients (sync and async) with connection pooling and retry logic."""
 
 import json
 import time
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
+import httpx
 import requests  # type: ignore[import-untyped]
 from loguru import logger
 from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from urllib3.util.retry import Retry
 
 from llm_core.api_models import OpenRouterResponse
@@ -18,8 +25,14 @@ from llm_core.config import (
     OPENROUTER_POOL_MAXSIZE,
     OPENROUTER_REQUEST_TIMEOUT,
 )
-from llm_core.exceptions import LlmModelError, ResponseTruncatedError
-from llm_core.providers.base import ProviderClient
+from llm_core.exceptions import (
+    APIError,
+    AuthenticationError,
+    LlmModelError,
+    RateLimitError,
+    ResponseTruncatedError,
+)
+from llm_core.providers.base import AsyncProviderClient, ProviderClient
 
 module_logger = logger
 
@@ -199,3 +212,163 @@ class OpenRouterClient(ProviderClient):
 
         generation_id = response.id or "unknown"
         return content, generation_id
+
+
+class AsyncOpenRouterClient(AsyncProviderClient):
+    """Async client for OpenRouter API with retry logic.
+
+    Uses httpx for async HTTP requests and tenacity for exponential backoff.
+    Suitable for parallel/concurrent LLM generation workflows.
+    """
+
+    BASE_URL = "https://openrouter.ai/api/v1"
+
+    def __init__(
+        self,
+        api_key: str,
+        default_model: str = "anthropic/claude-sonnet-4",
+        timeout: float = 120.0,
+        max_retries: int = 3,
+    ):
+        """Initialize the async OpenRouter client.
+
+        Args:
+            api_key: OpenRouter API key
+            default_model: Default model to use if not specified per-request
+            timeout: Request timeout in seconds
+            max_retries: Maximum number of retries for rate limits/timeouts
+        """
+        self.api_key = api_key
+        self.default_model = default_model
+        self.max_retries = max_retries
+        self._client = httpx.AsyncClient(timeout=timeout)
+
+    async def generate(
+        self,
+        messages: list[dict[str, str]],
+        model: Optional[str] = None,
+    ) -> str:
+        """Generate completion with automatic retry logic.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content' keys
+            model: Optional model override (uses default_model if not specified)
+
+        Returns:
+            Generated content string
+
+        Raises:
+            APIError: On non-retryable API errors
+            AuthenticationError: On authentication failure
+            RateLimitError: If rate limits persist after retries
+        """
+        model = model or self.default_model
+
+        try:
+            response = await self._call_api_with_retry(messages, model)
+            return self._extract_content(response)
+        except (RateLimitError, AuthenticationError, APIError):
+            raise
+        except Exception as e:
+            raise APIError(f"Unexpected error: {str(e)}") from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        retry=retry_if_exception_type((RateLimitError, httpx.TimeoutException)),
+        reraise=True,
+    )
+    async def _call_api_with_retry(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+    ) -> dict:
+        """Make single API call with retry wrapper."""
+        return await self._call_api(messages, model)
+
+    async def _call_api(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+    ) -> dict:
+        """Make a single API call to OpenRouter."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/llm-book-updater",
+            "X-Title": "LLM Book Tools",
+        }
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "reasoning": {"effort": "high"},
+        }
+
+        try:
+            response = await self._client.post(
+                f"{self.BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+        except httpx.TimeoutException:
+            raise  # Let tenacity retry this
+
+        # Handle response status codes
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 401:
+            raise AuthenticationError("Invalid API key")
+        elif response.status_code == 429:
+            raise RateLimitError("Rate limit exceeded")
+        elif response.status_code >= 500:
+            # Server errors - retry via RateLimitError
+            raise RateLimitError(f"Server error: {response.status_code}")
+        else:
+            # Client errors - don't retry
+            try:
+                error_data = response.json()
+                error_msg = error_data.get("error", {}).get("message", str(error_data))
+            except Exception:
+                error_msg = response.text
+            raise APIError(f"API error ({response.status_code}): {error_msg}")
+
+    def _extract_content(self, response: dict) -> str:
+        """Extract generated content from API response."""
+        try:
+            choices = response.get("choices", [])
+            if not choices:
+                raise APIError("No choices in response")
+
+            choice = choices[0]
+            message = choice.get("message", {})
+            content = message.get("content")
+
+            # Content can be null/empty for tool_calls, refusals, or reasoning models
+            if content:
+                return content
+
+            # Check for refusal
+            if message.get("refusal"):
+                raise APIError(f"Model refused: {message['refusal']}")
+
+            # Check for tool calls (content is expected to be null)
+            if message.get("tool_calls"):
+                raise APIError("Response contains tool_calls but no content")
+
+            # Check finish_reason for more context
+            finish_reason = choice.get("finish_reason")
+            if finish_reason == "content_filter":
+                raise APIError("Content filtered by provider")
+            elif finish_reason == "error":
+                raise APIError("Model returned an error")
+            elif finish_reason == "length":
+                raise APIError("Response truncated due to length limit")
+
+            raise APIError(f"Empty content in response (finish_reason: {finish_reason})")
+        except KeyError as e:
+            raise APIError(f"Unexpected response format: {e}")
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        await self._client.aclose()

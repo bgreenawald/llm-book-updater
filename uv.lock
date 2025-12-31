@@ -125,8 +125,10 @@ source = { editable = "packages/book-updater" }
 dependencies = [
     { name = "click" },
     { name = "llm-core" },
+    { name = "loguru" },
     { name = "marker-pdf", extra = ["full"] },
     { name = "psutil" },
+    { name = "pydantic" },
     { name = "streamlit" },
     { name = "streamlit-ace" },
     { name = "tqdm" },
@@ -136,8 +138,10 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.2.1" },
     { name = "llm-core", editable = "packages/llm-core" },
+    { name = "loguru", specifier = ">=0.7.3" },
     { name = "marker-pdf", extras = ["full"], specifier = ">=1.7.3" },
     { name = "psutil", specifier = ">=7.0.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
     { name = "streamlit", specifier = ">=1.45.1" },
     { name = "streamlit-ace", specifier = ">=0.1.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
@@ -151,6 +155,8 @@ dependencies = [
     { name = "click" },
     { name = "httpx" },
     { name = "llm-core" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "rich" },
 ]
@@ -160,6 +166,8 @@ requires-dist = [
     { name = "click", specifier = ">=8.2.1" },
     { name = "httpx", specifier = ">=0.24.0" },
     { name = "llm-core", editable = "packages/llm-core" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
 ]
