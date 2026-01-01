@@ -18,7 +18,7 @@ from .config import (
     validate_book_directory,
 )
 from .generator import BookGenerator, combine_chapters
-from .models import BookConfig, ChapterStatus
+from .models import BookConfig, ChapterStatus, PhaseModels
 from .parser import compute_rubric_hash, parse_rubric
 from .state import StateManager
 
@@ -81,11 +81,17 @@ def init(book_dir: str, title: str, model: str):
 @click.argument("book_dir", type=click.Path(exists=True), required=True)
 @click.option("--chapters", "-c", help="Comma-separated chapter numbers to generate")
 @click.option("--model", "-m", help="Override model from config")
+@click.option("--phase1-model", help="Override model for Phase 1 (Generate)")
+@click.option("--phase2-model", help="Override model for Phase 2 (Identify)")
+@click.option("--phase3-model", help="Override model for Phase 3 (Implement)")
 @click.option("--max-concurrent", type=int, help="Max concurrent chapters")
 def generate(
     book_dir: str,
     chapters: Optional[str],
     model: Optional[str],
+    phase1_model: Optional[str],
+    phase2_model: Optional[str],
+    phase3_model: Optional[str],
     max_concurrent: Optional[int],
 ):
     """Generate book content from the rubric outline."""
@@ -109,9 +115,18 @@ def generate(
         console.print(f"[red]{e}[/red]")
         return
 
+    phase_models_override = None
+    if any([phase1_model, phase2_model, phase3_model]):
+        phase_models_override = PhaseModels(
+            generate=phase1_model,
+            identify=phase2_model,
+            implement=phase3_model,
+        )
+
     gen_config = get_generation_config(
         book_path,
         model_override=model,
+        phase_models_override=phase_models_override,
         max_concurrent_override=max_concurrent,
     )
 

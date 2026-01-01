@@ -114,11 +114,20 @@ class BookState(BaseModel):
         return completed
 
 
+class PhaseModels(BaseModel):
+    """Per-phase model configuration."""
+
+    generate: Optional[str] = None
+    identify: Optional[str] = None
+    implement: Optional[str] = None
+
+
 class BookConfig(BaseModel):
     """Per-book configuration (config.yaml)."""
 
     title: str = "Untitled Book"
     model: str = "anthropic/claude-sonnet-4"
+    phase_models: Optional[PhaseModels] = None
     max_concurrent_chapters: int = 5
 
 
@@ -126,7 +135,18 @@ class GenerationConfig(BaseModel):
     """Runtime configuration for generation."""
 
     model: str = "anthropic/claude-sonnet-4"
+    phase_models: PhaseModels = Field(default_factory=PhaseModels)
     max_retries: int = 3
     base_delay: float = 1.0  # Base delay for exponential backoff
     max_delay: float = 60.0  # Maximum delay cap
     max_concurrent_chapters: int = 5
+
+    def get_model_for_phase(self, phase: int) -> str:
+        """Get the model to use for a specific phase (1, 2, or 3)."""
+        if phase == 1:
+            return self.phase_models.generate or self.model
+        if phase == 2:
+            return self.phase_models.identify or self.model
+        if phase == 3:
+            return self.phase_models.implement or self.model
+        raise ValueError(f"Invalid phase: {phase}. Must be 1, 2, or 3.")

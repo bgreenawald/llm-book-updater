@@ -7,7 +7,7 @@ from typing import Optional
 import yaml
 from pydantic_settings import BaseSettings
 
-from .models import BookConfig, GenerationConfig
+from .models import BookConfig, GenerationConfig, PhaseModels
 
 
 class Settings(BaseSettings):
@@ -54,6 +54,7 @@ def save_book_config(book_dir: Path, config: BookConfig) -> None:
 def get_generation_config(
     book_dir: Path,
     model_override: Optional[str] = None,
+    phase_models_override: Optional[PhaseModels] = None,
     max_concurrent_override: Optional[int] = None,
 ) -> GenerationConfig:
     """
@@ -69,9 +70,20 @@ def get_generation_config(
     # Load book-specific config
     book_config = load_book_config(book_dir)
 
+    base_phase_models = book_config.phase_models or PhaseModels()
+    if phase_models_override:
+        phase_models = PhaseModels(
+            generate=phase_models_override.generate or base_phase_models.generate,
+            identify=phase_models_override.identify or base_phase_models.identify,
+            implement=phase_models_override.implement or base_phase_models.implement,
+        )
+    else:
+        phase_models = base_phase_models
+
     # Build config with priority chain
     return GenerationConfig(
         model=model_override or book_config.model or settings.default_model,
+        phase_models=phase_models,
         max_retries=settings.max_retries,
         base_delay=1.0,
         max_delay=60.0,
