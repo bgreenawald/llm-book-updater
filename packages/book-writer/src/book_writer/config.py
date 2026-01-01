@@ -70,7 +70,15 @@ def get_generation_config(
     # Load book-specific config
     book_config = load_book_config(book_dir)
 
-    phase_models = phase_models_override or book_config.phase_models or PhaseModels()
+    base_phase_models = book_config.phase_models or PhaseModels()
+    if phase_models_override:
+        phase_models = PhaseModels(
+            generate=phase_models_override.generate or base_phase_models.generate,
+            identify=phase_models_override.identify or base_phase_models.identify,
+            implement=phase_models_override.implement or base_phase_models.implement,
+        )
+    else:
+        phase_models = base_phase_models
 
     # Build config with priority chain
     return GenerationConfig(
