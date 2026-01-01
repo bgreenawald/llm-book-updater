@@ -10,6 +10,7 @@ from book_writer.models import (
     ChapterState,
     ChapterStatus,
     GenerationConfig,
+    PhaseModels,
     SectionOutline,
     SectionState,
     SectionStatus,
@@ -295,18 +296,48 @@ class TestBookConfig:
         config = BookConfig()
         assert config.title == "Untitled Book"
         assert config.model == "anthropic/claude-sonnet-4"
+        assert config.phase_models is None
         assert config.max_concurrent_chapters == 5
 
     def test_custom_values(self):
         """Test custom values."""
+        phase_models = PhaseModels(
+            generate="anthropic/claude-sonnet-4",
+            identify="anthropic/claude-haiku-4",
+            implement="anthropic/claude-sonnet-4",
+        )
         config = BookConfig(
             title="My Book",
             model="openai/gpt-4",
+            phase_models=phase_models,
             max_concurrent_chapters=10,
         )
         assert config.title == "My Book"
         assert config.model == "openai/gpt-4"
+        assert config.phase_models == phase_models
         assert config.max_concurrent_chapters == 10
+
+
+class TestPhaseModels:
+    """Tests for PhaseModels model."""
+
+    def test_default_values(self):
+        """Test default values."""
+        config = PhaseModels()
+        assert config.generate is None
+        assert config.identify is None
+        assert config.implement is None
+
+    def test_custom_values(self):
+        """Test custom values."""
+        config = PhaseModels(
+            generate="anthropic/claude-sonnet-4",
+            identify="anthropic/claude-haiku-4",
+            implement="anthropic/claude-opus-4",
+        )
+        assert config.generate == "anthropic/claude-sonnet-4"
+        assert config.identify == "anthropic/claude-haiku-4"
+        assert config.implement == "anthropic/claude-opus-4"
 
 
 class TestGenerationConfig:
@@ -316,6 +347,7 @@ class TestGenerationConfig:
         """Test default values."""
         config = GenerationConfig()
         assert config.model == "anthropic/claude-sonnet-4"
+        assert config.phase_models == PhaseModels()
         assert config.max_retries == 3
         assert config.base_delay == 1.0
         assert config.max_delay == 60.0
@@ -325,13 +357,35 @@ class TestGenerationConfig:
         """Test custom values."""
         config = GenerationConfig(
             model="test/model",
+            phase_models=PhaseModels(
+                generate="phase1/model",
+                identify="phase2/model",
+                implement="phase3/model",
+            ),
             max_retries=5,
             base_delay=2.0,
             max_delay=120.0,
             max_concurrent_chapters=3,
         )
         assert config.model == "test/model"
+        assert config.phase_models.generate == "phase1/model"
+        assert config.phase_models.identify == "phase2/model"
+        assert config.phase_models.implement == "phase3/model"
         assert config.max_retries == 5
         assert config.base_delay == 2.0
         assert config.max_delay == 120.0
         assert config.max_concurrent_chapters == 3
+
+    def test_get_model_for_phase(self):
+        """Test phase-specific model selection."""
+        config = GenerationConfig(
+            model="default/model",
+            phase_models=PhaseModels(
+                generate="phase1/model",
+                identify=None,
+                implement="phase3/model",
+            ),
+        )
+        assert config.get_model_for_phase(1) == "phase1/model"
+        assert config.get_model_for_phase(2) == "default/model"
+        assert config.get_model_for_phase(3) == "phase3/model"

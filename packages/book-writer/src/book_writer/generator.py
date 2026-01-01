@@ -312,7 +312,8 @@ class BookGenerator:
         self._notify_progress(chapter_id, section_id, f"phase{phase_number}_{action_verb}")
 
         try:
-            content = await self.client.generate(messages)
+            model = self.config.get_model_for_phase(phase_number)
+            content = await self.client.generate(messages, model=model)
             self._notify_progress(chapter_id, section_id, f"phase{phase_number}_completed")
             return True, content
 
