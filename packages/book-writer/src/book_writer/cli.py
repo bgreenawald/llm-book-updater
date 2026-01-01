@@ -44,17 +44,9 @@ def _create_test_outline(
     if max_sections is None:
         return filtered
 
-    if filtered.preface:
-        if filtered.preface.id not in chapter_ids:
-            filtered.preface = None
-        else:
-            filtered.preface.sections = filtered.preface.sections[:max_sections]
-
     filtered.chapters = [ch for ch in filtered.chapters if ch.id in chapter_ids]
     for ch in filtered.chapters:
         ch.sections = ch.sections[:max_sections]
-
-    filtered.appendices = []
 
     return filtered
 
@@ -83,15 +75,14 @@ def init(book_dir: str, title: str, model: str):
     rubric_path = book_path / "rubric.md"
     rubric_template = f"""# {title}
 
-## Chapter Goals
-- Define your chapter goals here
+## Chapter 1: Introduction
 
-## 1.1 First Section
+### First Section
 
 ### Subsection guidance
 - Add your outline content here
 
-## 1.2 Second Section
+### Second Section
 
 ### Subsection guidance
 - Continue adding sections...
@@ -168,12 +159,7 @@ def generate(
         if chapters:
             console.print("[yellow]Warning: --chapters ignored when --test-run is used[/yellow]")
 
-        all_chapters = []
-        if outline.preface:
-            all_chapters.append(outline.preface.id)
-        all_chapters.extend(ch.id for ch in outline.chapters)
-
-        chapter_list = all_chapters[:2]
+        chapter_list = [ch.id for ch in outline.chapters[:2]]
         max_sections = 3
         filtered_outline = _create_test_outline(outline, chapter_list, max_sections)
     elif chapters:
@@ -376,29 +362,18 @@ def status(book_dir: str):
     table.add_column("Failed", justify="right", style="red")
     table.add_column("Pending", justify="right", style="yellow")
 
-    # Sort chapters: preface first, then numbered, then appendices
     def sort_key(ch_id):
-        if ch_id == "preface":
-            return (0, 0)
-        elif ch_id.startswith("appendix_"):
-            return (2, ord(ch_id[-1]))
-        else:
-            try:
-                return (1, int(ch_id))
-            except ValueError:
-                return (1, 999)
+        try:
+            return int(ch_id)
+        except ValueError:
+            return 999
 
     for ch_id in sorted(state.chapters.keys(), key=sort_key):
         ch_state = state.chapters[ch_id]
         progress = state_manager.get_chapter_progress(state, ch_id)
 
         # Format chapter name
-        if ch_id == "preface":
-            ch_name = "Preface"
-        elif ch_id.startswith("appendix_"):
-            ch_name = f"Appendix {ch_id[-1].upper()}"
-        else:
-            ch_name = f"Chapter {ch_id}"
+        ch_name = f"Chapter {ch_id}"
 
         # Format status with color
         status_str = ch_state.status.value

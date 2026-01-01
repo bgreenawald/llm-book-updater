@@ -31,7 +31,7 @@ class SectionOutline(BaseModel):
 
     id: str  # e.g., "1.1", "1.2"
     title: str  # e.g., "Core Idea: The Firm as Coordination Mechanism"
-    heading_level: int = 2  # Default to H2
+    heading_level: int = 3  # Default to H3
     outline_content: str  # H3+ content as the detailed outline
     line_start: int = 0  # Line number in rubric for debugging
     line_end: int = 0
@@ -55,12 +55,10 @@ class SectionState(BaseModel):
 class ChapterOutline(BaseModel):
     """Parsed chapter from rubric.md."""
 
-    id: str  # e.g., "1", "2", "preface", "appendix_a"
-    number: Optional[int] = None  # Numeric chapter number if applicable
+    id: str  # e.g., "0", "1"
+    number: Optional[int] = None  # Optional ordering index
     title: str  # e.g., "What a Firm Is (and Why It Exists)"
-    goals: Optional[str] = None  # Chapter Goals section if present
     sections: list[SectionOutline] = Field(default_factory=list)
-    summary_box: Optional[str] = None  # Summary box template if present
     line_start: int = 0
     line_end: int = 0
 
@@ -79,11 +77,7 @@ class BookOutline(BaseModel):
     """Complete parsed book structure."""
 
     title: str
-    preface: Optional[ChapterOutline] = None
-    parts: list[str] = Field(default_factory=list)  # Part titles
     chapters: list[ChapterOutline] = Field(default_factory=list)
-    appendices: list[ChapterOutline] = Field(default_factory=list)
-    final_notes: Optional[str] = None  # Drafter guidelines
 
 
 class BookState(BaseModel):

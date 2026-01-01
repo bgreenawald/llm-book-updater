@@ -52,7 +52,7 @@ class TestSectionOutline:
         )
         assert section.id == "1.1"
         assert section.title == "Introduction"
-        assert section.heading_level == 2
+        assert section.heading_level == 3
         assert section.line_start == 0
         assert section.line_end == 0
 
@@ -111,9 +111,7 @@ class TestChapterOutline:
         assert chapter.id == "1"
         assert chapter.number == 1
         assert chapter.title == "Introduction"
-        assert chapter.goals is None
         assert chapter.sections == []
-        assert chapter.summary_box is None
 
     def test_chapter_with_sections(self):
         """Test chapter with sections."""
@@ -166,31 +164,17 @@ class TestBookOutline:
         """Test creating minimal book outline."""
         outline = BookOutline(title="Test Book")
         assert outline.title == "Test Book"
-        assert outline.preface is None
-        assert outline.parts == []
         assert outline.chapters == []
-        assert outline.appendices == []
-        assert outline.final_notes is None
 
     def test_complete_book_outline(self):
         """Test creating complete book outline."""
-        preface = ChapterOutline(id="preface", title="Preface")
         chapter = ChapterOutline(id="1", number=1, title="Chapter 1")
-        appendix = ChapterOutline(id="appendix_a", title="Appendix A")
 
         outline = BookOutline(
             title="Complete Book",
-            preface=preface,
-            parts=["Part I: Foundations", "Part II: Advanced"],
             chapters=[chapter],
-            appendices=[appendix],
-            final_notes="Some notes",
         )
-        assert outline.preface is not None
-        assert len(outline.parts) == 2
         assert len(outline.chapters) == 1
-        assert len(outline.appendices) == 1
-        assert outline.final_notes == "Some notes"
 
 
 class TestBookState:

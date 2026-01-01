@@ -105,11 +105,6 @@ This section is well-written."""
 class TestGetChapterFilename:
     """Tests for get_chapter_filename helper."""
 
-    def test_preface_filename(self):
-        """Test preface chapter filename."""
-        chapter = ChapterOutline(id="preface", title="Preface")
-        assert get_chapter_filename(chapter) == "00_preface.md"
-
     def test_regular_chapter_single_digit(self):
         """Test regular chapter with single digit."""
         chapter = ChapterOutline(id="1", number=1, title="Chapter One")
@@ -120,12 +115,7 @@ class TestGetChapterFilename:
         chapter = ChapterOutline(id="12", number=12, title="Chapter Twelve")
         assert get_chapter_filename(chapter) == "chapter_12.md"
 
-    def test_appendix_filename(self):
-        """Test appendix chapter filename."""
-        chapter = ChapterOutline(id="appendix_a", title="Appendix A")
-        assert get_chapter_filename(chapter) == "appendix_a.md"
-
-    def test_appendix_uppercase_id(self):
-        """Test appendix with uppercase letter in id."""
-        chapter = ChapterOutline(id="appendix_B", title="Appendix B")
-        assert get_chapter_filename(chapter) == "appendix_b.md"
+    def test_regular_chapter_no_number(self):
+        """Test chapter filename when number is missing."""
+        chapter = ChapterOutline(id="3", title="Chapter Three")
+        assert get_chapter_filename(chapter) == "chapter_03.md"

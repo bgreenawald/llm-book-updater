@@ -35,48 +35,33 @@ def sample_rubric_content():
     """Sample rubric content for testing."""
     return """# My Test Book
 
-# Part I: Foundations
+## Introduction
 
-# Chapter 1: Introduction
+Some intro content that should be included in the first section.
 
-## Chapter Goals
-
-- Introduce core concepts
-- Set the stage
-
-## 1.1 Opening Vignette
+### Opening Vignette
 
 A brief opening story.
 
-## 1.2 Core Concepts
+### Core Concepts
 
-### Key Ideas
+#### Key Ideas
 
 Explain the main ideas.
 
-### Examples
+#### Examples
 
 Provide examples.
 
-# Chapter 2: Advanced Topics
+## Advanced Topics
 
-## 2.1 Deep Dive
+### Deep Dive
 
 Going deeper.
 
-## 2.2 Applications
+### Applications
 
 Real-world applications.
-
-# Appendix A: Reference Guide
-
-## A.1 Quick Reference
-
-Reference material.
-
-# Final Notes
-
-Some final guidance for the writer.
 """
 
 

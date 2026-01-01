@@ -232,22 +232,10 @@ def build_section_prompt(
     """Build the complete messages array for section generation."""
     system_msg = SYSTEM_PROMPT.format(book_title=book_title)
 
-    # Determine chapter type
-    if chapter.id == "preface":
-        chapter_type = "Preface"
-        chapter_display_id = ""
-    elif chapter.id.startswith("appendix_"):
-        chapter_type = "Appendix"
-        chapter_display_id = chapter.id.replace("appendix_", "").upper()
-    else:
-        chapter_type = "Chapter"
-        chapter_display_id = chapter.id
-
     if not previous_sections:
         user_msg = FIRST_SECTION_PROMPT.format(
             section_title=section.title,
-            chapter_type=chapter_type,
-            chapter_id=chapter_display_id,
+            chapter_id=chapter.id,
             chapter_title=chapter.title,
             section_outline=section.outline_content,
         )
@@ -256,8 +244,7 @@ def build_section_prompt(
         prev_text = "\n\n---\n\n".join([f"### {title}\n\n{content}" for title, content in previous_sections])
         user_msg = SECTION_PROMPT.format(
             section_title=section.title,
-            chapter_type=chapter_type,
-            chapter_id=chapter_display_id,
+            chapter_id=chapter.id,
             chapter_title=chapter.title,
             section_outline=section.outline_content,
             previous_sections=prev_text,

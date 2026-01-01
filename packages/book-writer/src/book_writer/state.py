@@ -66,17 +66,9 @@ class StateManager:
 
         chapters: dict[str, ChapterState] = {}
 
-        # Add preface if present
-        if outline.preface:
-            chapters[outline.preface.id] = self._create_chapter_state(outline.preface)
-
         # Add all chapters
         for chapter in outline.chapters:
             chapters[chapter.id] = self._create_chapter_state(chapter)
-
-        # Add appendices
-        for appendix in outline.appendices:
-            chapters[appendix.id] = self._create_chapter_state(appendix)
 
         state = BookState(
             rubric_hash=rubric_hash,

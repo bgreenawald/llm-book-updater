@@ -103,31 +103,6 @@ class TestStateManager:
         assert "1.1" in state.chapters["1"].sections
         assert "1.2" in state.chapters["1"].sections
 
-    def test_initialize_state_with_preface(self, state_manager):
-        """Test initialize_state includes preface."""
-        preface = ChapterOutline(
-            id="preface",
-            title="Preface",
-            sections=[SectionOutline(id="p.1", title="Intro", outline_content="Content")],
-        )
-        outline = BookOutline(title="Book", preface=preface)
-
-        state = state_manager.initialize_state(outline, "model", "hash")
-        assert "preface" in state.chapters
-        assert "p.1" in state.chapters["preface"].sections
-
-    def test_initialize_state_with_appendices(self, state_manager):
-        """Test initialize_state includes appendices."""
-        appendix = ChapterOutline(
-            id="appendix_a",
-            title="Appendix A",
-            sections=[SectionOutline(id="a.1", title="Section", outline_content="Content")],
-        )
-        outline = BookOutline(title="Book", appendices=[appendix])
-
-        state = state_manager.initialize_state(outline, "model", "hash")
-        assert "appendix_a" in state.chapters
-
     def test_initialize_state_saves_file(self, state_manager, sample_outline):
         """Test initialize_state saves the state file."""
         state_manager.initialize_state(sample_outline, "model", "hash")

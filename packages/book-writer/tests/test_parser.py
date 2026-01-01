@@ -53,12 +53,6 @@ class TestParseRubric:
         outline = parse_rubric(sample_rubric_file)
         assert outline.title == "My Test Book"
 
-    def test_parse_parts(self, sample_rubric_file):
-        """Test parsing parts."""
-        outline = parse_rubric(sample_rubric_file)
-        assert len(outline.parts) == 1
-        assert "Part I: Foundations" in outline.parts[0]
-
     def test_parse_chapters(self, sample_rubric_file):
         """Test parsing chapters."""
         outline = parse_rubric(sample_rubric_file)
@@ -66,22 +60,15 @@ class TestParseRubric:
 
         # Check first chapter
         ch1 = outline.chapters[0]
-        assert ch1.id == "1"
-        assert ch1.number == 1
+        assert ch1.id == "0"
+        assert ch1.number == 0
         assert ch1.title == "Introduction"
 
         # Check second chapter
         ch2 = outline.chapters[1]
-        assert ch2.id == "2"
-        assert ch2.number == 2
+        assert ch2.id == "1"
+        assert ch2.number == 1
         assert ch2.title == "Advanced Topics"
-
-    def test_parse_chapter_goals(self, sample_rubric_file):
-        """Test parsing chapter goals."""
-        outline = parse_rubric(sample_rubric_file)
-        ch1 = outline.chapters[0]
-        assert ch1.goals is not None
-        assert "Introduce core concepts" in ch1.goals
 
     def test_parse_sections(self, sample_rubric_file):
         """Test parsing sections."""
@@ -89,9 +76,9 @@ class TestParseRubric:
         ch1 = outline.chapters[0]
 
         assert len(ch1.sections) == 2
-        assert ch1.sections[0].id == "1.1"
+        assert ch1.sections[0].id == "0.0"
         assert "Opening Vignette" in ch1.sections[0].title
-        assert ch1.sections[1].id == "1.2"
+        assert ch1.sections[1].id == "0.1"
         assert "Core Concepts" in ch1.sections[1].title
 
     def test_parse_section_content(self, sample_rubric_file):
@@ -101,22 +88,8 @@ class TestParseRubric:
         section = ch1.sections[0]
 
         assert section.outline_content is not None
+        assert "Some intro content" in section.outline_content
         assert "opening story" in section.outline_content.lower()
-
-    def test_parse_appendices(self, sample_rubric_file):
-        """Test parsing appendices."""
-        outline = parse_rubric(sample_rubric_file)
-        assert len(outline.appendices) == 1
-
-        appendix = outline.appendices[0]
-        assert appendix.id == "appendix_a"
-        assert "Reference Guide" in appendix.title
-
-    def test_parse_final_notes(self, sample_rubric_file):
-        """Test parsing final notes."""
-        outline = parse_rubric(sample_rubric_file)
-        assert outline.final_notes is not None
-        assert "guidance" in outline.final_notes.lower()
 
     def test_parse_empty_rubric(self, temp_dir):
         """Test parsing an empty rubric."""
@@ -126,7 +99,6 @@ class TestParseRubric:
         outline = parse_rubric(rubric_file)
         assert outline.title == "Untitled Book"
         assert outline.chapters == []
-        assert outline.appendices == []
 
     def test_parse_rubric_with_only_title(self, temp_dir):
         """Test parsing rubric with only title."""
@@ -136,29 +108,6 @@ class TestParseRubric:
         outline = parse_rubric(rubric_file)
         assert outline.title == "My Only Title"
         assert outline.chapters == []
-
-    def test_parse_preface(self, temp_dir):
-        """Test parsing preface section."""
-        rubric_file = temp_dir / "with_preface.md"
-        rubric_file.write_text("""# Book Title
-
-# Preface
-
-## Welcome
-
-This is the preface content.
-
-# Chapter 1: First Chapter
-
-## 1.1 Section
-
-Content here.
-""")
-
-        outline = parse_rubric(rubric_file)
-        assert outline.preface is not None
-        assert outline.preface.id == "preface"
-        assert len(outline.preface.sections) == 1
 
     def test_line_numbers_are_tracked(self, sample_rubric_file):
         """Test that line numbers are tracked."""
@@ -173,60 +122,46 @@ Content here.
             assert section.line_start >= 0
             assert section.line_end >= section.line_start
 
-    def test_section_id_extraction(self, temp_dir):
-        """Test section ID extraction from different formats."""
-        rubric_file = temp_dir / "sections.md"
+    def test_chapters_preserve_document_order(self, temp_dir):
+        """Test chapters are parsed in document order."""
+        rubric_file = temp_dir / "order.md"
         rubric_file.write_text("""# Test Book
 
-# Chapter 1: Test
+## Third Chapter
 
-## 1.1 Standard Format
-
-Content.
-
-## 2.3: With Colon
+### Section One
 
 Content.
 
-## Custom Section Title
+## First Chapter
+
+### Section Two
 
 Content.
 """)
 
         outline = parse_rubric(rubric_file)
-        ch1 = outline.chapters[0]
+        assert [ch.title for ch in outline.chapters] == ["Third Chapter", "First Chapter"]
+        assert [ch.id for ch in outline.chapters] == ["0", "1"]
 
-        assert ch1.sections[0].id == "1.1"
-        assert ch1.sections[1].id == "2.3"
-        # Third section should have generated ID
-        assert ch1.sections[2].id.startswith("1.")
-
-    def test_multiple_appendices(self, temp_dir):
-        """Test parsing multiple appendices."""
-        rubric_file = temp_dir / "appendices.md"
+    def test_sections_preserve_document_order(self, temp_dir):
+        """Test sections are parsed in document order within a chapter."""
+        rubric_file = temp_dir / "section_order.md"
         rubric_file.write_text("""# Test Book
 
-# Appendix A: First
+## Chapter One
 
-## A.1 Section
-
-Content.
-
-# Appendix B: Second
-
-## B.1 Section
+### Second Section
 
 Content.
 
-# Appendix C: Third
-
-## C.1 Section
+### First Section
 
 Content.
 """)
 
         outline = parse_rubric(rubric_file)
-        assert len(outline.appendices) == 3
-        assert outline.appendices[0].id == "appendix_a"
-        assert outline.appendices[1].id == "appendix_b"
-        assert outline.appendices[2].id == "appendix_c"
+        section_titles = [section.title for section in outline.chapters[0].sections]
+        section_ids = [section.id for section in outline.chapters[0].sections]
+        assert section_titles == ["Second Section", "First Section"]
+        assert section_ids == ["0.0", "0.1"]
