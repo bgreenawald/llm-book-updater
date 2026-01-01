@@ -1,6 +1,7 @@
 """CLI interface for the book writer application."""
 
 import asyncio
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
@@ -18,7 +19,7 @@ from .config import (
     validate_book_directory,
 )
 from .generator import BookGenerator, combine_chapters
-from .models import BookConfig, ChapterStatus, PhaseModels
+from .models import BookConfig, BookOutline, ChapterStatus, PhaseModels
 from .parser import compute_rubric_hash, parse_rubric
 from .state import StateManager
 
@@ -30,6 +31,32 @@ console = Console()
 def cli():
     """Business Book Writer - Generate book drafts from outlines using LLMs."""
     pass
+
+
+def _create_test_outline(
+    outline: BookOutline,
+    chapter_ids: list[str],
+    max_sections: int,
+) -> BookOutline:
+    """Create a filtered outline for test runs."""
+    filtered = deepcopy(outline)
+
+    if max_sections is None:
+        return filtered
+
+    if filtered.preface:
+        if filtered.preface.id not in chapter_ids:
+            filtered.preface = None
+        else:
+            filtered.preface.sections = filtered.preface.sections[:max_sections]
+
+    filtered.chapters = [ch for ch in filtered.chapters if ch.id in chapter_ids]
+    for ch in filtered.chapters:
+        ch.sections = ch.sections[:max_sections]
+
+    filtered.appendices = []
+
+    return filtered
 
 
 @cli.command()
@@ -80,6 +107,7 @@ def init(book_dir: str, title: str, model: str):
 @cli.command()
 @click.argument("book_dir", type=click.Path(exists=True), required=True)
 @click.option("--chapters", "-c", help="Comma-separated chapter numbers to generate")
+@click.option("--test-run", is_flag=True, help="Quick test: generate first 2 chapters, 3 sections each")
 @click.option("--model", "-m", help="Override model from config")
 @click.option("--phase1-model", help="Override model for Phase 1 (Generate)")
 @click.option("--phase2-model", help="Override model for Phase 2 (Identify)")
@@ -88,6 +116,7 @@ def init(book_dir: str, title: str, model: str):
 def generate(
     book_dir: str,
     chapters: Optional[str],
+    test_run: bool,
     model: Optional[str],
     phase1_model: Optional[str],
     phase2_model: Optional[str],
@@ -102,11 +131,6 @@ def generate(
     except ValueError as e:
         console.print(f"[red]{e}[/red]")
         return
-
-    # Parse chapters option
-    chapter_list = None
-    if chapters:
-        chapter_list = [c.strip() for c in chapters.split(",")]
 
     # Load configuration
     try:
@@ -135,20 +159,48 @@ def generate(
     outline = parse_rubric(rubric_path)
     rubric_hash = compute_rubric_hash(rubric_path)
 
+    # Apply test-run constraints
+    chapter_list = None
+    max_sections = None
+    filtered_outline = outline
+
+    if test_run:
+        if chapters:
+            console.print("[yellow]Warning: --chapters ignored when --test-run is used[/yellow]")
+
+        all_chapters = []
+        if outline.preface:
+            all_chapters.append(outline.preface.id)
+        all_chapters.extend(ch.id for ch in outline.chapters)
+
+        chapter_list = all_chapters[:2]
+        max_sections = 3
+        filtered_outline = _create_test_outline(outline, chapter_list, max_sections)
+    elif chapters:
+        chapter_list = [c.strip() for c in chapters.split(",")]
+
+    if test_run:
+        console.print("[bold cyan]TEST RUN MODE[/bold cyan]")
+        console.print(f"  Chapters: {', '.join(chapter_list) if chapter_list else '(none)'}")
+        console.print(f"  Max sections per chapter: {max_sections}")
+
     console.print(f"[blue]Book: {outline.title}[/blue]")
     console.print(f"[blue]Model: {gen_config.model}[/blue]")
     console.print(f"[blue]Chapters: {len(outline.chapters)}[/blue]")
 
     # Setup state
-    output_dir = ensure_output_directory(book_path)
+    output_dir = ensure_output_directory(book_path, test_run=test_run)
     state_manager = StateManager(output_dir)
+
+    if test_run:
+        console.print(f"  Output directory: {output_dir}")
 
     state = state_manager.load_state()
 
     if state is None or state_manager.should_reinitialize(state, rubric_hash):
         if state is not None:
             console.print("[yellow]Rubric changed, reinitializing state...[/yellow]")
-        state = state_manager.initialize_state(outline, gen_config.model, rubric_hash)
+        state = state_manager.initialize_state(filtered_outline, gen_config.model, rubric_hash)
         console.print("[green]Initialized fresh state[/green]")
     else:
         console.print("[green]Resuming from existing state[/green]")
@@ -178,12 +230,13 @@ def generate(
             max_retries=gen_config.max_retries,
         ) as client:
             generator = BookGenerator(
-                outline=outline,
+                outline=filtered_outline,
                 client=client,
                 state_manager=state_manager,
                 config=gen_config,
                 output_dir=output_dir,
                 progress_callback=progress_callback,
+                max_sections_per_chapter=max_sections,
             )
             return await generator.generate_book(state, chapter_list)
 

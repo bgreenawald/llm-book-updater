@@ -117,9 +117,10 @@ def validate_book_directory(book_dir: Path) -> Path:
     return book_dir
 
 
-def ensure_output_directory(book_dir: Path) -> Path:
+def ensure_output_directory(book_dir: Path, test_run: bool = False) -> Path:
     """Ensure the output directory exists."""
-    output_dir = book_dir / "output"
+    subdir = "output_test" if test_run else "output"
+    output_dir = book_dir / subdir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     chapters_dir = output_dir / "chapters"

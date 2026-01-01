@@ -65,6 +65,7 @@ class BookGenerator:
         config: GenerationConfig,
         output_dir: Path,
         progress_callback: Optional[Callable] = None,
+        max_sections_per_chapter: Optional[int] = None,
     ):
         self.outline = outline
         self.client = client
@@ -72,6 +73,7 @@ class BookGenerator:
         self.config = config
         self.output_dir = output_dir
         self.progress_callback = progress_callback
+        self.max_sections_per_chapter = max_sections_per_chapter
 
         # Build chapter lookup
         self._chapters: dict[str, ChapterOutline] = {}
@@ -81,6 +83,11 @@ class BookGenerator:
             self._chapters[chapter.id] = chapter
         for appendix in outline.appendices:
             self._chapters[appendix.id] = appendix
+
+    def _get_sections_for_chapter(self, chapter: ChapterOutline) -> list[SectionOutline]:
+        if self.max_sections_per_chapter is None:
+            return chapter.sections
+        return chapter.sections[: self.max_sections_per_chapter]
 
     async def generate_book(
         self,
@@ -179,16 +186,17 @@ class BookGenerator:
 
         # Track previously generated content for context
         previous_sections: list[tuple[str, str]] = []
+        sections_to_process = self._get_sections_for_chapter(chapter)
 
         # First, load any already completed sections
-        for section in chapter.sections:
+        for section in sections_to_process:
             section_state = chapter_state.sections.get(section.id)
             if section_state and section_state.status == SectionStatus.COMPLETED:
                 if section_state.generated_content:
                     previous_sections.append((section.title, section_state.generated_content))
 
         # Process each section sequentially
-        for section in chapter.sections:
+        for section in sections_to_process:
             section_state = chapter_state.sections.get(section.id)
             if not section_state:
                 continue
@@ -475,7 +483,7 @@ class BookGenerator:
             lines.append("")
 
         # Add each section
-        for section in chapter.sections:
+        for section in self._get_sections_for_chapter(chapter):
             section_state = chapter_state.sections.get(section.id)
             if not section_state:
                 continue
