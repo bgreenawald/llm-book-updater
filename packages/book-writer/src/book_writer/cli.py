@@ -19,7 +19,7 @@ from .config import (
     validate_book_directory,
 )
 from .generator import BookGenerator, combine_chapters
-from .models import BookConfig, ChapterStatus, PhaseModels
+from .models import BookConfig, BookOutline, ChapterStatus, PhaseModels
 from .parser import compute_rubric_hash, parse_rubric
 from .state import StateManager
 
@@ -34,10 +34,10 @@ def cli():
 
 
 def _create_test_outline(
-    outline: "BookOutline",
+    outline: BookOutline,
     chapter_ids: list[str],
-    max_sections: Optional[int],
-) -> "BookOutline":
+    max_sections: int,
+) -> BookOutline:
     """Create a filtered outline for test runs."""
     filtered = deepcopy(outline)
 
