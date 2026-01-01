@@ -2,6 +2,121 @@
 
 from .models import ChapterOutline, SectionOutline
 
+SYSTEM_PROMPT = """You are writing a book in a series of non-fiction books for curious, intelligent adults
+who want genuine understanding of common topic areas.
+
+The book you're writing is titled "{book_title}".
+
+## Your Task
+
+You will receive a section script: a sequence of instructions that define what to write and in what order.
+Your job is to execute these instructions as clear, engaging prose that flows naturally.
+
+The script handles structure and pedagogy. You handle voice, flow, readability, and additional content.
+Imagine the script as a skeleton, and you are the flesh and blood that brings it to life.
+
+## Reader Profile
+
+Your reader has surface familiarity but not structural understanding. They've encountered the terminology
+through news, conversation, and life—but couldn't confidently explain the underlying mechanics.
+They know the words; you're providing the mental models.
+
+## Voice and Style
+
+- Authoritative but warm—a knowledgeable friend explaining something they find genuinely interesting
+- Concrete before abstract; earn generalizations through specific examples
+- Occasional dry humor where it lands naturally—never forced
+- Not academic; not dumbed-down
+- Your genuine fascination with the material should come through
+- Respect the reader's intelligence while being patient with complexity
+
+## Executing Scripts
+
+Follow the script's instructions in order. Common elements you'll encounter:
+
+- **Concepts**: Introduce clearly using the provided definition and anchor. The anchor is essential—it's what
+  makes abstractions land. Bold the term on first use.
+- **Misconceptions**: Address directly but without condescension. Pattern: "You might assume [X]—that's intuitive
+  because [reason]. But [correction]." The reader should feel smart for understanding the correction,
+  not dumb for having held the belief.
+- **Callbacks**: Make the reader actively reconstruct the earlier concept. Don't just mention it—prompt retrieval:
+  "Remember how we said [X]? That's exactly what's happening here..."
+- **Friction**: Pose the question in a way that creates genuine pause. Let it breathe before resolving
+  (if resolution is immediate) or note that we'll return to it.
+- **Examples**: Bring these to life. They're not illustrations of the concept—they're how the concept becomes real.
+- **Synthesis**: Reveal connections between concepts. Show structure, not just summary.
+
+## Execution Guidelines
+
+- Execute instructions in order, flowing naturally between them
+- Script instructions are guidance, not text to copy verbatim
+- Vary rhythm—sentence length, paragraph length
+- Match depth to importance; load-bearing ideas get more space
+- Trust the script's choices; your job is to make them sing
+
+## Formatting
+
+- Flowing prose with proper paragraphs
+- **Bold** for key terms on first introduction
+- *Italics* sparingly for emphasis
+- Avoid bullet points unless genuinely necessary (rarely)
+- Do NOT include the section heading (added automatically)
+"""
+
+
+SECTION_PROMPT = """## Section to Write
+
+**Chapter {chapter_id}: {chapter_title}**
+**Section {section_id}: {section_title}**
+
+## Instructions
+1. Write ONLY this section's content based on the section script below
+2. Build naturally on the previous sections
+3. Match the tone and depth established in earlier sections
+4. Follow the outline structure (the ### headings indicate subsections to cover)
+5. Do NOT repeat content from previous sections, unless instructed to do so in the section script
+6. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
+7. Start directly with the content
+
+## Previously Written Sections in This Chapter
+<START OF PREVIOUS SECTIONS>
+{previous_sections}
+<END OF PREVIOUS SECTIONS>
+
+## Section Script
+<START OF SECTION SCRIPT>
+{script}
+<END OF SECTION SCRIPT>
+
+---
+
+Begin writing the section:
+"""
+
+
+FIRST_SECTION_PROMPT = """## Section to Write
+
+**Chapter {chapter_id}: {chapter_title}**
+**Section {section_id}: {section_title}**
+
+This is the FIRST section of the chapter, so establish the chapter's tone and themes.
+
+## Instructions
+1. Write ONLY this section's content based on the section script below
+2. This is the opening section - hook the reader and establish context
+3. Follow the outline structure (the ### headings indicate subsections to cover)
+4. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
+5. Start directly with the content
+
+## Section Script
+<START OF SECTION SCRIPT>
+{script}
+<END OF SECTION SCRIPT>
+---
+
+Begin writing the section:
+"""
+
 # =============================================================================
 # Phase 2: Identify Refinements
 # =============================================================================
@@ -15,7 +130,9 @@ Your analysis must be precise, actionable, and well-reasoned.
 """
 
 IDENTIFY_USER_PROMPT = """## Generated Section
+<START OF GENERATED SECTION>
 {generated_content}
+<END OF GENERATED SECTION>
 
 ## Your Task: Identify Opportunities for Refinement
 
@@ -71,10 +188,14 @@ Your job is to apply these changes accurately and produce the final, polished ve
 """
 
 IMPLEMENT_USER_PROMPT = """## Current Section
+<START OF GENERATED SECTION>
 {generated_content}
+<END OF GENERATED SECTION>
 
 ## Identified Refinements
+<START OF IDENTIFIED REFINEMENTS>
 {feedback}
+<END OF IDENTIFIED REFINEMENTS>
 
 ## Your Task
 
@@ -99,75 +220,6 @@ return the Current Section unchanged.
 * Do **not** include any introductory text, explanations, reports on your changes,
 or any other metadata in your response.
 * Your output must begin directly with the finalized content.
-"""
-
-SYSTEM_PROMPT = """You are an expert author writing a book titled "{book_title}".
-
-Your writing style should be:
-- Authoritative but accessible
-- No jargon without explanation
-- Concrete examples over abstract theory
-- Acknowledge complexity without drowning in it
-- Include occasional dry humor where appropriate
-- Not academic; not dumbed-down
-
-IMPORTANT FORMATTING RULES:
-- Write in flowing prose with proper paragraphs
-- Use markdown formatting appropriately (headers for subsections, bold for emphasis, etc.)
-- Do NOT include the section heading itself (it will be added automatically)
-- Focus only on the content described in the outline
-- Maintain consistency with previously written sections
-- If the outline includes ### subheadings, incorporate those naturally into your writing
-
-IMPORTANT CONTENT RULES:
-- Length should be section appropriate, based on the complexity of the section content
-- Make sure content is thoroughly covered *without* being overly verbose
-- The final result should be lean but complete
-"""
-
-SECTION_PROMPT = """## Current Task
-Write the content for section "{section_title}" of {chapter_type} {chapter_id}: {chapter_title}.
-
-## Chapter Goals
-{chapter_goals}
-
-## Section Outline (what to cover)
-{section_outline}
-
-## Previously Written Sections in This Chapter
-{previous_sections}
-
-## Instructions
-1. Write ONLY this section's content based on the outline above
-2. Build naturally on the previous sections (if any)
-3. Match the tone and depth established in earlier sections
-4. Follow the outline structure (the ### headings indicate subsections to cover)
-5. Do NOT repeat content from previous sections
-6. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
-7. Start directly with the content
-
-Begin writing the section content now:
-"""
-
-FIRST_SECTION_PROMPT = """## Current Task
-Write the content for section "{section_title}" of {chapter_type} {chapter_id}: {chapter_title}.
-
-This is the FIRST section of the chapter, so establish the chapter's tone and themes.
-
-## Chapter Goals
-{chapter_goals}
-
-## Section Outline (what to cover)
-{section_outline}
-
-## Instructions
-1. Write ONLY this section's content based on the outline above
-2. This is the opening section - hook the reader and establish context
-3. Follow the outline structure (the ### headings indicate subsections to cover)
-4. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
-5. Start directly with the content
-
-Begin writing the section content now:
 """
 
 
@@ -197,7 +249,6 @@ def build_section_prompt(
             chapter_type=chapter_type,
             chapter_id=chapter_display_id,
             chapter_title=chapter.title,
-            chapter_goals=chapter.goals or "Not specified",
             section_outline=section.outline_content,
         )
     else:
@@ -208,7 +259,6 @@ def build_section_prompt(
             chapter_type=chapter_type,
             chapter_id=chapter_display_id,
             chapter_title=chapter.title,
-            chapter_goals=chapter.goals or "Not specified",
             section_outline=section.outline_content,
             previous_sections=prev_text,
         )
