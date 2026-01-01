@@ -106,6 +106,8 @@ class StateManager:
         content: Optional[str] = None,
         error: Optional[str] = None,
         token_count: Optional[int] = None,
+        initial_content: Optional[str] = None,
+        identify_feedback: Optional[str] = None,
     ) -> BookState:
         """Update section state and persist immediately."""
         if chapter_id not in state.chapters:
@@ -129,6 +131,13 @@ class StateManager:
         elif status == SectionStatus.FAILED:
             section_state.last_error = error
             section_state.retry_count += 1
+
+        # Store intermediate outputs from the three-phase pipeline (on any status)
+        # This enables debugging and potential resume even after failures
+        if initial_content is not None:
+            section_state.initial_content = initial_content
+        if identify_feedback is not None:
+            section_state.identify_feedback = identify_feedback
 
         # Update chapter status
         self._update_chapter_status(chapter_state)
