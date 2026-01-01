@@ -88,9 +88,11 @@ Calibre is used for EPUB to PDF conversion with perfect formatting and working t
 
 ## Usage
 
+### Book Updater (update existing books)
+
 The workflow is typically a two-step process:
 
-### 1. Convert PDF to Markdown
+1. **Convert PDF to Markdown**
 
 Use the `marker` tool to convert your book from PDF to a clean Markdown file.
 
@@ -98,7 +100,7 @@ Use the `marker` tool to convert your book from PDF to a clean Markdown file.
 uv run marker_single /path/to/book.pdf --output_format markdown --output_dir . --use_llm --gemini_api_key YOUR_GEMINI_API_KEY
 ```
 
-### 2. Run the Processing Pipeline
+2. **Run the Processing Pipeline**
 
 Use the Python pipeline to apply transformations to the Markdown file. You can run pre-defined phases or create your own.
 
@@ -119,6 +121,79 @@ pipeline = Pipeline(
 
 # Run the desired phases
 pipeline.run()
+```
+
+You can also run pipeline processing through the CLI for books defined in `books/`:
+
+```bash
+python -m cli run <book_name>
+```
+
+### Book Writer (generate a new book from an outline)
+
+The book writer is an outline-first workflow. It reads a rubric file, generates per-section drafts, and tracks progress
+so you can resume later.
+
+1. **Initialize a new project**
+
+```bash
+python -m book_writer init books/my_new_book --title "My New Book"
+```
+
+This creates `config.yaml`, `rubric.md`, and an `output/` folder.
+
+2. **Edit `rubric.md` with your outline**
+
+The parser looks for H1 chapter headers and H2 section headers. A minimal structure looks like this:
+
+```markdown
+# My New Book
+
+## Chapter Goals
+- What this chapter should accomplish
+
+# Chapter 1: Opening Ideas
+
+## 1.1 First Section
+### Guidance for the model
+- Bullet points, prompts, or notes
+
+## 1.2 Second Section
+### Guidance for the model
+- More detail
+```
+
+Supported headers include `# Preface`, `# Chapter N: Title`, `# Appendix A: Title`, and `# Final Notes`.
+
+3. **Generate content**
+
+The book writer currently uses OpenRouter for generation, so make sure `OPENROUTER_API_KEY` is set in your environment.
+
+```bash
+python -m book_writer generate books/my_new_book
+```
+
+Helpful options:
+
+```bash
+python -m book_writer generate books/my_new_book --chapters 1,2 --max-concurrent 3
+python -m book_writer generate books/my_new_book --test-run
+python -m book_writer generate books/my_new_book --phase1-model anthropic/claude-3.5-sonnet
+```
+
+4. **Resume, check status, and combine outputs**
+
+```bash
+python -m book_writer resume books/my_new_book
+python -m book_writer status books/my_new_book
+python -m book_writer combine books/my_new_book
+```
+
+The combined markdown is written to `output/book.md`. You can also convert to PDF/EPUB (requires Pandoc and the system
+dependencies described above):
+
+```bash
+python -m book_writer convert books/my_new_book --format both
 ```
 
 ## LLM Provider Configuration
@@ -318,6 +393,25 @@ The old build commands still work for backward compatibility:
 ```bash
 python -m build <book_name> <version>
 python -m books.the_federalist_papers.build build v0.0-alpha
+```
+
+### Book Writer CLI
+
+The book writer uses its own CLI module:
+
+```bash
+python -m book_writer --help
+```
+
+Common commands:
+
+```bash
+python -m book_writer init <book_dir> --title "Book Title"
+python -m book_writer generate <book_dir>
+python -m book_writer resume <book_dir>
+python -m book_writer status <book_dir>
+python -m book_writer combine <book_dir>
+python -m book_writer convert <book_dir> --format both
 ```
 
 ## Examples
