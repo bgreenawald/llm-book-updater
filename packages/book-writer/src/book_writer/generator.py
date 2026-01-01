@@ -43,11 +43,27 @@ def _feedback_indicates_no_changes(feedback: str) -> bool:
 
 
 def get_chapter_filename(chapter: ChapterOutline) -> str:
-    """Generate the filename for a chapter based on its ID."""
+    """Generate the filename for a chapter based on its ID.
+
+    Args:
+        chapter: The chapter outline to generate a filename for.
+
+    Returns:
+        A filename string in the format "chapter_XX.md" where XX is zero-padded.
+
+    Raises:
+        ValueError: If chapter.number is None and chapter.id is not a numeric string.
+    """
     if chapter.number is not None:
         chapter_num = chapter.number
     else:
-        chapter_num = int(chapter.id) if chapter.id.isdigit() else 0
+        if not chapter.id.isdigit():
+            raise ValueError(
+                f"Chapter ID '{chapter.id}' must be a numeric string when "
+                f"chapter.number is None. Non-digit IDs are not supported for "
+                f"filename generation to prevent collisions."
+            )
+        chapter_num = int(chapter.id)
     return f"chapter_{chapter_num:02d}.md"
 
 

@@ -85,7 +85,7 @@ SECTION_PROMPT = """## Section to Write
 
 ## Section Script
 <START OF SECTION SCRIPT>
-{script}
+{section_outline}
 <END OF SECTION SCRIPT>
 
 ---
@@ -110,7 +110,7 @@ This is the FIRST section of the chapter, so establish the chapter's tone and th
 
 ## Section Script
 <START OF SECTION SCRIPT>
-{script}
+{section_outline}
 <END OF SECTION SCRIPT>
 ---
 
@@ -234,6 +234,7 @@ def build_section_prompt(
 
     if not previous_sections:
         user_msg = FIRST_SECTION_PROMPT.format(
+            section_id=section.id,
             section_title=section.title,
             chapter_id=chapter.id,
             chapter_title=chapter.title,
@@ -243,6 +244,7 @@ def build_section_prompt(
         # Format previous sections
         prev_text = "\n\n---\n\n".join([f"### {title}\n\n{content}" for title, content in previous_sections])
         user_msg = SECTION_PROMPT.format(
+            section_id=section.id,
             section_title=section.title,
             chapter_id=chapter.id,
             chapter_title=chapter.title,
