@@ -143,9 +143,10 @@ class GenerationConfig(BaseModel):
 
     def get_model_for_phase(self, phase: int) -> str:
         """Get the model to use for a specific phase (1, 2, or 3)."""
-        phase_map = {
-            1: self.phase_models.generate,
-            2: self.phase_models.identify,
-            3: self.phase_models.implement,
-        }
-        return phase_map.get(phase) or self.model
+        if phase == 1:
+            return self.phase_models.generate or self.model
+        if phase == 2:
+            return self.phase_models.identify or self.model
+        if phase == 3:
+            return self.phase_models.implement or self.model
+        raise ValueError(f"Invalid phase: {phase}. Must be 1, 2, or 3.")
