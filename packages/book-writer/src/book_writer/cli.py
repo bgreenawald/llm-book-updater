@@ -34,10 +34,10 @@ def cli():
 
 
 def _create_test_outline(
-    outline,
+    outline: "BookOutline",
     chapter_ids: list[str],
-    max_sections: int,
-):
+    max_sections: Optional[int],
+) -> "BookOutline":
     """Create a filtered outline for test runs."""
     filtered = deepcopy(outline)
 
