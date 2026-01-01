@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from llm_core import AsyncOpenRouterClient, LlmModelError
 from loguru import logger
@@ -275,6 +275,59 @@ class BookGenerator:
         self._notify_progress(chapter.id, section.id, "completed")
         return True, final_content
 
+    async def _run_phase_with_error_handling(
+        self,
+        phase_name: str,
+        phase_number: int,
+        chapter_id: str,
+        section_id: str,
+        messages: list[dict[str, str]],
+        state: BookState,
+        **state_update_kwargs: Any,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Execute a phase with standardized error handling and progress reporting.
+
+        Args:
+            phase_name: Human-readable phase name (e.g., "Generate", "Identify", "Implement").
+            phase_number: Phase number (1, 2, or 3).
+            chapter_id: Chapter identifier.
+            section_id: Section identifier.
+            messages: LLM messages for this phase.
+            state: Current book state.
+            **state_update_kwargs: Additional kwargs to pass to update_section on failure
+                (e.g., initial_content, identify_feedback for debugging).
+
+        Returns:
+            Tuple of (success, content). On failure, returns (False, None).
+        """
+        # Convert phase name to gerund form for progress notification
+        # Generate -> generating, Identify -> identifying, Implement -> implementing
+        action_verb = phase_name.lower()
+        if action_verb.endswith("e"):
+            action_verb = action_verb[:-1] + "ing"
+        elif not action_verb.endswith("ing"):
+            action_verb = action_verb + "ing"
+
+        self._notify_progress(chapter_id, section_id, f"phase{phase_number}_{action_verb}")
+
+        try:
+            content = await self.client.generate(messages)
+            self._notify_progress(chapter_id, section_id, f"phase{phase_number}_completed")
+            return True, content
+
+        except LlmModelError as e:
+            self.state_manager.update_section(
+                state,
+                chapter_id,
+                section_id,
+                status=SectionStatus.FAILED,
+                error=f"Phase {phase_number} ({phase_name}) failed: {e}",
+                **state_update_kwargs,
+            )
+            self._notify_progress(chapter_id, section_id, f"phase{phase_number}_failed", str(e))
+            return False, None
+
     async def _run_generation_phase(
         self,
         chapter: ChapterOutline,
@@ -287,8 +340,6 @@ class BookGenerator:
 
         Returns (success, initial_content).
         """
-        self._notify_progress(chapter.id, section.id, "phase1_generating")
-
         messages = build_section_prompt(
             section=section,
             chapter=chapter,
@@ -296,21 +347,14 @@ class BookGenerator:
             previous_sections=previous_sections,
         )
 
-        try:
-            content = await self.client.generate(messages)
-            self._notify_progress(chapter.id, section.id, "phase1_completed")
-            return True, content
-
-        except LlmModelError as e:
-            self.state_manager.update_section(
-                state,
-                chapter.id,
-                section.id,
-                status=SectionStatus.FAILED,
-                error=f"Phase 1 (Generate) failed: {e}",
-            )
-            self._notify_progress(chapter.id, section.id, "phase1_failed", str(e))
-            return False, None
+        return await self._run_phase_with_error_handling(
+            phase_name="Generate",
+            phase_number=1,
+            chapter_id=chapter.id,
+            section_id=section.id,
+            messages=messages,
+            state=state,
+        )
 
     async def _run_identify_phase(
         self,
@@ -324,26 +368,17 @@ class BookGenerator:
 
         Returns (success, feedback).
         """
-        self._notify_progress(chapter_id, section_id, "phase2_identifying")
-
         messages = build_identify_prompt(generated_content=initial_content)
 
-        try:
-            feedback = await self.client.generate(messages)
-            self._notify_progress(chapter_id, section_id, "phase2_completed")
-            return True, feedback
-
-        except LlmModelError as e:
-            self.state_manager.update_section(
-                state,
-                chapter_id,
-                section_id,
-                status=SectionStatus.FAILED,
-                error=f"Phase 2 (Identify) failed: {e}",
-                initial_content=initial_content,  # Preserve P1 output for debugging
-            )
-            self._notify_progress(chapter_id, section_id, "phase2_failed", str(e))
-            return False, None
+        return await self._run_phase_with_error_handling(
+            phase_name="Identify",
+            phase_number=2,
+            chapter_id=chapter_id,
+            section_id=section_id,
+            messages=messages,
+            state=state,
+            initial_content=initial_content,  # Preserve P1 output for debugging
+        )
 
     async def _run_implement_phase(
         self,
@@ -358,30 +393,21 @@ class BookGenerator:
 
         Returns (success, final_content).
         """
-        self._notify_progress(chapter_id, section_id, "phase3_implementing")
-
         messages = build_implement_prompt(
             generated_content=initial_content,
             feedback=feedback,
         )
 
-        try:
-            final_content = await self.client.generate(messages)
-            self._notify_progress(chapter_id, section_id, "phase3_completed")
-            return True, final_content
-
-        except LlmModelError as e:
-            self.state_manager.update_section(
-                state,
-                chapter_id,
-                section_id,
-                status=SectionStatus.FAILED,
-                error=f"Phase 3 (Implement) failed: {e}",
-                initial_content=initial_content,  # Preserve P1 output for debugging
-                identify_feedback=feedback,  # Preserve P2 output for debugging
-            )
-            self._notify_progress(chapter_id, section_id, "phase3_failed", str(e))
-            return False, None
+        return await self._run_phase_with_error_handling(
+            phase_name="Implement",
+            phase_number=3,
+            chapter_id=chapter_id,
+            section_id=section_id,
+            messages=messages,
+            state=state,
+            initial_content=initial_content,  # Preserve P1 output for debugging
+            identify_feedback=feedback,  # Preserve P2 output for debugging
+        )
 
     async def _write_partial_chapter(
         self,
