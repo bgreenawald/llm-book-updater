@@ -43,15 +43,28 @@ def _feedback_indicates_no_changes(feedback: str) -> bool:
 
 
 def get_chapter_filename(chapter: ChapterOutline) -> str:
-    """Generate the filename for a chapter based on its ID."""
-    if chapter.id == "preface":
-        return "00_preface.md"
-    elif chapter.id.startswith("appendix_"):
-        letter = chapter.id.replace("appendix_", "").lower()
-        return f"appendix_{letter}.md"
+    """Generate the filename for a chapter based on its ID.
+
+    Args:
+        chapter: The chapter outline to generate a filename for.
+
+    Returns:
+        A filename string in the format "chapter_XX.md" where XX is zero-padded.
+
+    Raises:
+        ValueError: If chapter.number is None and chapter.id is not a numeric string.
+    """
+    if chapter.number is not None:
+        chapter_num = chapter.number
     else:
-        num = int(chapter.id) if chapter.id.isdigit() else 0
-        return f"chapter_{num:02d}.md"
+        if not chapter.id.isdigit():
+            raise ValueError(
+                f"Chapter ID '{chapter.id}' must be a numeric string when "
+                f"chapter.number is None. Non-digit IDs are not supported for "
+                f"filename generation to prevent collisions."
+            )
+        chapter_num = int(chapter.id)
+    return f"chapter_{chapter_num:02d}.md"
 
 
 class BookGenerator:
@@ -77,12 +90,8 @@ class BookGenerator:
 
         # Build chapter lookup
         self._chapters: dict[str, ChapterOutline] = {}
-        if outline.preface:
-            self._chapters[outline.preface.id] = outline.preface
         for chapter in outline.chapters:
             self._chapters[chapter.id] = chapter
-        for appendix in outline.appendices:
-            self._chapters[appendix.id] = appendix
 
     def _get_sections_for_chapter(self, chapter: ChapterOutline) -> list[SectionOutline]:
         if self.max_sections_per_chapter is None:
@@ -468,13 +477,7 @@ class BookGenerator:
         lines = []
 
         # Chapter heading
-        if chapter.id == "preface":
-            lines.append(f"# Preface: {chapter.title}")
-        elif chapter.id.startswith("appendix_"):
-            letter = chapter.id.replace("appendix_", "").upper()
-            lines.append(f"# Appendix {letter}: {chapter.title}")
-        else:
-            lines.append(f"# Chapter {chapter.id}: {chapter.title}")
+        lines.append(f"# Chapter {chapter.id}: {chapter.title}")
 
         lines.append("")
 
@@ -524,13 +527,7 @@ def combine_chapters(output_dir: Path, outline: BookOutline) -> Path:
     # Get all chapter files in order by iterating through the outline
     chapter_files = []
 
-    all_chapters = []
-    if outline.preface:
-        all_chapters.append(outline.preface)
-    all_chapters.extend(outline.chapters)
-    all_chapters.extend(outline.appendices)
-
-    for chapter in all_chapters:
+    for chapter in outline.chapters:
         chapter_file = chapters_dir / get_chapter_filename(chapter)
         if chapter_file.exists():
             chapter_files.append(chapter_file)
