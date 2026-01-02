@@ -66,8 +66,8 @@ Follow the script's instructions in order. Common elements you'll encounter:
 
 SECTION_PROMPT = """## Section to Write
 
-**Chapter {chapter_id}: {chapter_title}**
-**Section {section_id}: {section_title}**
+**{chapter_title}**
+**{section_title}**
 
 ## Instructions
 1. Write ONLY this section's content based on the section script below
@@ -75,7 +75,7 @@ SECTION_PROMPT = """## Section to Write
 3. Match the tone and depth established in earlier sections
 4. Follow the outline structure (the ### headings indicate subsections to cover)
 5. Do NOT repeat content from previous sections, unless instructed to do so in the section script
-6. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
+6. Do NOT include the section heading itself (e.g., don't start with "## Core Idea...")
 7. Start directly with the content
 
 ## Previously Written Sections in This Chapter
@@ -96,16 +96,16 @@ Begin writing the section:
 
 FIRST_SECTION_PROMPT = """## Section to Write
 
-**Chapter {chapter_id}: {chapter_title}**
-**Section {section_id}: {section_title}**
+**{chapter_title}**
+**{section_title}**
 
-This is the FIRST section of the chapter, so establish the chapter's tone and themes.
+This is the FIRST section, so establish the tone and themes.
 
 ## Instructions
 1. Write ONLY this section's content based on the section script below
 2. This is the opening section - hook the reader and establish context
 3. Follow the outline structure (the ### headings indicate subsections to cover)
-4. Do NOT include the section heading itself (e.g., don't start with "## 1.1 Core Idea...")
+4. Do NOT include the section heading itself (e.g., don't start with "## Core Idea...")
 5. Start directly with the content
 
 ## Section Script
