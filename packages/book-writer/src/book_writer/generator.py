@@ -477,7 +477,7 @@ class BookGenerator:
         lines = []
 
         # Chapter heading
-        lines.append(f"# Chapter {chapter.id}: {chapter.title}")
+        lines.append(f"# {chapter.title}")
 
         lines.append("")
 
