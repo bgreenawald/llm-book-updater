@@ -81,7 +81,7 @@ def main() -> None:
     """Main function to run the pipeline."""
     logger = setup_logging("the_varieties_of_religious_experience")
     try:
-        logger.info("Starting pipeline execution from main.py")
+        logger.info("Starting pipeline execution from run.py")
         run_pipeline(config=config)
         logger.success("Pipeline execution finished.")
     except Exception as e:
