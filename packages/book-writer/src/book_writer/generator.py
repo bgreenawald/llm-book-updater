@@ -361,7 +361,7 @@ class BookGenerator:
         messages = build_section_prompt(
             section=section,
             chapter=chapter,
-            book_title=self.outline.title,
+            outline=self.outline,
             previous_sections=previous_sections,
         )
 

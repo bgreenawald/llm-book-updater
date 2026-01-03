@@ -1,6 +1,6 @@
 """Prompt templates for LLM generation."""
 
-from .models import ChapterOutline, SectionOutline
+from .models import BookOutline, ChapterOutline, SectionOutline
 
 SYSTEM_PROMPT = """You are writing a book in a series of non-fiction books for curious, intelligent adults
 who want genuine understanding of common topic areas.
@@ -83,6 +83,14 @@ SECTION_PROMPT = """## Section to Write
 {previous_sections}
 <END OF PREVIOUS SECTIONS>
 
+## Full Book Rubric
+The following is the complete rubric for the entire book. Use this to understand
+what topics are covered in other sections and avoid repetition:
+
+<START OF FULL BOOK RUBRIC>
+{full_rubric}
+<END OF FULL BOOK RUBRIC>
+
 ## Section Script
 <START OF SECTION SCRIPT>
 {section_outline}
@@ -107,6 +115,14 @@ This is the FIRST section, so establish the tone and themes.
 3. Follow the outline structure (the ### headings indicate subsections to cover)
 4. Do NOT include the section heading itself (e.g., don't start with "## Core Idea...")
 5. Start directly with the content
+
+## Full Book Rubric
+The following is the complete rubric for the entire book. Use this to understand
+what topics are covered in other sections and avoid repetition:
+
+<START OF FULL BOOK RUBRIC>
+{full_rubric}
+<END OF FULL BOOK RUBRIC>
 
 ## Section Script
 <START OF SECTION SCRIPT>
@@ -226,11 +242,12 @@ or any other metadata in your response.
 def build_section_prompt(
     section: SectionOutline,
     chapter: ChapterOutline,
-    book_title: str,
+    outline: BookOutline,
     previous_sections: list[tuple[str, str]],  # [(section_title, content), ...]
 ) -> list[dict]:
     """Build the complete messages array for section generation."""
-    system_msg = SYSTEM_PROMPT.format(book_title=book_title)
+    system_msg = SYSTEM_PROMPT.format(book_title=outline.title)
+    full_rubric = format_full_rubric(outline)
 
     if not previous_sections:
         user_msg = FIRST_SECTION_PROMPT.format(
@@ -239,6 +256,7 @@ def build_section_prompt(
             chapter_id=chapter.id,
             chapter_title=chapter.title,
             section_outline=section.outline_content,
+            full_rubric=full_rubric,
         )
     else:
         # Format previous sections
@@ -250,12 +268,25 @@ def build_section_prompt(
             chapter_title=chapter.title,
             section_outline=section.outline_content,
             previous_sections=prev_text,
+            full_rubric=full_rubric,
         )
 
     return [
         {"role": "system", "content": system_msg},
         {"role": "user", "content": user_msg},
     ]
+
+
+def format_full_rubric(outline: BookOutline) -> str:
+    """Format the complete book rubric for inclusion in prompts."""
+    rubric_str = f"# {outline.title}"
+    for chapter in outline.chapters:
+        rubric_str += f"\n\n## {chapter.title}"
+        for section in chapter.sections:
+            rubric_str += f"\n\n### {section.title}"
+            if section.outline_content:
+                rubric_str += f"\n{section.outline_content}"
+    return rubric_str
 
 
 def build_identify_prompt(generated_content: str) -> list[dict]:
