@@ -279,16 +279,14 @@ def build_section_prompt(
 
 def format_full_rubric(outline: BookOutline) -> str:
     """Format the complete book rubric for inclusion in prompts."""
-    parts = [f"# {outline.title}"]
-
+    rubric_str = f"# {outline.title}"
     for chapter in outline.chapters:
-        parts.append(f"\n## {chapter.title}")
+        rubric_str += f"\n\n## {chapter.title}"
         for section in chapter.sections:
-            parts.append(f"\n### {section.title}")
+            rubric_str += f"\n\n### {section.title}"
             if section.outline_content:
-                parts.append(section.outline_content)
-
-    return "\n".join(parts)
+                rubric_str += f"\n{section.outline_content}"
+    return rubric_str
 
 
 def build_identify_prompt(generated_content: str) -> list[dict]:
