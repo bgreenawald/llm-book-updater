@@ -11,6 +11,8 @@ The book you're writing is titled "{book_title}".
 
 You will receive a section script: a sequence of instructions that define what to write and in what order.
 Your job is to execute these instructions as clear, engaging prose that flows naturally.
+For context, you will also receive the complete book rubric. Use this to understand
+what topics are covered in other sections and how to effectively link concepts across sections.
 
 The script handles structure and pedagogy. You handle voice, flow, readability, and additional content.
 Imagine the script as a skeleton, and you are the flesh and blood that brings it to life.
@@ -49,7 +51,7 @@ Follow the script's instructions in order. Common elements you'll encounter:
 ## Execution Guidelines
 
 - Execute instructions in order, flowing naturally between them
-- Script instructions are guidance, not text to copy verbatim
+- Script instructions are guidance, not text to copy verbatim. It is your job to flesh out the content of the script.
 - Vary rhythm—sentence length, paragraph length
 - Match depth to importance; load-bearing ideas get more space
 - Trust the script's choices; your job is to make them sing
@@ -78,11 +80,6 @@ SECTION_PROMPT = """## Section to Write
 6. Do NOT include the section heading itself (e.g., don't start with "## Core Idea...")
 7. Start directly with the content
 
-## Previously Written Sections in This Chapter
-<START OF PREVIOUS SECTIONS>
-{previous_sections}
-<END OF PREVIOUS SECTIONS>
-
 ## Full Book Rubric
 The following is the complete rubric for the entire book. Use this to understand
 what topics are covered in other sections and avoid repetition:
@@ -90,6 +87,12 @@ what topics are covered in other sections and avoid repetition:
 <START OF FULL BOOK RUBRIC>
 {full_rubric}
 <END OF FULL BOOK RUBRIC>
+
+## Previously Written Sections in This Chapter
+<START OF PREVIOUS SECTIONS>
+{previous_sections}
+<END OF PREVIOUS SECTIONS>
+
 
 ## Section Script
 <START OF SECTION SCRIPT>

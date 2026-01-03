@@ -1,0 +1,6 @@
+title: The Business Engine
+phase_models:
+  generate: moonshotai/kimi-k2-thinking
+  identify: deepseek/deepseek-v3.2
+  implement: moonshotai/kimi-k2-thinking
+max_concurrent_chapters: 5
