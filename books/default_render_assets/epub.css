@@ -57,9 +57,10 @@ p {
   margin: 0 0 1em;
 }
 blockquote {
-  margin: 1em 1.2em;
-  padding: 0.5em 1em;
-  border-left: 4px solid #ccc;
+  margin: 1em 0;
+  padding: 0.75em 0.25em;
+  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
   background: #f9f9f9;
   font-style: italic;
 }
