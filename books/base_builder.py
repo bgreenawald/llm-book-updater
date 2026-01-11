@@ -103,7 +103,7 @@ class BookConfig:
         """
         # Replace special characters and spaces with hyphens
         clean = re.sub(r"[^\w\s-]", "", title)
-        clean = re.sub(r"[-\s]+", "-", clean)
+        clean = re.sub(r"[-\s_]+", "-", clean)
         return clean.strip("-")
 
     def _get_cover_image(self) -> Path:
