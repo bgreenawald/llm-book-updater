@@ -69,7 +69,7 @@ class BookConfig:
         self.staged_original_md = self.staging_dir / "original.md"
 
         # Build Output Paths
-        self.build_dir = Path("build") / self.name / self.version
+        self.build_dir = Path("build") / self.name.replace("_", "-") / self.version
         self.build_modernized_md = self.build_dir / f"{self.clean_title}-modernized.md"
         self.build_annotated_md = self.build_dir / f"{self.clean_title}-annotated.md"
         self.build_original_md = self.build_dir / f"{self.clean_title}-original.md"
