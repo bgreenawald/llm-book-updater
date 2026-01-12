@@ -9,6 +9,7 @@ dependencies = [
     "llm-core",
     "book-updater",
     "book-writer",
+    "pillow",
 ]
 
 [tool.uv.workspace]
