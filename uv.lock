@@ -805,6 +805,7 @@ dependencies = [
     { name = "book-updater" },
     { name = "book-writer" },
     { name = "llm-core" },
+    { name = "pillow" },
 ]
 
 [package.optional-dependencies]
@@ -831,6 +832,7 @@ requires-dist = [
     { name = "book-writer", editable = "packages/book-writer" },
     { name = "llm-core", editable = "packages/llm-core" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
+    { name = "pillow" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },

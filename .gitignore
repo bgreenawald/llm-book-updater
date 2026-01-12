@@ -98,3 +98,6 @@ Thumbs.db
 
 # LLM plans
 plans
+
+# Untracked books
+books/the_road_to_serfdom/

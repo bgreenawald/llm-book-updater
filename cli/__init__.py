@@ -12,12 +12,16 @@ Available commands:
     build                Build books from markdown sources to EPUB/PDF formats
     run                  Run pipeline processing for books from markdown sources
     consolidate-metadata Consolidate multiple metadata files into one
+    cover                Generate book covers using AI image generation
+    mini-cover           Generate mini covers (thumbnails) from existing covers
     release              Create a GitHub release for a built book
 
 Examples:
     python -m cli build the_federalist_papers v1.0.0
     python -m cli run on_liberty
     python -m cli consolidate-metadata books/on_liberty/output
+    python -m cli cover on_liberty
+    python -m cli mini-cover on_liberty
     python -m cli release build/the_federalist_papers/v1.0
 """
 
@@ -27,6 +31,8 @@ import click
 
 from .build import build_command
 from .consolidate import consolidate_command
+from .cover import cover_command
+from .mini_cover import mini_cover_command
 from .release import release_command
 from .run import run_command
 
@@ -42,6 +48,8 @@ def cli():
 cli.add_command(build_command)
 cli.add_command(run_command)
 cli.add_command(consolidate_command)
+cli.add_command(cover_command)
+cli.add_command(mini_cover_command)
 cli.add_command(release_command)
 
 
