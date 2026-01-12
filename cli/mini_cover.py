@@ -6,15 +6,13 @@ top block and using AI to remove text and extend borders.
 """
 
 import base64
-import io
 import sys
 from pathlib import Path
 
 import click
 import requests
-from PIL import Image
 
-from .common import get_available_books, validate_book_exists
+from .common import convert_to_webp, get_available_books, validate_book_exists
 
 
 def encode_image_to_base64(image_data: bytes) -> str:
@@ -126,22 +124,6 @@ The result should be a clean, text-free version of the original images top squar
     except (KeyError, ValueError, IndexError) as e:
         click.echo(f"Failed to parse API response: {e}", err=True)
         raise
-
-
-def convert_to_webp(image_data: bytes) -> bytes:
-    """
-    Convert image bytes to WebP format.
-
-    Args:
-        image_data: Image data as bytes
-
-    Returns:
-        WebP image data as bytes
-    """
-    with Image.open(io.BytesIO(image_data)) as img:
-        buffer = io.BytesIO()
-        img.save(buffer, format="WEBP", quality=90)
-        return buffer.getvalue()
 
 
 @click.command("mini-cover")

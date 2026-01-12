@@ -11,7 +11,7 @@ from pathlib import Path
 import click
 import requests
 
-from .common import get_available_books, validate_book_exists
+from .common import convert_to_webp, get_available_books, validate_book_exists
 
 
 def get_book_metadata(book_name: str) -> tuple[str, str]:
@@ -237,11 +237,18 @@ Author: {author}
         reference_path = Path(example_cover)
         image_data = generate_cover_image(full_prompt, reference_path, api_key, model)
 
-        # Save the cover
-        output_path = Path("books") / matched_book_name / "cover.png"
-        output_path.write_bytes(image_data)
+        # Save PNG
+        png_output_path = Path("books") / matched_book_name / "cover.png"
+        png_output_path.write_bytes(image_data)
 
-        click.echo(f"Cover saved to: {output_path}")
+        # Save WebP
+        click.echo("Converting cover to WebP format...")
+        webp_image = convert_to_webp(image_data)
+        webp_output_path = Path("books") / matched_book_name / "cover.webp"
+        webp_output_path.write_bytes(webp_image)
+
+        click.echo(f"Cover saved to: {png_output_path}")
+        click.echo(f"Cover saved to: {webp_output_path}")
 
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)

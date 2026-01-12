@@ -5,9 +5,12 @@ This module provides common functionality used across different CLI commands,
 such as book discovery and validation.
 """
 
+import io
 import sys
 from pathlib import Path
 from typing import List
+
+from PIL import Image
 
 
 def _get_valid_book_dirs() -> List[Path]:
@@ -120,3 +123,19 @@ def validate_book_exists(book_name: str, available_books: List[str]) -> str:
         SystemExit: If the book is not found or multiple matches exist
     """
     return find_matching_book(book_name, available_books)
+
+
+def convert_to_webp(image_data: bytes) -> bytes:
+    """
+    Convert image bytes to WebP format.
+
+    Args:
+        image_data: Image data as bytes
+
+    Returns:
+        WebP image data as bytes
+    """
+    with Image.open(io.BytesIO(image_data)) as img:
+        buffer = io.BytesIO()
+        img.save(buffer, format="WEBP", quality=90)
+        return buffer.getvalue()
