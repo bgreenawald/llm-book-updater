@@ -408,10 +408,59 @@ class BaseBookBuilder(ABC):
                 self.config.staged_original_md, preface_content, license_content, self.config.version
             )
 
+    def fix_inline_quotes(self, input_path: Path) -> None:
+        """
+        Detects and fixes inline quotes that appear in the middle of sentences.
+
+        Quotes should be on their own lines with blank lines before and after,
+        but sometimes the LLM generates them inline with surrounding text.
+        This method extracts inline quotes and reformats them correctly.
+
+        Args:
+            input_path: Path to the markdown file to process
+        """
+        content = input_path.read_text(encoding="utf-8")
+        inline_quote_pattern = re.compile(r"(.*?)(>\s*\*\*Quote:\*\*\s*.*?\s*\*\*End quote\.\*\*)(.*)", flags=re.DOTALL)
+
+        lines = content.split("\n")
+        fixed_lines = []
+        fixed_count = 0
+
+        for line in lines:
+            match = inline_quote_pattern.match(line)
+            if match:
+                before = match.group(1).strip()
+                quote = match.group(2).strip()
+                after = match.group(3).strip()
+
+                if before:
+                    fixed_lines.append(before)
+
+                if before and fixed_lines and fixed_lines[-1].strip():
+                    fixed_lines.append("")
+
+                fixed_lines.append(quote)
+
+                if after:
+                    fixed_lines.append("")
+
+                if after:
+                    fixed_lines.append(after)
+
+                fixed_count += 1
+            else:
+                fixed_lines.append(line)
+
+        if fixed_count > 0:
+            content = "\n".join(fixed_lines)
+            input_path.write_text(content, encoding="utf-8")
+            logger.info(f"Fixed {fixed_count} inline quote(s) in '{self.safe_relative_path(input_path)}'")
+
     def clean_markdown_files(self) -> None:
         """
         Clean markdown files by replacing <br> tags, cleaning annotation patterns,
-        and replacing pipeline-specific markers with reader-friendly alternatives.
+        fixing inline quotes, and replacing pipeline-specific markers with
+        reader-friendly alternatives.
         """
         logger.info("Replacing <br> tags with spaces")
         self.replace_br_tags(self.config.staged_modernized_md)
@@ -424,6 +473,12 @@ class BaseBookBuilder(ABC):
         self.clean_annotation_patterns(self.config.staged_annotated_md)
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
+
+        logger.info("Fixing inline quotes")
+        self.fix_inline_quotes(self.config.staged_modernized_md)
+        self.fix_inline_quotes(self.config.staged_annotated_md)
+        if self.config.staged_original_md.exists():
+            self.fix_inline_quotes(self.config.staged_original_md)
 
         logger.info("Replacing pipeline-specific markers with reader-friendly alternatives")
         self.clean_start_markers(self.config.staged_modernized_md)
