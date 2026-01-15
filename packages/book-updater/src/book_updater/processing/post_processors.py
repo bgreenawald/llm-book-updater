@@ -793,9 +793,7 @@ class InlineQuoteProcessor(PostProcessor):
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(name="inline_quote", config=config)
         # Pattern to match inline quotes: > **Quote:** ... **End quote.**
-        self.inline_quote_pattern = re.compile(
-            r"(.*?)(>\s*\*\*Quote:\*\*\s*.*?\s*\*\*End quote\.\*\*)(.*)", flags=re.DOTALL
-        )
+        self.inline_quote_pattern = re.compile(r"(.*?)(>\s*\*\*Quote:\*\*\s*.*?\s*\*\*End quote\.\*\*)(.*)")
 
     def process(self, original_block: str, llm_block: str, **kwargs) -> str:
         """
@@ -819,23 +817,14 @@ class InlineQuoteProcessor(PostProcessor):
                 quote = match.group(2).strip()
                 after = match.group(3).strip()
 
-                # Add text before the quote
                 if before:
                     processed_lines.append(before)
-
-                # Add blank line before quote
-                if before and processed_lines and processed_lines[-1].strip():
                     processed_lines.append("")
 
-                # Add the quote on its own line
                 processed_lines.append(quote)
 
-                # Add blank line after quote
                 if after:
                     processed_lines.append("")
-
-                # Add text after the quote
-                if after:
                     processed_lines.append(after)
 
                 logger.info("Fixed inline quote: extracted from single line to proper format")

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import pypandoc  # type: ignore[import-untyped]
+from book_updater.processing.post_processors import InlineQuoteProcessor
 from loguru import logger
 from PIL import Image
 from PIL.Image import Image as PilImage
@@ -420,41 +421,12 @@ class BaseBookBuilder(ABC):
             input_path: Path to the markdown file to process
         """
         content = input_path.read_text(encoding="utf-8")
-        inline_quote_pattern = re.compile(r"(.*?)(>\s*\*\*Quote:\*\*\s*.*?\s*\*\*End quote\.\*\*)(.*)", flags=re.DOTALL)
+        processor = InlineQuoteProcessor()
+        new_content = processor.process(original_block="", llm_block=content)
 
-        lines = content.split("\n")
-        fixed_lines = []
-        fixed_count = 0
-
-        for line in lines:
-            match = inline_quote_pattern.match(line)
-            if match:
-                before = match.group(1).strip()
-                quote = match.group(2).strip()
-                after = match.group(3).strip()
-
-                if before:
-                    fixed_lines.append(before)
-
-                if before and fixed_lines and fixed_lines[-1].strip():
-                    fixed_lines.append("")
-
-                fixed_lines.append(quote)
-
-                if after:
-                    fixed_lines.append("")
-
-                if after:
-                    fixed_lines.append(after)
-
-                fixed_count += 1
-            else:
-                fixed_lines.append(line)
-
-        if fixed_count > 0:
-            content = "\n".join(fixed_lines)
-            input_path.write_text(content, encoding="utf-8")
-            logger.info(f"Fixed {fixed_count} inline quote(s) in '{self.safe_relative_path(input_path)}'")
+        if new_content != content:
+            input_path.write_text(new_content, encoding="utf-8")
+            logger.info(f"Fixed inline quotes in '{self.safe_relative_path(input_path)}'")
 
     def clean_markdown_files(self) -> None:
         """
