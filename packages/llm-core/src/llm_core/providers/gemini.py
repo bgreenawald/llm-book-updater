@@ -143,23 +143,30 @@ class GeminiClient(ProviderClient):
 
         return "\n".join(jsonl_lines)
 
-    def _retry_network_call(self, func, max_retries: int = 3, retry_delay: int = 30):
-        """Retry a network call with exponential backoff for OSError."""
+    def _retry_network_call(self, func, max_retries: int = 3, retry_delay: int = 30) -> Any:
+        """Retry a network call with exponential backoff for OSError.
+
+        Args:
+            func: The function to call.
+            max_retries: Number of retries after initial attempt (total attempts = max_retries + 1).
+            retry_delay: Base delay in seconds for exponential backoff.
+        """
         last_error: OSError | None = None
-        for attempt in range(max_retries):
+        total_attempts = max_retries + 1
+        for attempt in range(total_attempts):
             try:
                 return func()
             except OSError as e:
                 last_error = e
-                if attempt < max_retries - 1:
+                if attempt < max_retries:
                     wait_time = retry_delay * (2**attempt)
                     module_logger.warning(
-                        f"Network error (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s: {e}"
+                        f"Network error (attempt {attempt + 1}/{total_attempts}), retrying in {wait_time}s: {e}"
                     )
                     time.sleep(wait_time)
         if last_error is not None:
             raise last_error
-        raise OSError("Network call failed with no error captured")
+        raise ValueError("max_retries must be a non-negative integer")
 
     def _poll_batch_job(self, client, job_name: str, timeout_seconds: int = 3600 * 24) -> bool:
         """Poll batch job until completion or timeout."""
