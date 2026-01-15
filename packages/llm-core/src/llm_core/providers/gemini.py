@@ -143,6 +143,31 @@ class GeminiClient(ProviderClient):
 
         return "\n".join(jsonl_lines)
 
+    def _retry_network_call(self, func, max_retries: int = 3, retry_delay: int = 30) -> Any:
+        """Retry a network call with exponential backoff for OSError.
+
+        Args:
+            func: The function to call.
+            max_retries: Number of retries after initial attempt (total attempts = max_retries + 1).
+            retry_delay: Base delay in seconds for exponential backoff.
+        """
+        last_error: OSError | None = None
+        total_attempts = max_retries + 1
+        for attempt in range(total_attempts):
+            try:
+                return func()
+            except OSError as e:
+                last_error = e
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2**attempt)
+                    module_logger.warning(
+                        f"Network error (attempt {attempt + 1}/{total_attempts}), retrying in {wait_time}s: {e}"
+                    )
+                    time.sleep(wait_time)
+        if last_error is not None:
+            raise last_error
+        raise ValueError("max_retries must be a non-negative integer")
+
     def _poll_batch_job(self, client, job_name: str, timeout_seconds: int = 3600 * 24) -> bool:
         """Poll batch job until completion or timeout."""
         start_time = time.time()
@@ -166,6 +191,10 @@ class GeminiClient(ProviderClient):
             except (AttributeError, TypeError) as e:
                 module_logger.error(f"Error polling batch job: {e}")
                 return False
+            except OSError as e:
+                module_logger.warning(f"Network error polling batch job, will retry: {e}")
+                time.sleep(poll_interval)
+                continue
 
         module_logger.error(f"Batch job timed out after {timeout_seconds} seconds")
         return False
@@ -286,11 +315,11 @@ class GeminiClient(ProviderClient):
                 if not self._poll_batch_job(client, batch_job.name, batch_timeout):
                     return super().batch_chat_completion(requests, model_name, **kwargs)
 
-                completed_job = client.batches.get(name=batch_job.name)
+                completed_job = self._retry_network_call(lambda: client.batches.get(name=batch_job.name))
 
                 if hasattr(completed_job, "dest") and hasattr(completed_job.dest, "file_name"):
                     result_file_name = completed_job.dest.file_name
-                    result_bytes = client.files.download(file=result_file_name)
+                    result_bytes = self._retry_network_call(lambda: client.files.download(file=result_file_name))
                     result_content = result_bytes.decode("utf-8")
 
                     responses = self._parse_batch_results(result_content, requests, model_name)
