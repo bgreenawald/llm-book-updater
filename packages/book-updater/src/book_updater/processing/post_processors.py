@@ -832,7 +832,7 @@ class InlineQuoteProcessor(PostProcessor):
 
                 current = after
 
-            if current.strip():
+            if current:
                 processed_lines.append(current)
 
         return "\n".join(processed_lines)
