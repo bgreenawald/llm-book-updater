@@ -10,6 +10,7 @@ from book_updater.phases.two_stage import StageConfig, TwoStageFinalPhase
 from book_updater.phases.utils import read_file
 from book_updater.processing.post_processors import (
     EnsureBlankLineProcessor,
+    InlineQuoteProcessor,
     NoNewHeadersPostProcessor,
     OrderQuoteAnnotationProcessor,
     PostProcessor,
@@ -73,6 +74,7 @@ class PhaseFactory:
         PostProcessorType.REMOVE_XML_TAGS,
         PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
         PostProcessorType.PRESERVE_F_STRING_TAGS,
+        PostProcessorType.INLINE_QUOTE,
         PostProcessorType.ENSURE_BLANK_LINE,
         PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
     ]
@@ -407,6 +409,7 @@ class PhaseFactory:
             "remove_blank_lines_in_list": RemoveBlankLinesInListProcessor,
             "preserve_fstring_tags": PreserveFStringTagsProcessor,
             "validate_non_empty_section": ValidateNonEmptySectionProcessor,
+            "inline_quote": InlineQuoteProcessor,
         }
 
         processor_class = processors.get(processor_name.lower())
@@ -440,6 +443,7 @@ class PhaseFactory:
             PostProcessorType.PRESERVE_F_STRING_TAGS: PreserveFStringTagsProcessor,
             PostProcessorType.REMOVE_BLANK_LINES_IN_LIST: RemoveBlankLinesInListProcessor,
             PostProcessorType.VALIDATE_NON_EMPTY_SECTION: ValidateNonEmptySectionProcessor,
+            PostProcessorType.INLINE_QUOTE: InlineQuoteProcessor,
         }
 
         processor_class = processor_mapping.get(processor_type)

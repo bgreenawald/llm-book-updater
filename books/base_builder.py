@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import pypandoc  # type: ignore[import-untyped]
+from book_updater.processing.post_processors import InlineQuoteProcessor
 from loguru import logger
 from PIL import Image
 from PIL.Image import Image as PilImage
@@ -408,10 +409,30 @@ class BaseBookBuilder(ABC):
                 self.config.staged_original_md, preface_content, license_content, self.config.version
             )
 
+    def fix_inline_quotes(self, input_path: Path) -> None:
+        """
+        Detects and fixes inline quotes that appear in the middle of sentences.
+
+        Quotes should be on their own lines with blank lines before and after,
+        but sometimes the LLM generates them inline with surrounding text.
+        This method extracts inline quotes and reformats them correctly.
+
+        Args:
+            input_path: Path to the markdown file to process
+        """
+        content = input_path.read_text(encoding="utf-8")
+        processor = InlineQuoteProcessor()
+        new_content = processor.process(original_block="", llm_block=content)
+
+        if new_content != content:
+            input_path.write_text(new_content, encoding="utf-8")
+            logger.info(f"Fixed inline quotes in '{self.safe_relative_path(input_path)}'")
+
     def clean_markdown_files(self) -> None:
         """
         Clean markdown files by replacing <br> tags, cleaning annotation patterns,
-        and replacing pipeline-specific markers with reader-friendly alternatives.
+        fixing inline quotes, and replacing pipeline-specific markers with
+        reader-friendly alternatives.
         """
         logger.info("Replacing <br> tags with spaces")
         self.replace_br_tags(self.config.staged_modernized_md)
@@ -424,6 +445,12 @@ class BaseBookBuilder(ABC):
         self.clean_annotation_patterns(self.config.staged_annotated_md)
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
+
+        logger.info("Fixing inline quotes")
+        self.fix_inline_quotes(self.config.staged_modernized_md)
+        self.fix_inline_quotes(self.config.staged_annotated_md)
+        if self.config.staged_original_md.exists():
+            self.fix_inline_quotes(self.config.staged_original_md)
 
         logger.info("Replacing pipeline-specific markers with reader-friendly alternatives")
         self.clean_start_markers(self.config.staged_modernized_md)
