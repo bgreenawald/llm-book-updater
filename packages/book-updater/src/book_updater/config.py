@@ -49,6 +49,7 @@ class PostProcessorType(Enum):
 
     # Specialized processors
     ORDER_QUOTE_ANNOTATION = auto()
+    INLINE_QUOTE = auto()
 
     # Validation processors
     VALIDATE_NON_EMPTY_SECTION = auto()
