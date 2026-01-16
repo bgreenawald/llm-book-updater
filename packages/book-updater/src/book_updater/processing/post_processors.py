@@ -765,19 +765,19 @@ class PreserveFStringTagsProcessor(PostProcessor):
 
 
 __all__ = [
-    "PostProcessor",
+    "EmptySectionError",
     "EnsureBlankLineProcessor",
+    "InlineQuoteProcessor",
+    "NoNewHeadersPostProcessor",
+    "OrderQuoteAnnotationProcessor",
+    "PostProcessor",
+    "PreserveFStringTagsProcessor",
     "RemoveBlankLinesInListProcessor",
-    "RemoveXmlTagsProcessor",
     "RemoveMarkdownBlocksProcessor",
     "RemoveTrailingWhitespaceProcessor",
     "RevertRemovedBlockLines",
-    "NoNewHeadersPostProcessor",
-    "OrderQuoteAnnotationProcessor",
-    "EmptySectionError",
     "ValidateNonEmptySectionProcessor",
-    "PreserveFStringTagsProcessor",
-    "InlineQuoteProcessor",
+    "RemoveXmlTagsProcessor",
 ]
 
 
@@ -811,8 +811,12 @@ class InlineQuoteProcessor(PostProcessor):
         processed_lines = []
 
         for line in lines:
-            match = self.inline_quote_pattern.match(line)
-            if match:
+            current = line
+            while True:
+                match = self.inline_quote_pattern.search(current)
+                if not match:
+                    break
+
                 before = match.group(1).strip()
                 quote = match.group(2).strip()
                 after = match.group(3).strip()
@@ -822,13 +826,13 @@ class InlineQuoteProcessor(PostProcessor):
                     processed_lines.append("")
 
                 processed_lines.append(quote)
-
-                if after:
-                    processed_lines.append("")
-                    processed_lines.append(after)
+                processed_lines.append("")
 
                 logger.info("Fixed inline quote: extracted from single line to proper format")
-            else:
-                processed_lines.append(line)
+
+                current = after
+
+            if current.strip():
+                processed_lines.append(current)
 
         return "\n".join(processed_lines)
