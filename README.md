@@ -135,7 +135,9 @@ python -m cli run <book_name>
 Generate a study guide with section-by-section notes and flashcards:
 
 ```python
+from book_updater import PhaseConfig, PhaseType
 from book_updater.study_guide import StudyGuideConfig, run_study_guide
+from llm_core import GEMINI_FLASH
 from pathlib import Path
 
 config = StudyGuideConfig(
@@ -145,8 +147,18 @@ config = StudyGuideConfig(
     input_file=Path("input.md"),
     output_dir=Path("study_guide_output/"),
     original_file=Path("original.md"),
-    notes_phase=PhaseConfig(...),
-    flashcards_phase=PhaseConfig(...),
+    notes_phase=PhaseConfig(
+        phase_type=PhaseType.MODERNIZE,
+        model=GEMINI_FLASH,
+        system_prompt_path=Path("prompts/notes_system.md"),
+        user_prompt_path=Path("prompts/notes_user.md"),
+    ),
+    flashcards_phase=PhaseConfig(
+        phase_type=PhaseType.MODERNIZE,
+        model=GEMINI_FLASH,
+        system_prompt_path=Path("prompts/flashcards_system.md"),
+        user_prompt_path=Path("prompts/flashcards_user.md"),
+    ),
 )
 
 output = run_study_guide(config)

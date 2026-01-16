@@ -4,6 +4,7 @@ from pathlib import Path
 
 from llm_core import LlmModel, ModelConfig
 from llm_core.config import DEFAULT_TAGS_TO_PRESERVE, BaseConfig
+from loguru import logger
 from pydantic import Field
 
 from book_updater.config import PhaseConfig
@@ -51,52 +52,28 @@ def run_study_guide(config: StudyGuideConfig) -> Path:
     notes_model = _get_model(config.notes_phase.model)
     flashcards_model = _get_model(config.flashcards_phase.model)
 
-    notes_factory_config = PhaseConfig(
-        phase_type=config.notes_phase.phase_type,
-        name="study_guide_notes",
-        input_file_path=config.input_file,
-        output_file_path=notes_output,
-        original_file_path=config.original_file,
-        system_prompt_path=config.notes_phase.system_prompt_path,
-        user_prompt_path=config.notes_phase.user_prompt_path,
-        book_name=config.book_name,
-        author_name=config.author_name,
-        llm_model_instance=notes_model,
-        reasoning=config.notes_phase.reasoning,
-        llm_kwargs=config.notes_phase.llm_kwargs,
-        post_processors=config.notes_phase.post_processors,
-        use_batch=config.notes_phase.use_batch,
-        batch_size=config.notes_phase.batch_size,
-        enable_retry=config.notes_phase.enable_retry,
-        max_retries=config.notes_phase.max_retries,
-        use_subblocks=config.notes_phase.use_subblocks,
-        max_subblock_tokens=config.notes_phase.max_subblock_tokens,
-        min_subblock_tokens=config.notes_phase.min_subblock_tokens,
-        skip_if_less_than_tokens=config.notes_phase.skip_if_less_than_tokens,
+    notes_factory_config = config.notes_phase.model_copy(
+        update={
+            "name": "study_guide_notes",
+            "input_file_path": config.input_file,
+            "output_file_path": notes_output,
+            "original_file_path": config.original_file,
+            "book_name": config.book_name,
+            "author_name": config.author_name,
+            "llm_model_instance": notes_model,
+        }
     )
 
-    flashcards_factory_config = PhaseConfig(
-        phase_type=config.flashcards_phase.phase_type,
-        name="study_guide_flashcards",
-        input_file_path=config.input_file,
-        output_file_path=flashcards_output,
-        original_file_path=config.original_file,
-        system_prompt_path=config.flashcards_phase.system_prompt_path,
-        user_prompt_path=config.flashcards_phase.user_prompt_path,
-        book_name=config.book_name,
-        author_name=config.author_name,
-        llm_model_instance=flashcards_model,
-        reasoning=config.flashcards_phase.reasoning,
-        llm_kwargs=config.flashcards_phase.llm_kwargs,
-        post_processors=config.flashcards_phase.post_processors,
-        use_batch=config.flashcards_phase.use_batch,
-        batch_size=config.flashcards_phase.batch_size,
-        enable_retry=config.flashcards_phase.enable_retry,
-        max_retries=config.flashcards_phase.max_retries,
-        use_subblocks=config.flashcards_phase.use_subblocks,
-        max_subblock_tokens=config.flashcards_phase.max_subblock_tokens,
-        min_subblock_tokens=config.flashcards_phase.min_subblock_tokens,
-        skip_if_less_than_tokens=config.flashcards_phase.skip_if_less_than_tokens,
+    flashcards_factory_config = config.flashcards_phase.model_copy(
+        update={
+            "name": "study_guide_flashcards",
+            "input_file_path": config.input_file,
+            "output_file_path": flashcards_output,
+            "original_file_path": config.original_file,
+            "book_name": config.book_name,
+            "author_name": config.author_name,
+            "llm_model_instance": flashcards_model,
+        }
     )
 
     try:
@@ -147,6 +124,8 @@ def assemble_study_guide(notes_file: Path, flashcards_file: Path, output_file: P
         notes_header, notes_body = get_header_and_body(notes_block)
         flashcards_header, flashcards_body = get_header_and_body(flashcards_block)
 
+        if notes_header and flashcards_header and notes_header.strip() != flashcards_header.strip():
+            logger.warning(f'Mismatched headers found.\n  Notes: "{notes_header}"\n  Flashcards: "{flashcards_header}"')
         section_header = notes_header or flashcards_header
         flashcards_heading = _flashcards_heading(section_header)
 
@@ -167,13 +146,9 @@ def assemble_study_guide(notes_file: Path, flashcards_file: Path, output_file: P
 
 def _flashcards_heading(section_header: str) -> str:
     if section_header.startswith("#"):
-        hash_count = 0
-        for char in section_header:
-            if char == "#":
-                hash_count += 1
-            else:
-                break
-        if hash_count:
-            hash_count = max(1, min(hash_count + 1, 6))
-            return f"{'#' * hash_count} Flashcards"
+        hash_count = len(section_header) - len(section_header.lstrip("#"))
+        if hash_count > 0:
+            # Increment heading level, capping at 6
+            new_level = min(hash_count + 1, 6)
+            return f"{'#' * new_level} Flashcards"
     return "## Flashcards"

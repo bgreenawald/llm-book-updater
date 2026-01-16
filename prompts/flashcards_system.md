@@ -5,14 +5,14 @@ Create flashcards from the text section using the exact Obsidian Spaced Repetiti
 ## Format (use exactly)
 
 One-way cards (how/why/process):
-```
+```text
 ###### <Question>?
 ?
 <Answer>
 ```
 
 Bidirectional cards (facts/definitions):
-```
+```text
 ###### <Question>?
 ??
 <Answer>

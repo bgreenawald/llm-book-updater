@@ -9,6 +9,6 @@ Create a concise, chapter-following summary that captures every essential point 
 3. **Format**: You have flexibility on format. The structure should be Markdown, but there isn't a rigid approach you have to follow. For some books, full sentences and paragraphs may be appropriate. For others, bullet points or numbered lists might be better.
 4. **Content**: The idea is to give the reader a complete baseline for their notes, so that they can focus on adding their own insights and expanding on what is interesting to them without worrying that they are missing anything big.
 ---
-**Constraints**
+## Constraints
 - Output ONLY the Markdown body content
 - No preface, no commentary
