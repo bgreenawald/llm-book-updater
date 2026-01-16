@@ -10,6 +10,7 @@ from book_updater.config import (
     TwoStageModelConfig,
 )
 from book_updater.pipeline import Pipeline
+from book_updater.study_guide import StudyGuideConfig, run_study_guide
 
 __all__ = [
     "__version__",
@@ -19,4 +20,6 @@ __all__ = [
     "PostProcessorType",
     "RunConfig",
     "TwoStageModelConfig",
+    "StudyGuideConfig",
+    "run_study_guide",
 ]
