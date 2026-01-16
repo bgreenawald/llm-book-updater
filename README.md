@@ -16,6 +16,7 @@ This repository contains three packages:
 - **Markdown-First Workflow**: Easily convert PDF books to Markdown and process them.
 - **Flexible Processing Pipeline**: Customize content processing with different "phases" like content modernization, editing, and adding annotations.
 - **Extensible Annotation System**: Add introductions or summaries to sections without altering the original text.
+- **Study Guide Generation**: Generate study guides with section-by-section notes and flashcards.
 - **Parallel Processing**: Process multiple sections concurrently for improved performance.
 - **Automatic Metadata**: Keeps a JSON record of each pipeline run, tracking settings, files, and phase details.
 - **Post-Processing Pipeline**: Configurable post-processing chain with detailed logging and metadata tracking.
@@ -128,6 +129,30 @@ You can also run pipeline processing through the CLI for books defined in `books
 ```bash
 python -m cli run <book_name>
 ```
+
+#### Study Guide Generation
+
+Generate a study guide with section-by-section notes and flashcards:
+
+```python
+from book_updater.study_guide import StudyGuideConfig, run_study_guide
+from pathlib import Path
+
+config = StudyGuideConfig(
+    book_id="my_book",
+    book_name="My Book",
+    author_name="Author Name",
+    input_file=Path("input.md"),
+    output_dir=Path("study_guide_output/"),
+    original_file=Path("original.md"),
+    notes_phase=PhaseConfig(...),
+    flashcards_phase=PhaseConfig(...),
+)
+
+output = run_study_guide(config)
+```
+
+The study guide combines notes and flashcards into a single file with each section's notes followed by its flashcards.
 
 ### Book Writer (generate a new book from an outline)
 
