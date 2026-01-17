@@ -100,4 +100,5 @@ Thumbs.db
 plans
 
 # Untracked books
-books/the_road_to_serfdom/
+books/the_road_to_serfdom/*.md
+books/the_use_of_knowledge_in_society/*.md
