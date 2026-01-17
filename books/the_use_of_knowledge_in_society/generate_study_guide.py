@@ -51,8 +51,8 @@ def main() -> None:
         logger.info("Starting study guide generation")
         output_file = run_study_guide(config=config)
         logger.success(f"Study guide generated successfully: {output_file}")
-    except Exception as e:
-        logger.error(f"An error occurred during study guide generation: {e}", exc_info=True)
+    except Exception:
+        logger.exception("An error occurred during study guide generation")
         sys.exit(1)
 
 
