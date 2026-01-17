@@ -44,7 +44,6 @@ Bidirectional cards (facts/definitions):
 - **Bold**: `**term**` for key terms in answers
 - **Lists**: Bullet points or numbered lists are fine
 - **LaTeX**: `$$...$$` for display math, `$...$` for inline
-- **Tags**: Preserve `{preface}`, `{license}` exactly where they appear
 - **Length**: Maximum 5-6 lines per answer; be concise but complete
 
 ## Answer Style
@@ -83,4 +82,3 @@ That basal ganglia activity increases as behaviors become automatic, showing phy
 **Constraints**
 - Output ONLY the flashcards (no headers, commentary, or explanatory text)
 - Make sure there are blank lines between flashcards
-- Preserve any `{tag}` elements exactly as they appear
