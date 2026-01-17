@@ -4,7 +4,7 @@
 
 Create a minimalist book cover with three horizontal color blocks:
 
-- **Top block (60%)**: Book title in modern sans-serif
+- **Top block (60%)**: Book title in modern sans-serif, along with a distinct visual element for the book. The visual element should be a stylized representation of something representing the book.
 - **Middle block (25%)**: Author name(s)
 - **Bottom block (15%)**: "Timeless Library Edition"
 
