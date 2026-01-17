@@ -1,4 +1,4 @@
-"""Generate a study guide for The Use of Knowledge in Society.
+"""Generate a study guide for The Road to Serfdom.
 
 This script creates a study guide with:
 - Section-by-section notes
