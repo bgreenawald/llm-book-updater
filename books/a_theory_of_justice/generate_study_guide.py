@@ -17,7 +17,7 @@ from book_updater.study_guide import StudyGuideConfig, run_study_guide
 from llm_core import ModelConfig, Provider
 
 # Model configurations
-MINIMAX = ModelConfig(provider=Provider.OPENROUTER, model_id="minimax/minimax-m2.7")
+QWEN = ModelConfig(provider=Provider.OPENROUTER, model_id="qwen/qwen3.6-plus")
 # Study guide configuration
 config = StudyGuideConfig(
     book_id="a_theory_of_justice",
@@ -28,7 +28,7 @@ config = StudyGuideConfig(
     original_file=Path("books/a_theory_of_justice/input_transformed.md"),
     notes_phase=PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=MINIMAX,
+        model=QWEN,
         system_prompt_path=Path("prompts/notes_system.md"),
         user_prompt_path=Path("prompts/notes_user.md"),
         enable_retry=True,
@@ -41,7 +41,7 @@ config = StudyGuideConfig(
     ),
     flashcards_phase=PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=MINIMAX,
+        model=QWEN,
         system_prompt_path=Path("prompts/flashcards_system.md"),
         user_prompt_path=Path("prompts/flashcards_user.md"),
         post_processors=[
