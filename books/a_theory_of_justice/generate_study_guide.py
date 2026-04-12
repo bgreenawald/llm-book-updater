@@ -1,4 +1,4 @@
-"""Generate a study guide for The Road to Serfdom.
+"""Generate a study guide for A Theory of Justice.
 
 This script creates a study guide with:
 - Section-by-section notes
@@ -17,18 +17,18 @@ from book_updater.study_guide import StudyGuideConfig, run_study_guide
 from llm_core import ModelConfig, Provider
 
 # Model configurations
-KIMI = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
+MINIMAX = ModelConfig(provider=Provider.OPENROUTER, model_id="minimax/minimax-m2.7")
 # Study guide configuration
 config = StudyGuideConfig(
-    book_id="the_road_to_serfdom",
-    book_name="The Road to Serfdom",
-    author_name="Friedrich Hayek",
-    input_file=Path("books/the_road_to_serfdom/output/03-input_transformed Final_two_stage_1.md"),
-    output_dir=Path("books/the_road_to_serfdom/output/study_guide"),
-    original_file=Path("books/the_road_to_serfdom/input_transformed.md"),
+    book_id="a_theory_of_justice",
+    book_name="A Theory of Justice",
+    author_name="John Rawls",
+    input_file=Path("books/a_theory_of_justice/output/03-input_transformed Final_two_stage_1.md"),
+    output_dir=Path("books/a_theory_of_justice/output/study_guide"),
+    original_file=Path("books/a_theory_of_justice/input_transformed.md"),
     notes_phase=PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=KIMI,
+        model=MINIMAX,
         system_prompt_path=Path("prompts/notes_system.md"),
         user_prompt_path=Path("prompts/notes_user.md"),
         enable_retry=True,
@@ -41,7 +41,7 @@ config = StudyGuideConfig(
     ),
     flashcards_phase=PhaseConfig(
         phase_type=PhaseType.MODERNIZE,
-        model=KIMI,
+        model=MINIMAX,
         system_prompt_path=Path("prompts/flashcards_system.md"),
         user_prompt_path=Path("prompts/flashcards_user.md"),
         post_processors=[
@@ -51,6 +51,7 @@ config = StudyGuideConfig(
             PostProcessorType.PRESERVE_F_STRING_TAGS,
         ],
         enable_retry=True,
+        enabled=False,
     ),
     max_workers=5,
 )
@@ -58,7 +59,7 @@ config = StudyGuideConfig(
 
 def main() -> None:
     """Main function to generate the study guide."""
-    logger = setup_logging("study_guide_the_road_to_serfdom")
+    logger = setup_logging("study_guide_a_theory_of_justice")
     try:
         logger.info("Starting study guide generation")
         output_file = run_study_guide(config=config)
