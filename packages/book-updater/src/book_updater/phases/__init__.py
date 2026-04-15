@@ -1,5 +1,6 @@
 """Phase implementations for book text transformation."""
 
+from book_updater.phases.abridge import AbridgePlanPhase, AbridgeWritePhase
 from book_updater.phases.annotation import IntroductionAnnotationPhase, SummaryAnnotationPhase
 from book_updater.phases.base import LlmPhase
 from book_updater.phases.factory import PhaseFactory
@@ -16,4 +17,6 @@ __all__ = [
     "TwoStageFinalPhase",
     "StageConfig",
     "PhaseFactory",
+    "AbridgePlanPhase",
+    "AbridgeWritePhase",
 ]

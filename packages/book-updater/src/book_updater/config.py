@@ -30,6 +30,8 @@ class PhaseType(Enum):
     FINAL_TWO_STAGE = auto()  # Two-stage FINAL with identify + implement
     INTRODUCTION = auto()
     SUMMARY = auto()
+    ABRIDGE_PLAN = auto()  # Stage 1: reads full book, produces abridgement plan
+    ABRIDGE_WRITE = auto()  # Stage 2: writes abridged sections from plan + source
 
 
 class PostProcessorType(Enum):
@@ -91,6 +93,7 @@ class PhaseConfig(BaseConfig):
     llm_kwargs: dict[str, Any] | None = None
     system_prompt_path: Path | None = None
     user_prompt_path: Path | None = None
+    custom_input_path: Path | None = None
     custom_output_path: Path | None = None
     # Additional parameters for PhaseFactory integration
     name: str | None = None

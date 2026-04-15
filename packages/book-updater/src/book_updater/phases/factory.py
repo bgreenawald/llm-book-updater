@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Type, TypedDict, Union
 from llm_core import LlmModel
 
 from book_updater.config import PhaseConfig, PhaseType, PostProcessorType
+from book_updater.phases.abridge import AbridgePlanPhase, AbridgeWritePhase
 from book_updater.phases.annotation import IntroductionAnnotationPhase, SummaryAnnotationPhase
 from book_updater.phases.standard import StandardLlmPhase
 from book_updater.phases.two_stage import StageConfig, TwoStageFinalPhase
@@ -79,6 +80,19 @@ class PhaseFactory:
         PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
     ]
 
+    # Post-processors for the ABRIDGE_WRITE phase: same as base but without
+    # NO_NEW_HEADERS since the abridged edition creates its own structure.
+    ABRIDGE_WRITE_POST_PROCESSORS: list[PostProcessorType] = [
+        PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
+        PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+        PostProcessorType.REMOVE_XML_TAGS,
+        PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
+        PostProcessorType.PRESERVE_F_STRING_TAGS,
+        PostProcessorType.INLINE_QUOTE,
+        PostProcessorType.ENSURE_BLANK_LINE,
+        PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
+    ]
+
     DEFAULT_POST_PROCESSORS: dict[PhaseType, list[PostProcessorType]] = {
         PhaseType.MODERNIZE: BASE_POST_PROCESSORS,
         PhaseType.EDIT: BASE_POST_PROCESSORS,
@@ -93,6 +107,10 @@ class PhaseFactory:
             PostProcessorType.ORDER_QUOTE_ANNOTATION,
             *BASE_POST_PROCESSORS[1:],  # Rest of base processors
         ],
+        # ABRIDGE_PLAN produces structured plan text — no post-processing needed
+        PhaseType.ABRIDGE_PLAN: [],
+        # ABRIDGE_WRITE creates new structure so NO_NEW_HEADERS is excluded
+        PhaseType.ABRIDGE_WRITE: ABRIDGE_WRITE_POST_PROCESSORS,
     }
 
     @staticmethod
@@ -361,6 +379,80 @@ class PhaseFactory:
             max_retries=config.max_retries,
             skip_if_less_than_tokens=config.skip_if_less_than_tokens,
             tags_to_preserve=tags_to_preserve,
+        )
+
+    @staticmethod
+    def create_abridge_plan_phase(
+        config: PhaseConfig,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> AbridgePlanPhase:
+        """Create an AbridgePlanPhase from a PhaseConfig.
+
+        Args:
+            config: PhaseConfig with ABRIDGE_PLAN type. Must have
+                llm_model_instance, input_file_path, and output_file_path set.
+            tags_to_preserve: Unused for plan phase; kept for API consistency.
+            max_workers: Unused for plan phase; kept for API consistency.
+
+        Returns:
+            AbridgePlanPhase: Configured planning phase.
+        """
+        validated = PhaseFactory._validate_required_phase_fields(config, "AbridgePlanPhase")
+
+        return AbridgePlanPhase(
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            original_file_path=validated["original_file_path"],
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            model=validated["llm_model_instance"],
+            system_prompt_path=config.system_prompt_path,
+            user_prompt_path=config.user_prompt_path,
+            reasoning=config.reasoning,
+            llm_kwargs=config.llm_kwargs,
+            enable_retry=config.enable_retry,
+            max_retries=config.max_retries,
+        )
+
+    @staticmethod
+    def create_abridge_write_phase(
+        config: PhaseConfig,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> AbridgeWritePhase:
+        """Create an AbridgeWritePhase from a PhaseConfig.
+
+        The write phase reads the plan (input_file_path) and writes each section.
+        Source material is embedded in the plan by the planning phase, so no
+        separate source file is required.
+
+        Args:
+            config: PhaseConfig with ABRIDGE_WRITE type. Must have
+                llm_model_instance, input_file_path, and output_file_path set.
+            tags_to_preserve: Unused; kept for API consistency.
+            max_workers: Number of parallel workers for section writing.
+
+        Returns:
+            AbridgeWritePhase: Configured writing phase.
+        """
+        validated = PhaseFactory._validate_required_phase_fields(config, "AbridgeWritePhase")
+
+        return AbridgeWritePhase(
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            model=validated["llm_model_instance"],
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            system_prompt_path=config.system_prompt_path,
+            user_prompt_path=config.user_prompt_path,
+            reasoning=config.reasoning,
+            llm_kwargs=config.llm_kwargs,
+            max_workers=max_workers,
+            enable_retry=config.enable_retry,
+            max_retries=config.max_retries,
         )
 
     @staticmethod

@@ -66,6 +66,7 @@ class BookConfig:
         self.staging_dir = self.base_dir / "staging"
         self.staged_modernized_md = self.staging_dir / "modernized.md"
         self.staged_annotated_md = self.staging_dir / "annotated.md"
+        self.staged_abridged_md = self.staging_dir / "abridged.md"
         self.staged_metadata_json = self.staging_dir / "metadata.json"
         self.staged_original_md = self.staging_dir / "original.md"
 
@@ -73,12 +74,15 @@ class BookConfig:
         self.build_dir = Path("build") / self.name.replace("_", "-") / self.version
         self.build_modernized_md = self.build_dir / f"{self.clean_title}-modernized.md"
         self.build_annotated_md = self.build_dir / f"{self.clean_title}-annotated.md"
+        self.build_abridged_md = self.build_dir / f"{self.clean_title}-abridged.md"
         self.build_original_md = self.build_dir / f"{self.clean_title}-original.md"
         self.build_metadata_json = self.build_dir / f"{self.clean_title}-metadata.json"
         self.build_modernized_epub = self.build_dir / f"{self.clean_title}-modernized.epub"
         self.build_modernized_pdf = self.build_dir / f"{self.clean_title}-modernized.pdf"
         self.build_annotated_epub = self.build_dir / f"{self.clean_title}-annotated.epub"
         self.build_annotated_pdf = self.build_dir / f"{self.clean_title}-annotated.pdf"
+        self.build_abridged_epub = self.build_dir / f"{self.clean_title}-abridged.epub"
+        self.build_abridged_pdf = self.build_dir / f"{self.clean_title}-abridged.pdf"
 
         # Asset Paths
         self.cover_image = self._get_cover_image()
@@ -89,6 +93,7 @@ class BookConfig:
         # Base Directory Output Paths
         self.base_modernized_md = self.base_dir / "output-modernized.md"
         self.base_annotated_md = self.base_dir / "output-annotated.md"
+        self.base_abridged_md = self.base_dir / "output-abridged.md"
         self.base_original_md = self.base_dir / "output-original.md"
         self.base_metadata_json = self.base_dir / "metadata.json"
 
@@ -352,6 +357,8 @@ class BaseBookBuilder(ABC):
                 dest_path = self.config.staged_modernized_md
             elif file_type == "annotated":
                 dest_path = self.config.staged_annotated_md
+            elif file_type == "abridged":
+                dest_path = self.config.staged_abridged_md
             else:
                 continue
 
@@ -402,6 +409,10 @@ class BaseBookBuilder(ABC):
         self.format_markdown_file(
             self.config.staged_annotated_md, preface_content, license_content, self.config.version
         )
+        if self.config.staged_abridged_md.exists():
+            self.format_markdown_file(
+                self.config.staged_abridged_md, preface_content, license_content, self.config.version
+            )
 
         # Format original file if it exists
         if self.config.staged_original_md.exists():
@@ -437,24 +448,32 @@ class BaseBookBuilder(ABC):
         logger.info("Replacing <br> tags with spaces")
         self.replace_br_tags(self.config.staged_modernized_md)
         self.replace_br_tags(self.config.staged_annotated_md)
+        if self.config.staged_abridged_md.exists():
+            self.replace_br_tags(self.config.staged_abridged_md)
         if self.config.staged_original_md.exists():
             self.replace_br_tags(self.config.staged_original_md)
 
         logger.info("Cleaning annotation patterns")
         self.clean_annotation_patterns(self.config.staged_modernized_md)
         self.clean_annotation_patterns(self.config.staged_annotated_md)
+        if self.config.staged_abridged_md.exists():
+            self.clean_annotation_patterns(self.config.staged_abridged_md)
         if self.config.staged_original_md.exists():
             self.clean_annotation_patterns(self.config.staged_original_md)
 
         logger.info("Fixing inline quotes")
         self.fix_inline_quotes(self.config.staged_modernized_md)
         self.fix_inline_quotes(self.config.staged_annotated_md)
+        if self.config.staged_abridged_md.exists():
+            self.fix_inline_quotes(self.config.staged_abridged_md)
         if self.config.staged_original_md.exists():
             self.fix_inline_quotes(self.config.staged_original_md)
 
         logger.info("Replacing pipeline-specific markers with reader-friendly alternatives")
         self.clean_start_markers(self.config.staged_modernized_md)
         self.clean_start_markers(self.config.staged_annotated_md)
+        if self.config.staged_abridged_md.exists():
+            self.clean_start_markers(self.config.staged_abridged_md)
         if self.config.staged_original_md.exists():
             self.clean_start_markers(self.config.staged_original_md)
 
@@ -697,6 +716,38 @@ class BaseBookBuilder(ABC):
         else:
             logger.error(f"  -> Failed to create '{self.safe_relative_path(self.config.build_annotated_pdf)}'")
 
+        # Build Abridged Version (only if the staged file exists)
+        if self.config.staged_abridged_md.exists():
+            logger.info(f"Building abridged version for '{self.config.title}'...")
+            pypandoc.convert_file(
+                str(self.config.staged_abridged_md),
+                "epub2",
+                outputfile=str(self.config.build_abridged_epub),
+                extra_args=pandoc_args
+                + cover_args
+                + [
+                    f'--metadata=title:"{self.config.title}"',
+                    f'--metadata=author:"{self.config.author}"',
+                    f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
+                ],
+            )
+            logger.success(f"  -> Created '{self.safe_relative_path(self.config.build_abridged_epub)}'")
+
+            logger.info("Building PDF from EPUB for abridged version...")
+            success = self._build_pdf_from_epub(
+                epub_path=self.config.build_abridged_epub,
+                pdf_path=self.config.build_abridged_pdf,
+                title=self.config.title,
+                author=self.config.author,
+                version=metadata.get("book_version", self.config.version),
+            )
+            if success:
+                logger.success(f"  -> Created '{self.safe_relative_path(self.config.build_abridged_pdf)}'")
+            else:
+                logger.error(f"  -> Failed to create '{self.safe_relative_path(self.config.build_abridged_pdf)}'")
+        else:
+            logger.info("No abridged staged file found — skipping abridged EPUB/PDF build")
+
     def _build_pdf_from_epub(self, epub_path: Path, pdf_path: Path, title: str, author: str, version: str) -> bool:
         """
         Builds PDF from EPUB using Calibre's ebook-convert for perfect conversion.
@@ -778,6 +829,10 @@ class BaseBookBuilder(ABC):
 
         shutil.copy(self.config.staged_annotated_md, self.config.build_annotated_md)
         logger.info(f"Copied annotated markdown to '{self.safe_relative_path(self.config.build_annotated_md)}'")
+
+        if self.config.staged_abridged_md.exists():
+            shutil.copy(self.config.staged_abridged_md, self.config.build_abridged_md)
+            logger.info(f"Copied abridged markdown to '{self.safe_relative_path(self.config.build_abridged_md)}'")
 
         if self.config.staged_original_md.exists():
             shutil.copy(self.config.staged_original_md, self.config.build_original_md)

@@ -2,11 +2,10 @@ import sys
 from pathlib import Path
 from typing import List
 
-from src.api.config import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
-from src.api.provider import Provider
-from src.core.pipeline import run_pipeline
-from src.models.model import ModelConfig
-from src.utils.logging_config import setup_logging
+from book_updater import PhaseConfig, PhaseType, RunConfig, TwoStageModelConfig
+from book_updater.logging_config import setup_logging
+from book_updater.pipeline import run_pipeline
+from llm_core import ModelConfig, Provider
 
 DEEPSEEK_V32 = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v3.2")
 GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")

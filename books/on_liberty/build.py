@@ -39,6 +39,11 @@ class OnLibertyBuilder(BaseBookBuilder):
             "annotated": self.config.source_output_dir / "06-input_transformed Annotate_1.md",
         }
 
+        # Abridged is optional — only include it when it has been generated
+        abridged_path = self.config.source_output_dir / "07-input_transformed Abridge_write_1.md"
+        if abridged_path.exists():
+            source_files["abridged"] = abridged_path
+
         # Validate that required files exist
         for file_type, file_path in source_files.items():
             if not file_path.exists():

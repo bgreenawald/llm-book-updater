@@ -65,6 +65,7 @@ run_phases: List[PhaseConfig] = [
         use_batch=True,
     ),
 ]
+
 # Main configuration object for the pipeline run.
 config = RunConfig(
     book_id="the_federalist_papers",

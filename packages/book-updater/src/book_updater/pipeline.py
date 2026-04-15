@@ -3,7 +3,7 @@ import shutil
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import requests  # type: ignore[import-untyped]
 from llm_core import GenerationFailedError, LlmModel, LlmModelError, MaxRetriesExceededError, ModelConfig
@@ -406,6 +406,10 @@ class Pipeline:
         Returns:
             Path: The input file path for the phase
         """
+        # Use custom input path if explicitly specified on the phase
+        if self.config.phases[phase_index].custom_input_path:
+            return self.config.phases[phase_index].custom_input_path  # type: ignore[return-value]
+
         # First phase uses the run's input file
         if phase_index == 0:
             return self.config.input_file
@@ -515,7 +519,7 @@ class Pipeline:
                 name=phase_config.phase_type.name.lower(),
                 input_file_path=input_path,
                 output_file_path=output_path,
-                original_file_path=self.config.original_file,
+                original_file_path=phase_config.original_file_path or self.config.original_file,
                 system_prompt_path=phase_config.system_prompt_path,
                 user_prompt_path=phase_config.user_prompt_path,
                 book_name=self.config.book_name,
@@ -551,6 +555,24 @@ class Pipeline:
                     config=factory_config,
                     tags_to_preserve=self.config.tags_to_preserve,
                     max_workers=self.config.max_workers,
+                )
+            elif phase_config.phase_type == PhaseType.ABRIDGE_PLAN:
+                phase = cast(
+                    Phase,
+                    PhaseFactory.create_abridge_plan_phase(
+                        config=factory_config,
+                        tags_to_preserve=self.config.tags_to_preserve,
+                        max_workers=self.config.max_workers,
+                    ),
+                )
+            elif phase_config.phase_type == PhaseType.ABRIDGE_WRITE:
+                phase = cast(
+                    Phase,
+                    PhaseFactory.create_abridge_write_phase(
+                        config=factory_config,
+                        tags_to_preserve=self.config.tags_to_preserve,
+                        max_workers=self.config.max_workers,
+                    ),
                 )
             else:
                 raise ValueError(f"Unsupported phase type: {phase_config.phase_type}")
