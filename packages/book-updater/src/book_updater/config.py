@@ -31,7 +31,8 @@ class PhaseType(Enum):
     INTRODUCTION = auto()
     SUMMARY = auto()
     ABRIDGE_PLAN = auto()  # Stage 1: reads full book, produces abridgement plan
-    ABRIDGE_WRITE = auto()  # Stage 2: writes abridged sections from plan + source
+    ABRIDGE_FLESH = auto()  # Stage 2: enriches each section plan with source chapter context
+    ABRIDGE_WRITE = auto()  # Stage 3: writes abridged sections from fleshed plan
 
 
 class PostProcessorType(Enum):
@@ -55,6 +56,30 @@ class PostProcessorType(Enum):
 
     # Validation processors
     VALIDATE_NON_EMPTY_SECTION = auto()
+
+
+class AbridgeWriteModelConfig(BaseConfig):
+    """Two-model configuration for AbridgeWritePhase (profile sub-stage + write sub-stage)."""
+
+    profile_model: ModelConfig
+    write_model: ModelConfig
+    profile_reasoning: dict[str, str] | None = None
+    write_reasoning: dict[str, str] | None = None
+
+    @field_validator("profile_reasoning", "write_reasoning")
+    @classmethod
+    def validate_reasoning_fields(cls, value: dict[str, str] | None, info: ValidationInfo) -> dict[str, str] | None:
+        if value is None:
+            return value
+        if not isinstance(value, dict):
+            raise ValueError(f"{info.field_name} must be a dict[str, str] or None, got {type(value).__name__}")
+        for key, item in value.items():
+            if not isinstance(key, str) or not isinstance(item, str):
+                raise ValueError(
+                    f"{info.field_name} must be a dict[str, str]; "
+                    f"found key/value types ({type(key).__name__}, {type(item).__name__})"
+                )
+        return value
 
 
 class TwoStageModelConfig(BaseConfig):
@@ -133,6 +158,8 @@ class PhaseConfig(BaseConfig):
     skip_if_less_than_tokens: int | None = None
     # Two-stage phase configuration (required for FINAL_TWO_STAGE)
     two_stage_config: TwoStageModelConfig | None = None
+    # Abridge write configuration (required for ABRIDGE_WRITE)
+    abridge_write_config: AbridgeWriteModelConfig | None = None
 
     @field_validator("reasoning")
     @classmethod
@@ -191,7 +218,13 @@ class PhaseConfig(BaseConfig):
         elif self.two_stage_config is not None:
             raise ValueError(f"two_stage_config is only valid for FINAL_TWO_STAGE phase, not {self.phase_type.name}")
 
-        if self.phase_type != PhaseType.FINAL_TWO_STAGE:
+        if self.phase_type == PhaseType.ABRIDGE_WRITE:
+            if self.abridge_write_config is None:
+                raise ValueError("abridge_write_config is required for ABRIDGE_WRITE phase")
+        elif self.abridge_write_config is not None:
+            raise ValueError(f"abridge_write_config is only valid for ABRIDGE_WRITE phase, not {self.phase_type.name}")
+
+        if self.phase_type not in (PhaseType.FINAL_TWO_STAGE, PhaseType.ABRIDGE_WRITE):
             if self.system_prompt_path is None:
                 self.system_prompt_path = Path(f"./prompts/{self.phase_type.name.lower()}_system.md")
             if self.user_prompt_path is None:

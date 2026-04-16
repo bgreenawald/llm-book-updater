@@ -60,6 +60,16 @@ def get_books_with_run() -> List[str]:
     return sorted([item.name for item in _get_valid_book_dirs() if (item / "run.py").exists()])
 
 
+def get_books_with_abridge() -> List[str]:
+    """
+    Get books that have an abridge.py file.
+
+    Returns:
+        List of book names that can be abridged
+    """
+    return sorted([item.name for item in _get_valid_book_dirs() if (item / "abridge.py").exists()])
+
+
 def find_matching_book(partial_name: str, available_books: List[str]) -> str:
     """
     Find a book that matches the partial name. If there's exactly one match, return it.

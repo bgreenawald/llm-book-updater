@@ -11,6 +11,7 @@ Usage:
 Available commands:
     build                Build books from markdown sources to EPUB/PDF formats
     run                  Run pipeline processing for books from markdown sources
+    abridge              Run the abridged pipeline for a book
     consolidate-metadata Consolidate multiple metadata files into one
     cover                Generate book covers using AI image generation
     mini-cover           Generate mini covers (thumbnails) from existing covers
@@ -19,6 +20,7 @@ Available commands:
 Examples:
     python -m cli build the_federalist_papers v1.0.0
     python -m cli run on_liberty
+    python -m cli abridge on_liberty
     python -m cli consolidate-metadata books/on_liberty/output
     python -m cli cover on_liberty
     python -m cli mini-cover on_liberty
@@ -29,6 +31,7 @@ import sys
 
 import click
 
+from .abridge import abridge_command
 from .build import build_command
 from .consolidate import consolidate_command
 from .cover import cover_command
@@ -47,6 +50,7 @@ def cli():
 # Add the subcommands
 cli.add_command(build_command)
 cli.add_command(run_command)
+cli.add_command(abridge_command)
 cli.add_command(consolidate_command)
 cli.add_command(cover_command)
 cli.add_command(mini_cover_command)

@@ -173,7 +173,7 @@ class Pipeline:
                 else:
                     post_processors_info.append(str(processor))
 
-        # Get model metadata (handles two-stage phases differently)
+        # Get model metadata (handles multi-model phases differently)
         if phase_config.phase_type == PhaseType.FINAL_TWO_STAGE and phase_config.two_stage_config:
             identify_model_metadata = self._get_model_metadata(model_type=phase_config.two_stage_config.identify_model)
             implement_model_metadata = self._get_model_metadata(
@@ -182,6 +182,13 @@ class Pipeline:
             # Prefix model metadata keys for two-stage
             model_metadata = {"identify_" + k: v for k, v in identify_model_metadata.items()}
             model_metadata.update({"implement_" + k: v for k, v in implement_model_metadata.items()})
+        elif phase_config.phase_type == PhaseType.ABRIDGE_WRITE and phase_config.abridge_write_config:
+            profile_model_metadata = self._get_model_metadata(
+                model_type=phase_config.abridge_write_config.profile_model
+            )
+            write_model_metadata = self._get_model_metadata(model_type=phase_config.abridge_write_config.write_model)
+            model_metadata = {"profile_" + k: v for k, v in profile_model_metadata.items()}
+            model_metadata.update({"write_" + k: v for k, v in write_model_metadata.items()})
         else:
             model_metadata = self._get_model_metadata(model_type=phase_config.model)
 
@@ -467,7 +474,7 @@ class Pipeline:
 
         logger.info(f"Initializing phase: {phase_config.phase_type.name} (run {phase_index + 1})")
 
-        # Handle FINAL_TWO_STAGE specially - it needs two models
+        # Handle phases that require multiple models specially
         phase: Phase
         if phase_config.phase_type == PhaseType.FINAL_TWO_STAGE:
             if phase_config.two_stage_config is None:
@@ -505,6 +512,44 @@ class Pipeline:
                 implement_model=implement_model,
                 tags_to_preserve=self.config.tags_to_preserve,
                 max_workers=self.config.max_workers,
+            )
+        elif phase_config.phase_type == PhaseType.ABRIDGE_WRITE:
+            if phase_config.abridge_write_config is None:
+                raise ValueError("abridge_write_config is required for ABRIDGE_WRITE phase")
+
+            # Create both model instances
+            profile_model = self._get_or_create_model(
+                model_config=phase_config.abridge_write_config.profile_model,
+            )
+            write_model = self._get_or_create_model(
+                model_config=phase_config.abridge_write_config.write_model,
+            )
+
+            # Create PhaseConfig for the factory
+            factory_config = type(phase_config)(
+                phase_type=phase_config.phase_type,
+                name=phase_config.phase_type.name.lower(),
+                input_file_path=input_path,
+                output_file_path=output_path,
+                original_file_path=phase_config.original_file_path or self.config.original_file,
+                book_name=self.config.book_name,
+                author_name=self.config.author_name,
+                llm_kwargs=phase_config.llm_kwargs,
+                post_processors=phase_config.post_processors,
+                enable_retry=phase_config.enable_retry,
+                max_retries=phase_config.max_retries,
+                abridge_write_config=phase_config.abridge_write_config,
+            )
+
+            phase = cast(
+                Phase,
+                PhaseFactory.create_abridge_write_phase(
+                    config=factory_config,
+                    profile_model=profile_model,
+                    write_model=write_model,
+                    tags_to_preserve=self.config.tags_to_preserve,
+                    max_workers=self.config.max_workers,
+                ),
             )
         else:
             # Standard phase handling (single model)
@@ -565,10 +610,10 @@ class Pipeline:
                         max_workers=self.config.max_workers,
                     ),
                 )
-            elif phase_config.phase_type == PhaseType.ABRIDGE_WRITE:
+            elif phase_config.phase_type == PhaseType.ABRIDGE_FLESH:
                 phase = cast(
                     Phase,
-                    PhaseFactory.create_abridge_write_phase(
+                    PhaseFactory.create_abridge_flesh_phase(
                         config=factory_config,
                         tags_to_preserve=self.config.tags_to_preserve,
                         max_workers=self.config.max_workers,

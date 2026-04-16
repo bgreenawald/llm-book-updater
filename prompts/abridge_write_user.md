@@ -8,9 +8,9 @@ Please write the following section for the abridged edition of *{book_name}* by 
 
 ---
 
-**Sections already written:**
+**Writing profile:**
 
-{completed_sections}
+{writing_profile}
 
 ---
 

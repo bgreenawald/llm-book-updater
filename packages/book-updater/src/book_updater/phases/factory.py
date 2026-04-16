@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Type, TypedDict, Union
 from llm_core import LlmModel
 
 from book_updater.config import PhaseConfig, PhaseType, PostProcessorType
-from book_updater.phases.abridge import AbridgePlanPhase, AbridgeWritePhase
+from book_updater.phases.abridge import AbridgeFleshPhase, AbridgePlanPhase, AbridgeWritePhase
 from book_updater.phases.annotation import IntroductionAnnotationPhase, SummaryAnnotationPhase
 from book_updater.phases.standard import StandardLlmPhase
 from book_updater.phases.two_stage import StageConfig, TwoStageFinalPhase
@@ -80,6 +80,16 @@ class PhaseFactory:
         PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
     ]
 
+    # Post-processors for the ABRIDGE_FLESH phase: validates content and strips
+    # artefacts; NO_NEW_HEADERS prevents sub-headers inside flesh content.
+    ABRIDGE_FLESH_POST_PROCESSORS: list[PostProcessorType] = [
+        PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
+        PostProcessorType.NO_NEW_HEADERS,
+        PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+        PostProcessorType.REMOVE_XML_TAGS,
+        PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
+    ]
+
     # Post-processors for the ABRIDGE_WRITE phase: same as base but without
     # NO_NEW_HEADERS since the abridged edition creates its own structure.
     ABRIDGE_WRITE_POST_PROCESSORS: list[PostProcessorType] = [
@@ -109,6 +119,8 @@ class PhaseFactory:
         ],
         # ABRIDGE_PLAN produces structured plan text — no post-processing needed
         PhaseType.ABRIDGE_PLAN: [],
+        # ABRIDGE_FLESH validates content and prevents new headers in flesh output
+        PhaseType.ABRIDGE_FLESH: ABRIDGE_FLESH_POST_PROCESSORS,
         # ABRIDGE_WRITE creates new structure so NO_NEW_HEADERS is excluded
         PhaseType.ABRIDGE_WRITE: ABRIDGE_WRITE_POST_PROCESSORS,
     }
@@ -417,38 +429,112 @@ class PhaseFactory:
         )
 
     @staticmethod
+    def create_abridge_flesh_phase(
+        config: PhaseConfig,
+        tags_to_preserve: Optional[List[str]] = None,
+        max_workers: Optional[int] = None,
+    ) -> AbridgeFleshPhase:
+        """Create an AbridgeFleshPhase from a PhaseConfig.
+
+        Args:
+            config: PhaseConfig with ABRIDGE_FLESH type. Must have
+                llm_model_instance, input_file_path, output_file_path, and
+                original_file_path (used as modernized_text_path) set.
+            tags_to_preserve: Unused for flesh phase; kept for API consistency.
+            max_workers: Number of parallel workers for section processing.
+
+        Returns:
+            AbridgeFleshPhase: Configured flesh-out phase.
+        """
+        validated = PhaseFactory._validate_required_phase_fields(config, "AbridgeFleshPhase")
+
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors,
+            phase_type=config.phase_type,
+            tags_to_preserve=tags_to_preserve,
+        )
+
+        return AbridgeFleshPhase(
+            name=validated["name"],
+            input_file_path=validated["input_file_path"],
+            output_file_path=validated["output_file_path"],
+            modernized_text_path=validated["original_file_path"],
+            original_file_path=validated["original_file_path"],
+            book_name=validated["book_name"],
+            author_name=validated["author_name"],
+            model=validated["llm_model_instance"],
+            system_prompt_path=config.system_prompt_path,
+            user_prompt_path=config.user_prompt_path,
+            post_processor_chain=post_processor_chain,
+            reasoning=config.reasoning,
+            llm_kwargs=config.llm_kwargs,
+            max_workers=max_workers,
+            enable_retry=config.enable_retry,
+            max_retries=config.max_retries,
+        )
+
+    @staticmethod
     def create_abridge_write_phase(
         config: PhaseConfig,
+        profile_model: LlmModel,
+        write_model: LlmModel,
         tags_to_preserve: Optional[List[str]] = None,
         max_workers: Optional[int] = None,
     ) -> AbridgeWritePhase:
         """Create an AbridgeWritePhase from a PhaseConfig.
 
-        The write phase reads the plan (input_file_path) and writes each section.
-        Source material is embedded in the plan by the planning phase, so no
-        separate source file is required.
+        The write phase reads the fleshed plan (input_file_path) and writes each
+        section in parallel using a writing profile generated from the modernized
+        text.
 
         Args:
             config: PhaseConfig with ABRIDGE_WRITE type. Must have
-                llm_model_instance, input_file_path, and output_file_path set.
+                input_file_path, output_file_path, and original_file_path set.
+                Must have abridge_write_config set.
+            profile_model: LLM model instance for the profile sub-stage (3a).
+            write_model: LLM model instance for the section-writing sub-stage (3b).
             tags_to_preserve: Unused; kept for API consistency.
             max_workers: Number of parallel workers for section writing.
 
         Returns:
             AbridgeWritePhase: Configured writing phase.
         """
-        validated = PhaseFactory._validate_required_phase_fields(config, "AbridgeWritePhase")
+        if config.abridge_write_config is None:
+            raise ValueError("abridge_write_config is required for AbridgeWritePhase")
+        if config.name is None:
+            raise ValueError("name is required for AbridgeWritePhase")
+        if config.input_file_path is None:
+            raise ValueError("input_file_path is required for AbridgeWritePhase")
+        if config.output_file_path is None:
+            raise ValueError("output_file_path is required for AbridgeWritePhase")
+        if config.original_file_path is None:
+            raise ValueError("original_file_path is required for AbridgeWritePhase")
+        if config.book_name is None:
+            raise ValueError("book_name is required for AbridgeWritePhase")
+        if config.author_name is None:
+            raise ValueError("author_name is required for AbridgeWritePhase")
+
+        post_processor_chain = PhaseFactory._create_post_processor_chain(
+            post_processors=config.post_processors,
+            phase_type=config.phase_type,
+            tags_to_preserve=tags_to_preserve,
+        )
 
         return AbridgeWritePhase(
-            name=validated["name"],
-            input_file_path=validated["input_file_path"],
-            output_file_path=validated["output_file_path"],
-            model=validated["llm_model_instance"],
-            book_name=validated["book_name"],
-            author_name=validated["author_name"],
+            name=config.name,
+            input_file_path=config.input_file_path,
+            output_file_path=config.output_file_path,
+            model=write_model,
+            profile_model=profile_model,
+            modernized_text_path=config.original_file_path,
+            original_file_path=config.original_file_path,
+            book_name=config.book_name,
+            author_name=config.author_name,
             system_prompt_path=config.system_prompt_path,
             user_prompt_path=config.user_prompt_path,
-            reasoning=config.reasoning,
+            post_processor_chain=post_processor_chain,
+            reasoning=config.abridge_write_config.write_reasoning,
+            profile_reasoning=config.abridge_write_config.profile_reasoning,
             llm_kwargs=config.llm_kwargs,
             max_workers=max_workers,
             enable_retry=config.enable_retry,

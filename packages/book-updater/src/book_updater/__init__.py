@@ -3,6 +3,7 @@
 __version__ = "0.1.0"
 
 from book_updater.config import (
+    AbridgeWriteModelConfig,
     PhaseConfig,
     PhaseType,
     PostProcessorType,
@@ -19,6 +20,7 @@ __all__ = [
     "PhaseType",
     "PostProcessorType",
     "RunConfig",
+    "AbridgeWriteModelConfig",
     "TwoStageModelConfig",
     "StudyGuideConfig",
     "run_study_guide",

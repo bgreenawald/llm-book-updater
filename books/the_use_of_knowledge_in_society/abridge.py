@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-from book_updater import PhaseConfig, PhaseType, RunConfig
+from book_updater import AbridgeWriteModelConfig, PhaseConfig, PhaseType, RunConfig
 from book_updater.logging_config import setup_logging
 from book_updater.pipeline import run_pipeline
 from llm_core import ModelConfig, Provider
@@ -20,9 +20,19 @@ abridge_phases: List[PhaseConfig] = [
         enable_retry=True,
     ),
     PhaseConfig(
-        phase_type=PhaseType.ABRIDGE_WRITE,
+        phase_type=PhaseType.ABRIDGE_FLESH,
         model=GEMINI_3_FLASH,
         reasoning={"effort": "high"},
+        enable_retry=True,
+    ),
+    PhaseConfig(
+        phase_type=PhaseType.ABRIDGE_WRITE,
+        abridge_write_config=AbridgeWriteModelConfig(
+            profile_model=GEMINI_3_FLASH,
+            write_model=GEMINI_3_FLASH,
+            profile_reasoning={"effort": "low"},
+            write_reasoning={"effort": "high"},
+        ),
         enable_retry=True,
     ),
 ]
