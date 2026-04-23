@@ -524,7 +524,9 @@ class AbridgeFleshPhase:
         for line in lines:
             if _SECTION_HEADER_RE.match(line):
                 if current_title is not None:
-                    sections.append({"title": current_title, "body": "".join(current_lines).strip()})
+                    body = "".join(current_lines).strip()
+                    if body:
+                        sections.append({"title": current_title, "body": body})
                 current_title = line.strip()
                 current_lines = []
             else:
@@ -563,7 +565,8 @@ class AbridgeFleshPhase:
         user_prompt = user_template.format(
             book_name=self.book_name,
             author_name=self.author_name,
-            section_plan=f"{section['title']}\n\n{section['body']}",
+            section_title=section["title"],
+            section_plan=section["body"],
             source_chapters=source_chapters,
         )
         call_kwargs = dict(self.llm_kwargs)
@@ -784,7 +787,9 @@ class AbridgeWritePhase:
         for line in lines:
             if _SECTION_HEADER_RE.match(line):
                 if current_title is not None:
-                    sections.append({"title": current_title, "body": "".join(current_lines).strip()})
+                    body = "".join(current_lines).strip()
+                    if body:
+                        sections.append({"title": current_title, "body": body})
                 current_title = line.strip()
                 current_lines = []
             else:
@@ -842,7 +847,7 @@ class AbridgeWritePhase:
                 llm_block=content,
             )
 
-        return content
+        return f"{section['title']}\n\n{content}"
 
     def _write_sections(
         self,

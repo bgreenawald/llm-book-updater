@@ -7,31 +7,33 @@ from book_updater.logging_config import setup_logging
 from book_updater.pipeline import run_pipeline
 from llm_core import ModelConfig, Provider
 
-GEMINI_3_FLASH = ModelConfig(provider=Provider.GEMINI, model_id="gemini-3-flash-preview")
+GPT_54 = ModelConfig(provider=Provider.OPENROUTER, model_id="openai/gpt-5.4")
+KIMI_K2 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2-thinking")
+KIMI_K2_5 = ModelConfig(provider=Provider.OPENROUTER, model_id="moonshotai/kimi-k2.5")
 
-# Input for the abridged pipeline: the FINAL_TWO_STAGE output from the main pipeline
+# Input for the abridged pipeline: the Modernize output from the main pipeline
 _MODERNIZED_OUTPUT = Path(
-    "books/the_varieties_of_religious_experience/output/03-input_transformed Final_two_stage_1.md"
+    "books/the_varieties_of_religious_experience/output/01-input_transformed Modernize_1.md"
 )
 
 abridge_phases: List[PhaseConfig] = [
     PhaseConfig(
         phase_type=PhaseType.ABRIDGE_PLAN,
-        model=GEMINI_3_FLASH,
+        model=GPT_54,
         reasoning={"effort": "high"},
         enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.ABRIDGE_FLESH,
-        model=GEMINI_3_FLASH,
+        model=KIMI_K2_5,
         reasoning={"effort": "high"},
         enable_retry=True,
     ),
     PhaseConfig(
         phase_type=PhaseType.ABRIDGE_WRITE,
         abridge_write_config=AbridgeWriteModelConfig(
-            profile_model=GEMINI_3_FLASH,
-            write_model=GEMINI_3_FLASH,
+            profile_model=GPT_54,
+            write_model=KIMI_K2,
             profile_reasoning={"effort": "low"},
             write_reasoning={"effort": "high"},
         ),

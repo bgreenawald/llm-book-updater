@@ -19,7 +19,7 @@ You will be given the relevant source chapters from the modernized text. Use the
 - Verify all verbatim quotes and add any important ones the plan omitted
 - Identify paraphrase-closely passages: material too important to omit but not requiring verbatim quotation
 - Surface concrete examples with notes on what each illustrates
-- Capture tonal or stylistic notes specific to this section
+- Capture tonal or structural notes *specific to this section* that the write phase cannot derive from completed sections
 
 Do not reproduce the source chapters wholesale. Extract what matters for the writer.
 
@@ -27,35 +27,33 @@ Do not reproduce the source chapters wholesale. Extract what matters for the wri
 
 ## Output Format
 
-Return **only** the fleshed-out section, beginning with the `## Section N:` header carried from the plan. Use `**bold:**` labels for each field — no sub-headers.
+Return **only** the fleshed-out section, beginning with the `## Section N:` header carried from the plan. Use `**bold:**` labels as shown — no sub-headers.
+
+The body of the section is a **single interleaved sequence** ordered as the argument actually unfolds. Do not collect all quotes in one block, all examples in another, and all paraphrases in a third. Instead, present each argumentative step together with the quotes, paraphrases, and examples that belong to that step, in the order they occur. A writer reading this brief should be able to move through it top-to-bottom and produce prose — not reassemble scattered parts.
 
 ```
 ## Section N: [Title]
 
-**Core argument (step by step):**
-[Expanded logical walkthrough — each argumentative step with explicit transitions, not just a list of conclusions. Enough detail that a writer can render it in prose without guessing at the logical connections.]
+**Step-by-step argument with supporting material:**
+[An ordered walkthrough of the argument as it unfolds. For each step:
+  - State the argumentative move clearly, with explicit transitions between steps.
+  - Immediately follow with any verbatim quotes that belong at this point (exact text, with a one-line placement note).
+  - Immediately follow with any paraphrase-closely passages that belong here (what they say, what they contribute).
+  - Immediately follow with any examples that belong here (what the example is, what it demonstrates).
+Everything appears in the order it should be written, not grouped by type.]
 
-**Key quotes (verbatim):**
-[All quotes from the plan, verified against the source, plus any additions found in the source chapters. For each quote: the exact text, and a brief placement note ("opens the section", "follows the example of X", etc.).]
-
-**Paraphrase-closely passages:**
-[Passages too important to omit but not required verbatim. Summarise what they say and what they contribute to the argument.]
-
-**Illustrative examples:**
-[Specific examples from the source, each with a note on what it demonstrates in the argument.]
-
-**Tonal / stylistic notes:**
-[Section-specific voice guidance drawn from the source. E.g. "polemical opening, then measured"; "dense philosophical argument — let it breathe"; "rhetorical questions used to dramatise the dilemma".]
-
-**What to cut:**
-[Carried forward from the plan, refined after reviewing the source chapters. Be specific.]
+**Section-specific tonal notes:**
+[Observations about this section's tone or structure that are *specific to this section* and cannot be inferred from the rest of the book. Limit to things the writer would not know from reading completed sections — e.g. an unusual rhetorical mode used only here, a structural device unique to this passage, a tonal shift that marks a departure from the book's baseline register. Do not repeat general voice guidance (sentence rhythm, vocabulary, formality) — the write phase derives that from completed sections.]
 ```
 
 ---
 
 ## Rules
 
-- The only headers in your output are the `## Section N:` lines. Do not add sub-headers (`###`, `####`, etc.) inside the section.
+- The only headers in your output are the `## Section N:` lines. Do not add sub-headers (`###`, `####`, etc.) inside the section. Output the section header exactly once — do not repeat it.
+- **All supporting material must be interleaved, not batched.** Quotes, paraphrases, and examples must appear at the point in the argument where they belong — never collected into separate blocks by type. A writer should be able to read the brief top-to-bottom and produce prose without having to cross-reference scattered sections.
+- **Cuts are decisions, not instructions.** The plan's "What to cut" guidance tells you what to exclude when composing the brief — do not carry it forward into your output. If something is cut, it simply does not appear. The writer receives only what should be written.
+- **Do not repeat general voice guidance.** The write phase derives overall register, rhythm, and vocabulary from completed sections. Only include tonal notes that are specific to this section.
 - Do not invent content not present in either the plan or the source chapters.
 - Do not write final prose. This is a detailed outline, not the abridged text.
 - If the plan's source chapter list does not match what you were given, work with what you have.

@@ -18,7 +18,7 @@ You are **not** writing a summary. You are writing a section of a book — the a
 
 ## How to Use the Outline
 
-The outline is your complete source. It traces the argument step by step, specifies which quotes must appear verbatim, and tells you what to cut. You are expanding it — not summarizing it, not departing from it.
+The outline is your complete source. It traces the argument step by step and specifies which quotes must appear verbatim. You are expanding it — not summarizing it, not departing from it. What is not in the outline is not in the section.
 
 **You MAY:**
 - Render the outlined argument in flowing prose
