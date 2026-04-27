@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openai_base_url: str = "https://api.openai.com/v1"
 
-    debug: bool = False
+    debug: bool = Field(False, alias="LLM_DEBUG")
     log_level: str = "INFO"
     llm_enable_prompt_logging: bool = Field(False, alias="LLM_ENABLE_PROMPT_LOGGING")
 

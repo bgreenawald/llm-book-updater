@@ -95,7 +95,12 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [
+    ".",
+    "packages/llm-core/src",
+    "packages/book-updater/src",
+    "packages/book-writer/src",
+]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

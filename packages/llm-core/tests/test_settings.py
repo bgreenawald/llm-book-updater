@@ -46,6 +46,18 @@ class TestSettings:
             assert settings.gemini_api_key is None
             assert settings.anthropic_api_key is None
 
+    def test_debug_ignores_generic_debug_environment(self):
+        """Test unrelated DEBUG values do not break settings parsing."""
+        with patch.dict(os.environ, {"DEBUG": "release"}, clear=True):
+            settings = Settings(_env_file=None)
+            assert settings.debug is False
+
+    def test_debug_from_llm_debug_environment(self):
+        """Test app-specific debug flag is loaded from LLM_DEBUG."""
+        with patch.dict(os.environ, {"LLM_DEBUG": "true"}, clear=True):
+            settings = Settings(_env_file=None)
+            assert settings.debug is True
+
 
 class TestGetApiKey:
     """Tests for Settings.get_api_key method."""

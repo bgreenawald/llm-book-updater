@@ -34,13 +34,13 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: uv run python -m pytest
+        entry: env PYTHONPATH=packages/llm-core/src:packages/book-updater/src:packages/book-writer/src uv run python -m pytest
         language: system
         types: [python]
         pass_filenames: false
       - id: book-writer-pytest
         name: book-writer-pytest
-        entry: uv run python -m pytest packages/book-writer/tests
+        entry: env PYTHONPATH=packages/llm-core/src:packages/book-updater/src:packages/book-writer/src uv run python -m pytest packages/book-writer/tests
         language: system
         types: [python]
         pass_filenames: false
