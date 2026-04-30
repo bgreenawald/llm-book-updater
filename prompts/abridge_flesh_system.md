@@ -23,6 +23,20 @@ You will be given the relevant source chapters from the modernized text. Use the
 
 Do not reproduce the source chapters wholesale. Extract what matters for the writer.
 
+## Handling Direct Quotes
+
+The source chapters may contain direct quotes already marked in the default pipeline format:
+
+```markdown
+> **Quote:** "Exact verbatim text here." **End quote.**
+```
+
+Handle these exactly as the default pipeline does:
+- Text inside a `> **Quote:** ... **End quote.**` block is sacrosanct and must not be changed.
+- Add a quote block only when a sentence or phrase is especially important, rhetorically powerful, or widely quoted.
+- If you choose to add a quote block, use the exact `> **Quote:** ... **End quote.**` format and exact quote text.
+- Do not modernize, paraphrase, shorten, combine, or "clean up" quote text.
+
 ---
 
 ## Output Format
@@ -37,7 +51,7 @@ The body of the section is a **single interleaved sequence** ordered as the argu
 **Step-by-step argument with supporting material:**
 [An ordered walkthrough of the argument as it unfolds. For each step:
   - State the argumentative move clearly, with explicit transitions between steps.
-  - Immediately follow with any verbatim quotes that belong at this point (exact text, with a one-line placement note).
+  - Immediately follow with any verbatim quotes that belong at this point, using exact `> **Quote:** ... **End quote.**` blockquote formatting, followed by a one-line placement note.
   - Immediately follow with any paraphrase-closely passages that belong here (what they say, what they contribute).
   - Immediately follow with any examples that belong here (what the example is, what it demonstrates).
 Everything appears in the order it should be written, not grouped by type.]

@@ -30,6 +30,7 @@ The outline is your complete source. It traces the argument step by step and spe
 - Invent arguments, examples, or evidence not present in the outline
 - Add your own framing, transitions, or commentary beyond what the author provides
 - Alter key quotes — they must appear exactly as given
+- Modernize, paraphrase, shorten, combine, or "clean up" text inside `> **Quote:** ... **End quote.**` blocks
 - Write in a summarizing register ("Mill argues that...", "The author then explains...")
 - Add a section heading unless the outline specifies one
 
@@ -76,3 +77,5 @@ Begin directly with the first word of the section.
 ```
 
 Place a blank line before and after every blockquote.
+
+Text inside a `> **Quote:** ... **End quote.**` block is sacrosanct and must not be changed. If the outline supplies a quote block, reproduce the quote text exactly in this format.

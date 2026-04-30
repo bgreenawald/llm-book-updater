@@ -37,6 +37,8 @@ Your job is to answer three questions for each section:
 2. What is the core argument or theme being covered?
 3. What are the key editorial decisions — what to keep, what to cut, and why?
 
+Do not preserve or introduce direct quote blocks at this planning stage. Quote selection belongs to the fleshing-out stage, where the editor has the relevant source chapters in view.
+
 ---
 
 ## Output Format

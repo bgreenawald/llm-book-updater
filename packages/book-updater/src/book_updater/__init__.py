@@ -2,6 +2,7 @@
 
 __version__ = "0.1.0"
 
+from book_updater.abridge_config import create_abridge_run_config, default_abridge_phases
 from book_updater.config import (
     AbridgeWriteModelConfig,
     PhaseConfig,
@@ -24,4 +25,6 @@ __all__ = [
     "TwoStageModelConfig",
     "StudyGuideConfig",
     "run_study_guide",
+    "create_abridge_run_config",
+    "default_abridge_phases",
 ]

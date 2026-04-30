@@ -30,17 +30,27 @@ Examples:
 """
 
 import sys
+from pathlib import Path
 
 import click
 
-from .abridge import abridge_command
-from .abridge_cover import abridge_cover_command
-from .build import build_command
-from .consolidate import consolidate_command
-from .cover import cover_command
-from .mini_cover import mini_cover_command
-from .release import release_command
-from .run import run_command
+
+def _add_workspace_package_paths() -> None:
+    """Make workspace packages importable when the CLI is run from a source checkout."""
+    repo_root = Path(__file__).resolve().parents[1]
+    package_src_dirs = (
+        repo_root / "packages" / "llm-core" / "src",
+        repo_root / "packages" / "book-updater" / "src",
+        repo_root / "packages" / "book-writer" / "src",
+    )
+
+    for src_dir in reversed(package_src_dirs):
+        src_path = str(src_dir)
+        if src_dir.is_dir() and src_path not in sys.path:
+            sys.path.insert(0, src_path)
+
+
+_add_workspace_package_paths()
 
 
 @click.group()
@@ -50,15 +60,28 @@ def cli():
     pass
 
 
-# Add the subcommands
-cli.add_command(build_command)
-cli.add_command(run_command)
-cli.add_command(abridge_command)
-cli.add_command(consolidate_command)
-cli.add_command(cover_command)
-cli.add_command(abridge_cover_command)
-cli.add_command(mini_cover_command)
-cli.add_command(release_command)
+def _register_commands() -> None:
+    """Register CLI subcommands after workspace packages have been made importable."""
+    from .abridge import abridge_command
+    from .abridge_cover import abridge_cover_command
+    from .build import build_command
+    from .consolidate import consolidate_command
+    from .cover import cover_command
+    from .mini_cover import mini_cover_command
+    from .release import release_command
+    from .run import run_command
+
+    cli.add_command(build_command)
+    cli.add_command(run_command)
+    cli.add_command(abridge_command)
+    cli.add_command(consolidate_command)
+    cli.add_command(cover_command)
+    cli.add_command(abridge_cover_command)
+    cli.add_command(mini_cover_command)
+    cli.add_command(release_command)
+
+
+_register_commands()
 
 
 def main() -> None:
