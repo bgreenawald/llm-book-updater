@@ -7,9 +7,20 @@ from llm_core.config import DEFAULT_TAGS_TO_PRESERVE, BaseConfig
 from loguru import logger
 from pydantic import Field
 
-from book_updater.config import PhaseConfig
+from book_updater.config import PhaseConfig, PostProcessorType
 from book_updater.phases.factory import PhaseFactory
 from book_updater.phases.utils import extract_markdown_blocks, get_header_and_body
+
+STUDY_GUIDE_POST_PROCESSORS: list[PostProcessorType] = [
+    PostProcessorType.VALIDATE_NON_EMPTY_SECTION,
+    PostProcessorType.REMOVE_TRAILING_WHITESPACE,
+    PostProcessorType.REMOVE_XML_TAGS,
+    PostProcessorType.REMOVE_MARKDOWN_BLOCKS,
+    PostProcessorType.PRESERVE_F_STRING_TAGS,
+    PostProcessorType.INLINE_QUOTE,
+    PostProcessorType.ENSURE_BLANK_LINE,
+    PostProcessorType.REMOVE_BLANK_LINES_IN_LIST,
+]
 
 
 class StudyGuideConfig(BaseConfig):
@@ -52,7 +63,7 @@ def run_study_guide(config: StudyGuideConfig) -> Path:
     notes_model = _get_model(config.notes_phase.model)
     flashcards_model = _get_model(config.flashcards_phase.model)
 
-    notes_factory_config = config.notes_phase.model_copy(
+    notes_factory_config = _prepare_study_guide_phase_config(config.notes_phase).model_copy(
         update={
             "name": "study_guide_notes",
             "input_file_path": config.input_file,
@@ -64,7 +75,7 @@ def run_study_guide(config: StudyGuideConfig) -> Path:
         }
     )
 
-    flashcards_factory_config = config.flashcards_phase.model_copy(
+    flashcards_factory_config = _prepare_study_guide_phase_config(config.flashcards_phase).model_copy(
         update={
             "name": "study_guide_flashcards",
             "input_file_path": config.input_file,
@@ -100,17 +111,26 @@ def run_study_guide(config: StudyGuideConfig) -> Path:
         raise FileNotFoundError(f"Flashcards draft not found after phase run: {flashcards_output}")
 
     final_output = config.output_dir / config.output_filename
-    assemble_study_guide(notes_file=notes_output, flashcards_file=flashcards_output, output_file=final_output)
+    input_text = config.input_file.read_text(encoding="utf-8")
+    input_headers = [get_header_and_body(block)[0] for block in extract_markdown_blocks(input_text)]
+    assemble_study_guide(
+        notes_file=notes_output,
+        flashcards_file=flashcards_output,
+        output_file=final_output,
+        section_headers=input_headers,
+    )
     return final_output
 
 
-def assemble_study_guide(notes_file: Path, flashcards_file: Path, output_file: Path) -> None:
+def assemble_study_guide(
+    notes_file: Path, flashcards_file: Path, output_file: Path, section_headers: list[str] | None = None
+) -> None:
     """Combine notes and flashcards drafts into a single study guide."""
     notes_text = notes_file.read_text(encoding="utf-8")
     flashcards_text = flashcards_file.read_text(encoding="utf-8")
 
-    notes_blocks = extract_markdown_blocks(notes_text)
-    flashcards_blocks = extract_markdown_blocks(flashcards_text)
+    notes_blocks = _extract_study_guide_blocks(notes_text, section_headers=section_headers)
+    flashcards_blocks = _extract_study_guide_blocks(flashcards_text, section_headers=section_headers)
 
     if len(notes_blocks) != len(flashcards_blocks):
         raise ValueError(
@@ -142,6 +162,87 @@ def assemble_study_guide(notes_file: Path, flashcards_file: Path, output_file: P
         assembled_sections.append("\n".join(section_parts))
 
     output_file.write_text("\n".join(assembled_sections).strip() + "\n", encoding="utf-8")
+
+
+def _prepare_study_guide_phase_config(config: PhaseConfig) -> PhaseConfig:
+    """Return a phase config whose processors preserve generated study-guide headings."""
+    if config.post_processors is None:
+        return config.model_copy(update={"post_processors": list(STUDY_GUIDE_POST_PROCESSORS)})
+
+    return config.model_copy(
+        update={
+            "post_processors": [
+                processor for processor in config.post_processors if not _is_no_new_headers_processor(processor)
+            ]
+        }
+    )
+
+
+def _is_no_new_headers_processor(processor: object) -> bool:
+    return processor == PostProcessorType.NO_NEW_HEADERS or (
+        isinstance(processor, str) and processor.lower() == "no_new_headers"
+    )
+
+
+def _extract_study_guide_blocks(text: str, section_headers: list[str] | None = None) -> list[str]:
+    if section_headers:
+        blocks = _extract_blocks_by_exact_headers(text, section_headers)
+        if blocks:
+            return blocks
+
+    blocks = extract_markdown_blocks(text)
+    if not blocks:
+        return blocks
+
+    first_header, _ = get_header_and_body(blocks[0])
+    first_level = _heading_level(first_header)
+    if first_level is None:
+        return blocks
+
+    merged_blocks: list[str] = []
+    current_parts: list[str] = []
+    for block in blocks:
+        header, _ = get_header_and_body(block)
+        if _heading_level(header) == first_level:
+            if current_parts:
+                merged_blocks.append("\n\n".join(current_parts))
+            current_parts = [block]
+        elif current_parts:
+            current_parts.append(block)
+        else:
+            merged_blocks.append(block)
+
+    if current_parts:
+        merged_blocks.append("\n\n".join(current_parts))
+    return merged_blocks
+
+
+def _extract_blocks_by_exact_headers(text: str, section_headers: list[str]) -> list[str]:
+    expected_headers = {header.strip() for header in section_headers if header.strip()}
+    blocks: list[str] = []
+    current_parts: list[str] = []
+
+    for line in text.splitlines(keepends=True):
+        if line.strip() in expected_headers:
+            if current_parts:
+                blocks.append("".join(current_parts))
+            current_parts = [line]
+        elif current_parts:
+            current_parts.append(line)
+
+    if current_parts:
+        blocks.append("".join(current_parts))
+    return blocks
+
+
+def _heading_level(header: str) -> int | None:
+    stripped = header.lstrip()
+    if not stripped.startswith("#"):
+        return None
+    level = len(stripped) - len(stripped.lstrip("#"))
+    if level == 0 or level > 6 or not stripped[level:].startswith(" "):
+        return None
+    return level
 
 
 def _flashcards_heading(section_header: str) -> str:

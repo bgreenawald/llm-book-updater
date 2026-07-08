@@ -49,6 +49,7 @@ GEMINI_PRO = ModelConfig(
     provider_model_name="gemini-2.5-pro",
 )
 DEEPSEEK = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-r1-0528")
+DEEPSEEK_V4_PRO = ModelConfig(provider=Provider.OPENROUTER, model_id="deepseek/deepseek-v4-pro")
 OPENAI_04_MINI = ModelConfig(
     provider=Provider.OPENAI,
     model_id="openai/o4-mini-high",

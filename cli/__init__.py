@@ -10,6 +10,7 @@ Usage:
 
 Available commands:
     build                Build books from markdown sources to EPUB/PDF formats
+    build abridged       Build books including the generated abridged edition
     run                  Run pipeline processing for books from markdown sources
     abridge              Run the abridged pipeline for a book
     consolidate-metadata Consolidate multiple metadata files into one
@@ -20,6 +21,7 @@ Available commands:
 
 Examples:
     python -m cli build the_federalist_papers v1.0.0
+    python -m cli build abridged the_federalist_papers v1.0.0
     python -m cli run on_liberty
     python -m cli abridge on_liberty
     python -m cli consolidate-metadata books/on_liberty/output
@@ -70,6 +72,7 @@ def _register_commands() -> None:
     from .mini_cover import mini_cover_command
     from .release import release_command
     from .run import run_command
+    from .study_guide import study_guide_command
 
     cli.add_command(build_command)
     cli.add_command(run_command)
@@ -79,6 +82,7 @@ def _register_commands() -> None:
     cli.add_command(abridge_cover_command)
     cli.add_command(mini_cover_command)
     cli.add_command(release_command)
+    cli.add_command(study_guide_command)
 
 
 _register_commands()

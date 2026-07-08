@@ -7,6 +7,7 @@ file organization patterns.
 """
 
 import argparse
+import importlib
 import json
 import os
 import re
@@ -38,6 +39,7 @@ class BookConfig:
         title: str,
         author: str,
         clean_title: Optional[str] = None,
+        language: str = "en-US",
     ):
         """
         Initialize book configuration.
@@ -48,6 +50,7 @@ class BookConfig:
             title: Full book title for metadata
             author: Book author(s) for metadata
             clean_title: Clean version of title for filenames (auto-generated if None)
+            language: BCP 47 language tag for EPUB metadata
         """
         if name is None:
             raise ValueError("Book name cannot be None")
@@ -56,6 +59,7 @@ class BookConfig:
         self.version = version
         self.title = title
         self.author = author
+        self.language = language
         self.clean_title = clean_title or self._generate_clean_title(title)
 
         # Source Paths
@@ -86,6 +90,7 @@ class BookConfig:
 
         # Asset Paths
         self.cover_image = self._get_cover_image()
+        self.abridged_cover_image = self._get_abridged_cover_image()
         self.epub_css = self._get_asset_path("epub.css")
         self.preface_md = self._get_asset_path("preface.md")
         self.license_md = self._get_asset_path("license.md")
@@ -137,6 +142,21 @@ class BookConfig:
 
         # If no cover found, return a default path (will be checked later)
         return self.base_dir / "cover.webp"
+
+    def _get_abridged_cover_image(self) -> Optional[Path]:
+        """
+        Get the path for the abridged edition cover image, if one exists.
+
+        Returns:
+            Path to the abridged cover image file, or None when no abridged
+            cover has been generated for this book.
+        """
+        for extension in ["webp", "png", "jpg", "jpeg"]:
+            book_specific_path = self.base_dir / f"abridge-cover.{extension}"
+            if book_specific_path.exists():
+                return book_specific_path
+
+        return None
 
     def _get_asset_path(self, filename: str) -> Path:
         """
@@ -352,7 +372,13 @@ class BaseBookBuilder(ABC):
 
         # Copy main source files
         source_files = self.get_source_files()
+        abridged_file = self.get_abridged_file()
+        if abridged_file:
+            source_files["abridged"] = abridged_file
         for file_type, source_path in source_files.items():
+            if source_path is None:
+                continue
+
             if file_type == "modernized":
                 dest_path = self.config.staged_modernized_md
             elif file_type == "annotated":
@@ -382,6 +408,54 @@ class BaseBookBuilder(ABC):
             logger.info(f"Copied latest metadata '{self.safe_relative_path(latest_metadata)}' to staging.")
         else:
             logger.warning("No metadata file found. Build will proceed with defaults.")
+
+    def get_abridged_file(self) -> Optional[Path]:
+        """
+        Get the final generated abridged markdown file, if one exists.
+
+        The abridge pipeline can leave stale intermediate write artifacts in the
+        output directory, so resolve the exact final output path from the book's
+        abridge.py config instead of guessing by glob order.
+        """
+        require_abridged = os.environ.get("LLM_BOOK_BUILD_REQUIRE_ABRIDGED") == "1"
+        abridged_file = self._get_configured_abridged_output_file()
+
+        if abridged_file and abridged_file.exists():
+            return abridged_file
+
+        if require_abridged:
+            if abridged_file:
+                raise FileNotFoundError(f"Final abridged source file not found: {abridged_file}")
+
+            raise FileNotFoundError(
+                f"Could not resolve final abridged source file from books/{self.config.name}/abridge.py"
+            )
+
+        return None
+
+    def _get_configured_abridged_output_file(self) -> Optional[Path]:
+        """
+        Resolve the final abridged output path from this book's abridge config.
+        """
+        try:
+            abridge_module = importlib.import_module(f"books.{self.config.name}.abridge")
+        except ImportError:
+            return None
+
+        abridge_config = getattr(abridge_module, "config", None)
+        if not abridge_config or not getattr(abridge_config, "phases", None):
+            return None
+
+        final_phase_index = len(abridge_config.phases) - 1
+        final_phase_config = abridge_config.phases[final_phase_index]
+        if getattr(final_phase_config, "custom_output_path", None):
+            return final_phase_config.custom_output_path
+
+        input_file = abridge_config.input_file
+        phase_type = final_phase_config.phase_type
+        phase_count = sum(1 for phase in abridge_config.phases if phase.phase_type == phase_type)
+        output_stem = f"{final_phase_index + 1:02d}-{input_file.stem} {phase_type.name.capitalize()}_{phase_count}"
+        return abridge_config.output_dir / f"{output_stem}{input_file.suffix}"
 
     def format_markdown_files(self) -> None:
         """
@@ -584,27 +658,39 @@ class BaseBookBuilder(ABC):
             input_path.write_text(content, encoding="utf-8")
             logger.info(f"Cleaned start markers in '{self.safe_relative_path(input_path)}'")
 
-    def _ensure_compatible_cover_image(self) -> Optional[Path]:
+    def _ensure_compatible_cover_image(
+        self,
+        cover_image: Optional[Path] = None,
+        converted_filename: str = "cover.jpg",
+    ) -> Optional[Path]:
         """
         Ensures the cover image is in a compatible format (JPEG) for PDF conversion.
         Converts PNG/WebP to JPEG if necessary.
 
+        Args:
+            cover_image: Source cover image to convert. Defaults to the regular
+                book cover.
+            converted_filename: Filename to use when writing a converted JPEG
+                into the staging directory.
+
         Returns:
             Path to the compatible cover image, or None if no cover exists
         """
-        if not self.config.cover_image.exists():
+        source_cover = cover_image or self.config.cover_image
+
+        if not source_cover.exists():
             return None
 
         # Check if it's already a JPEG
-        if self.config.cover_image.suffix.lower() in [".jpg", ".jpeg"]:
-            return self.config.cover_image
+        if source_cover.suffix.lower() in [".jpg", ".jpeg"]:
+            return source_cover
 
         # Convert to JPEG in staging directory
-        converted_path = self.config.staging_dir / "cover.jpg"
+        converted_path = self.config.staging_dir / converted_filename
 
         try:
-            logger.info("Converting cover image to JPEG for compatibility...")
-            img: PilImage = Image.open(self.config.cover_image)
+            logger.info(f"Converting cover image to JPEG for compatibility: {self.safe_relative_path(source_cover)}")
+            img: PilImage = Image.open(source_cover)
 
             # Convert RGBA to RGB if necessary (for PNG with transparency)
             if img.mode in ("RGBA", "LA", "P"):
@@ -645,6 +731,7 @@ class BaseBookBuilder(ABC):
             "--toc-depth=3",
             f"--css={self.safe_relative_path(self.config.epub_css)}",
             "--lua-filter=books/exclude_h1.lua",
+            f"--metadata=lang:{self.config.language}",
         ]
 
         # Ensure we have a compatible cover image
@@ -662,13 +749,7 @@ class BaseBookBuilder(ABC):
             str(self.config.staged_modernized_md),
             "epub2",
             outputfile=str(self.config.build_modernized_epub),
-            extra_args=pandoc_args
-            + cover_args
-            + [
-                f'--metadata=title:"{self.config.title}"',
-                f'--metadata=author:"{self.config.author}"',
-                f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
-            ],
+            extra_args=pandoc_args + cover_args + self._book_metadata_args(metadata),
         )
         logger.success(f"  -> Created '{self.safe_relative_path(self.config.build_modernized_epub)}'")
 
@@ -692,13 +773,7 @@ class BaseBookBuilder(ABC):
             str(self.config.staged_annotated_md),
             "epub2",
             outputfile=str(self.config.build_annotated_epub),
-            extra_args=pandoc_args
-            + cover_args
-            + [
-                f'--metadata=title:"{self.config.title}"',
-                f'--metadata=author:"{self.config.author}"',
-                f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
-            ],
+            extra_args=pandoc_args + cover_args + self._book_metadata_args(metadata),
         )
         logger.success(f"  -> Created '{self.safe_relative_path(self.config.build_annotated_epub)}'")
 
@@ -719,17 +794,26 @@ class BaseBookBuilder(ABC):
         # Build Abridged Version (only if the staged file exists)
         if self.config.staged_abridged_md.exists():
             logger.info(f"Building abridged version for '{self.config.title}'...")
+            require_abridged = os.environ.get("LLM_BOOK_BUILD_REQUIRE_ABRIDGED") == "1"
+            abridged_cover_source = self.config.abridged_cover_image
+            if require_abridged and abridged_cover_source is None:
+                raise FileNotFoundError(f"Abridged cover not found for book '{self.config.name}'")
+
+            abridged_compatible_cover = self._ensure_compatible_cover_image(
+                cover_image=abridged_cover_source or self.config.cover_image,
+                converted_filename="abridge-cover.jpg" if abridged_cover_source else "cover.jpg",
+            )
+            abridged_cover_args = []
+            if abridged_compatible_cover:
+                abridged_cover_args.append(f"--epub-cover-image={self.safe_relative_path(abridged_compatible_cover)}")
+            else:
+                logger.warning("No abridged cover image available for EPUB")
+
             pypandoc.convert_file(
                 str(self.config.staged_abridged_md),
                 "epub2",
                 outputfile=str(self.config.build_abridged_epub),
-                extra_args=pandoc_args
-                + cover_args
-                + [
-                    f'--metadata=title:"{self.config.title}"',
-                    f'--metadata=author:"{self.config.author}"',
-                    f'--metadata=version:"{metadata.get("book_version", self.config.version)}"',
-                ],
+                extra_args=pandoc_args + abridged_cover_args + self._book_metadata_args(metadata),
             )
             logger.success(f"  -> Created '{self.safe_relative_path(self.config.build_abridged_epub)}'")
 
@@ -747,6 +831,19 @@ class BaseBookBuilder(ABC):
                 logger.error(f"  -> Failed to create '{self.safe_relative_path(self.config.build_abridged_pdf)}'")
         else:
             logger.info("No abridged staged file found — skipping abridged EPUB/PDF build")
+
+    def _book_metadata_args(self, metadata: Dict) -> list[str]:
+        """
+        Build Pandoc metadata args without shell quotes.
+
+        pypandoc passes args directly to Pandoc, so wrapping values in quotes
+        stores the quote characters in the EPUB metadata.
+        """
+        return [
+            f"--metadata=title:{self.config.title}",
+            f"--metadata=author:{self.config.author}",
+            f"--metadata=version:{metadata.get('book_version', self.config.version)}",
+        ]
 
     def _build_pdf_from_epub(self, epub_path: Path, pdf_path: Path, title: str, author: str, version: str) -> bool:
         """

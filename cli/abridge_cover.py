@@ -22,10 +22,10 @@ produce a new cover that:
 
 1. **Mirrors the original design closely** — same color scheme, same \
 three-block horizontal layout, same overall proportions and visual style.
-2. **Updates the bottom block** — replace any edition label (e.g. \
-"Timeless Library Edition") with **"Abridged Edition"**.
-3. **Preserves the title and author** — keep them exactly as they appear, \
-using the same typography style and placement.
+2. **Preserves the bottom block** — keep any edition label (e.g. \
+"Timeless Library Edition") exactly as it appears.
+3. **Updates the title** — keep the original title text, typography style, \
+and placement, but add **"Abridged"** to the end of the title.
 4. **Keeps the visual element** — retain the same illustrative or geometric \
 element from the top block; do not change it.
 
@@ -50,8 +50,8 @@ def abridge_cover_command(book_name: str, model: str) -> None:
     BOOK_NAME: Name of the book to generate an abridged cover for (supports partial matching)
 
     The command reads the book's existing cover.png as a reference and produces
-    a variant cover labelled "Abridged Edition", saving it as abridge-cover.png
-    and abridge-cover.webp in the book directory.
+    a variant cover with "Abridged" added to the title, saving it as
+    abridge-cover.png and abridge-cover.webp in the book directory.
 
     Examples:
       python -m cli abridge-cover on_liberty
